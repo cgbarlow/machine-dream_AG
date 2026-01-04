@@ -1,9 +1,9 @@
 # Memory System Specification
 
 **Date:** January 4, 2026
-**Component:** Memory System (ReasoningBank + AgentDB)
-**Version:** 1.0
-**Status:** Draft
+**Component:** AgentDB (Primary Memory System)
+**Version:** 2.0 (AgentDB Migration)
+**Status:** Specification
 
 ---
 
@@ -110,33 +110,15 @@ interface WorkingMemory {
 
 **Operations (detailed in Section 2.3)**
 
-### 2.2 Phased Memory System Adoption
-
-**Phase 1 (Days 1-5): ReasoningBank Primary**
-- Implementation: Built-in Claude Flow memory system
-- Status: Proven, stable (already used in research swarm)
-- Benefits:
-  - Fast setup (3 hours vs 42 hours custom SQLite)
-  - 46% faster execution (claimed)
-  - 88% success rate (claimed)
-- Use Case: Core POC implementation with guaranteed working demo
-
-**Phase 2 (Days 6-10): AgentDB Parallel Evaluation**
-- Implementation: Advanced vector database with RL capabilities
-- Status: Alpha (v2.0.0-alpha.3.3) - stability evaluation needed
-- Benefits:
-  - 150x-12,500x faster performance (claimed)
-  - 9 RL learning algorithms including Decision Transformer
-  - Reflexion memory (learns from errors)
-  - Skill library auto-consolidation
-  - 4 reasoning agent modules
-  - 100% backward compatible with ReasoningBank
-- Use Case: Non-blocking evaluation for potential demo enhancement
-
-**Phase 3 (Days 11-15): Best-of-Both Benchmarking**
-- Compare ReasoningBank vs AgentDB performance
-- Select optimal system for final demo based on stability and results
-- Fallback: ReasoningBank-only demo if AgentDB testing fails
+### 2.2 Memory System Architecture
+**Primary System: AgentDB**
+- Implementation: Advanced vector database with RL capabilities (v2.0.0+)
+- Status: Primary Production System
+- Core Features:
+  - **ReasoningBank**: Semantic pattern matching
+  - **ReflexionMemory**: Episodic replay with self-critique
+  - **SkillLibrary**: Transformation of successful patterns into reusable, composable skills
+  - **Causal Memory Graph**: Tracking interventions and outcomes
 
 ### 2.3 Core Operations
 
@@ -204,10 +186,7 @@ interface ExperienceLogOperation {
 
 ```typescript
 interface SimilarityRetrievalOperation {
-  // Basic retrieval (ReasoningBank)
-  querySimilar(context: PuzzleState, limit?: number): Promise<Experience[]>;
-
-  // Advanced retrieval (AgentDB only)
+  // AgentDB Native Retrieval
   retrieveWithReasoning(context: PuzzleState, options: {
     k: number;                    // Top-k results
     useMMR: boolean;              // Maximal Marginal Relevance

@@ -38,7 +38,7 @@ The Dreaming Pipeline is the "night cycle" consolidation system that transforms 
 │                                 └── Verification            │
 │         │                                │                  │
 │         ▼                                ▼                  │
-│  ReasoningBank Memory ◄──────────────────┘                  │
+│  AgentDB Memory (ReasoningBank) ◄────────┘                  │
 │  (Persistent Storage)                                       │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
@@ -52,7 +52,7 @@ The Dreaming Pipeline is the "night cycle" consolidation system that transforms 
 
 | Component | Dependency | Nature |
 |-----------|-----------|--------|
-| **Memory System (ReasoningBank)** | Critical | Source of raw experiences, storage of consolidated knowledge |
+| **AgentDB (Memory System)** | Critical | Source of raw experiences, storage of consolidated knowledge |
 | **GRASP Loop** | Input Provider | Generates experiences during solving |
 | **Attention Mechanism** | Metadata Source | Importance scores for triage |
 | **Puzzle Engine** | Domain Context | Validation of strategy correctness |
@@ -166,8 +166,8 @@ async function compress(
   experiences: Experience[],
   config: CompressionConfig
 ): Promise<Pattern[]> {
-  // Step 1: Cluster by similarity
-  const clusters = await clusterExperiences(experiences, {
+  // Step 1: Cluster by similarity using AgentDB HNSW
+  const clusters = await agentDB.cluster(experiences, {
     method: config.clusteringMethod,
     minSize: config.minClusterSize
   });

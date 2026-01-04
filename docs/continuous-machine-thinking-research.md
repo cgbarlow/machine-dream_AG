@@ -201,33 +201,17 @@ class ContinuousThinkingSystem {
 **Hierarchical Memory Architecture**:
 
 ```typescript
-interface MemorySystem {
-  // Short-term working memory
-  workingMemory: {
-    capacity: number;
-    items: CognitiveItem[];
-    attentionWeights: Map<string, number>;
-  };
+import { createDatabase, EmbeddingService, ReasoningBank, ReflexionMemory } from 'agentdb';
 
-  // Medium-term episodic memory
-  episodicMemory: {
-    recentInteractions: Interaction[];
-    sessionContext: SessionState;
-    temporalIndex: TemporalIndex;
-  };
+async function initializeMemorySystem() {
+  const db = await createDatabase('./agent-memory.db');
+  const embedder = new EmbeddingService({ model: 'Xenova/all-MiniLM-L6-v2' });
+  await embedder.initialize();
 
-  // Long-term semantic memory
-  semanticMemory: {
-    concepts: ConceptGraph;
-    patterns: LearnedPattern[];
-    strategies: ReasoningStrategy[];
-  };
-
-  // Meta-cognitive memory
-  metaMemory: {
-    performanceMetrics: Metrics;
-    learningHistory: LearningRecord[];
-    confidenceLevels: ConfidenceMap;
+  return {
+    reasoningBank: new ReasoningBank(db, embedder),
+    reflexion: new ReflexionMemory(db, embedder),
+    // ... specialized banks
   };
 }
 ```
@@ -289,26 +273,19 @@ const agents = await Promise.all([
 **Memory-based Coordination**:
 
 ```typescript
-// Agent stores findings in shared memory
-await memory.store({
-  key: 'swarm/researcher/findings',
-  namespace: 'coordination',
-  value: JSON.stringify({
-    patterns: ['pattern1', 'pattern2'],
-    insights: ['insight1', 'insight2'],
-    questions: ['question1']
-  }),
-  ttl: 3600 // 1 hour
+// Agent stores findings in ReasoningBank
+await reasoningBank.storePattern({
+  taskType: 'research_synthesis',
+  approach: 'Cross-reference with graph walking',
+  successRate: 0.92,
+  tags: ['swarm', 'coordination']
 });
 
 // Other agents retrieve and build upon findings
-const researchFindings = await memory.retrieve({
-  key: 'swarm/researcher/findings',
-  namespace: 'coordination'
+const similarPatterns = await reasoningBank.searchPatterns({
+  task: 'distributed analysis',
+  k: 5
 });
-
-// Planner uses findings to create tasks
-const tasks = await createTasksFromFindings(researchFindings);
 ```
 
 ### 3.3 Resource Management

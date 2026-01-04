@@ -37,7 +37,7 @@
     "vitest": "^1.0.0"
   },
   "dependencies": {
-    "claude-flow": "^2.7.47"
+    "agentdb": "^0.1.0"
   },
   "engines": {
     "node": ">=20.0.0"
