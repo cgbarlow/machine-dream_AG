@@ -1,0 +1,45 @@
+{
+  "name": "machine-dream-poc",
+  "version": "0.1.0",
+  "description": "Proof-of-Concept: Continuous Thinking and Machine Dreaming with Cognitive Puzzle Solver",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "test": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:benchmark": "node tests/benchmarks/run-all.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src tests --ext .ts",
+    "clean": "rm -rf dist",
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "continuous-thinking",
+    "machine-dreaming",
+    "cognitive-architecture",
+    "sudoku",
+    "puzzle-solving",
+    "reasoningbank",
+    "claude-flow"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.54.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "dependencies": {
+    "claude-flow": "^2.7.47"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
