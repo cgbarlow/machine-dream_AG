@@ -1,0 +1,4 @@
+node_modules
+.agentdb
+dist
+.DS_Store
