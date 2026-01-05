@@ -157,19 +157,31 @@ machine-dream system cleanup --all
 
 ## 🎯 Terminal User Interface (TUI)
 
-The TUI provides an intuitive, menu-driven interface to all Machine Dream functionality.
+> **⚠️ TUI Under Reconstruction**
+> The TUI is currently being rebuilt with enhanced testability, improved text alignment, and component-based architecture.
+> See [TUI Specification](specs/10-terminal-menu-interface-spec.md) for details on the new architecture.
+> **Expected completion**: TBD
 
-### Launching the TUI
+The TUI will provide an intuitive, menu-driven interface to all Machine Dream functionality.
+
+### Launching the TUI (Coming Soon)
+
+The `machine-dream tui` command is currently disabled during the rebuild. Running it will show:
+
+```bash
+machine-dream tui
+# ⚠️  TUI is currently being rebuilt with enhanced testability and architecture.
+# 📖 See docs/specs/10-terminal-menu-interface-spec.md for details.
+# 🔜 TUI will be available again soon with improved features.
+```
+
+Once the rebuild is complete, you'll be able to launch it with:
 ```bash
 # Quick launch
-npx tsx src/tui/tui-bin.ts
+machine-dream tui
 
 # With options
-machine-dream tui --theme light --no-mouse
-
-# After building
-npm run build:cli
-node dist/tui-bin.js --theme dark
+machine-dream tui --theme light --no-mouse --debug-output /tmp/tui-events.jsonl
 ```
 
 ### TUI Navigation

@@ -16,6 +16,13 @@ export function registerTUICommand(program: Command): void {
         .option('--theme <theme>', 'Set theme (dark, light, auto)', 'dark')
         .option('--no-mouse', 'Disable mouse support')
         .action(async (options) => {
+            // TUI under reconstruction - see docs/specs/10-terminal-menu-interface-spec.md
+            logger.warn('⚠️  TUI is currently being rebuilt with enhanced testability and architecture.');
+            logger.info('📖 See docs/specs/10-terminal-menu-interface-spec.md for details.');
+            logger.info('🔜 TUI will be available again soon with improved features.');
+
+            // TODO: Uncomment when TUI rebuild is complete
+            /*
             try {
                 logger.info('🎯 Starting Machine Dream TUI...');
 
@@ -39,6 +46,7 @@ export function registerTUICommand(program: Command): void {
                     ['Check TUI dependencies', 'Try again with --theme dark']
                 );
             }
+            */
         });
 
     program.addCommand(tuiCommand);

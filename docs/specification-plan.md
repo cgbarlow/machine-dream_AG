@@ -130,6 +130,34 @@
 
 ---
 
+### 9. CLI Interface Specification
+**File:** `docs/specs/09-cli-interface-spec.md`
+**Scope:**
+- Complete CLI command structure (8 command groups)
+- Global options and configuration hierarchy
+- Backend integration via programmatic execution
+- TUI integration interface (progress events)
+- Output formats (JSON, table, YAML)
+
+**Agent:** `specification` agent
+
+---
+
+### 10. Terminal Menu Interface Specification
+**File:** `docs/specs/10-terminal-menu-interface-spec.md`
+**Scope:**
+- Component-based TUI architecture
+- CLI command mapping (TUI executes CLI)
+- JSON event stream for testability
+- Text alignment utilities (string-width)
+- Terminal environment detection
+- E2E test protocol and TestDriver API
+- Theme support and accessibility
+
+**Agent:** `specification` agent
+
+---
+
 ## Specification Template
 
 Each spec should include:
@@ -167,7 +195,7 @@ Each spec should include:
 
 ## Swarm Execution Plan
 
-**Phase 1: Spawn 8 specification agents in parallel**
+**Phase 1: Spawn 10 specification agents in parallel**
 - Each agent receives: component name, scope, template
 - Each agent produces: complete specification document
 
@@ -185,7 +213,7 @@ Each spec should include:
 
 ## Success Criteria
 
-✅ All 8 specification documents created
+✅ All 10 specification documents created
 ✅ Each spec follows template structure
 ✅ Cross-component interfaces documented
 ✅ Aligned with POC strategy (docs/poc-strategy-report.md)
@@ -194,4 +222,4 @@ Each spec should include:
 
 ---
 
-**Next Step:** Spawn specification swarm to create all 8 specs in parallel
+**Next Step:** Spawn specification swarm to create all 10 specs in parallel
