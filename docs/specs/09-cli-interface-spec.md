@@ -1,0 +1,1191 @@
+# Machine Dream - Complete CLI Interface Specification
+
+**Component:** Command-Line Interface (CLI)
+**Version:** 1.0.0
+**Date:** January 5, 2026
+**Status:** Implementation-Ready
+
+---
+
+## 1. Executive Summary
+
+This specification defines a comprehensive, production-ready CLI for the Machine Dream system - a Cognitive Puzzle Solver using the GRASP loop and AgentDB memory. The CLI provides unified access to all system capabilities including puzzle solving, memory management, dreaming/consolidation, benchmarking, configuration, and data export.
+
+### Key Design Principles
+
+1. **Hierarchical Commands**: Organized by domain (solve, memory, dream, benchmark, etc.)
+2. **Intuitive Defaults**: Sensible defaults for all parameters
+3. **Progressive Disclosure**: Simple commands for beginners, advanced options for experts
+4. **Consistent Patterns**: Similar options across related commands
+5. **Machine-Readable Output**: JSON/structured formats for automation
+6. **Human-Friendly Display**: Rich terminal UI for interactive use
+
+---
+
+## 2. Architecture Overview
+
+### 2.1 Command Structure
+
+```
+machine-dream <command> [subcommand] [options] [arguments]
+│
+├── solve           # Puzzle solving operations
+├── memory          # Memory system operations
+├── dream           # Dreaming/consolidation operations
+├── benchmark       # Performance benchmarking
+├── demo            # Demo & presentation mode
+├── config          # Configuration management
+├── export          # Data export utilities
+└── system          # System utilities
+```
+
+### 2.2 Global Options
+
+Available for all commands:
+
+```bash
+--config <file>              # Custom configuration file (.poc-config.json)
+--log-level <level>          # debug|info|warn|error (default: info)
+--output-format <format>     # json|table|yaml (default: table)
+--quiet                      # Suppress non-essential output
+--verbose                    # Show detailed output
+--no-color                   # Disable colored output
+--help, -h                   # Show help for command
+--version, -v                # Show version information
+```
+
+---
+
+## 3. Core Commands
+
+### 3.1 Solve Command
+
+Execute puzzle solving with GRASP loop and AgentDB memory.
+
+```bash
+machine-dream solve <puzzle-file> [options]
+```
+
+**Arguments:**
+- `<puzzle-file>`: Path to puzzle file (JSON format, 9x9 or 16x16 Sudoku)
+
+**Options:**
+```bash
+# Memory System
+--memory-system <type>       # reasoningbank|agentdb (default: agentdb)
+--enable-rl                  # Enable RL learning (AgentDB only)
+--enable-reflexion           # Enable error correction memory
+--enable-skill-library       # Auto-extract reusable skills
+
+# Solving Behavior
+--max-iterations <n>         # Maximum GRASP iterations (default: 50)
+--max-time <ms>              # Maximum solve time in milliseconds (default: 300000)
+--reflection-interval <n>    # Iterations between reflections (default: 5)
+--attention-window <n>       # Window size for attention mechanism (default: 10)
+
+# Strategy Configuration
+--strategies <list>          # Comma-separated strategy list (default: all)
+                             # Available: naked-single,hidden-single,pointing-pairs,
+                             #            box-line-reduction,naked-pairs,x-wing,etc.
+--backtrack-enabled          # Enable backtracking for hard puzzles
+--guess-threshold <n>        # Confidence threshold before guessing (0.0-1.0, default: 0.3)
+
+# Output & Logging
+--output <file>              # Save result to file (.json)
+--session-id <id>            # Custom session identifier
+--dream-after                # Trigger dreaming after solving
+--visualize                  # Show live solving visualization
+--export-trajectory          # Export full move trajectory
+
+# Demo Mode
+--demo-mode                  # Enable presentation-friendly output
+--demo-speed <speed>         # realtime|fast|instant (default: realtime)
+--pause-on-insight           # Pause when insights discovered
+```
+
+**Examples:**
+
+```bash
+# Basic solve
+machine-dream solve puzzles/easy-01.json
+
+# Advanced solve with AgentDB + RL
+machine-dream solve puzzles/hard-showcase.json \
+  --memory-system agentdb \
+  --enable-rl \
+  --enable-reflexion \
+  --max-iterations 100 \
+  --output results/hard-showcase.json
+
+# Demo mode for presentation
+machine-dream solve puzzles/demo.json \
+  --demo-mode \
+  --demo-speed realtime \
+  --visualize \
+  --pause-on-insight
+
+# Batch solving with custom strategies
+machine-dream solve puzzles/medium-*.json \
+  --strategies naked-single,hidden-single,pointing-pairs \
+  --max-time 60000 \
+  --output results/batch-{timestamp}.json
+```
+
+**Output Format:**
+
+```json
+{
+  "puzzleId": "hard-showcase",
+  "success": true,
+  "solveTime": 12487,
+  "iterations": 47,
+  "strategiesUsed": ["naked-single", "hidden-single", "pointing-pairs", "guess"],
+  "insightsDiscovered": 5,
+  "finalState": { /* puzzle grid */ },
+  "trajectory": [ /* array of moves */ ],
+  "sessionId": "solve-abc123"
+}
+```
+
+---
+
+### 3.2 Memory Command
+
+Manage AgentDB memory system and persistent storage.
+
+```bash
+machine-dream memory <subcommand> [options]
+```
+
+**Subcommands:**
+
+#### 3.2.1 `memory store` - Store Data
+
+```bash
+machine-dream memory store <key> <value> [options]
+
+Arguments:
+  <key>                        # Memory key
+  <value>                      # Value to store (string or JSON)
+
+Options:
+  --namespace <ns>             # Memory namespace (default: "default")
+  --ttl <seconds>              # Time-to-live in seconds
+  --type <type>                # experience|pattern|skill|insight
+```
+
+#### 3.2.2 `memory retrieve` - Retrieve Data
+
+```bash
+machine-dream memory retrieve <key> [options]
+
+Arguments:
+  <key>                        # Memory key or pattern
+
+Options:
+  --namespace <ns>             # Memory namespace (default: "default")
+  --format <format>            # json|yaml|table (default: json)
+```
+
+#### 3.2.3 `memory search` - Search Memory
+
+```bash
+machine-dream memory search <pattern> [options]
+
+Arguments:
+  <pattern>                    # Search pattern (supports regex)
+
+Options:
+  --namespace <ns>             # Memory namespace
+  --limit <n>                  # Maximum results (default: 10)
+  --type <type>                # Filter by type
+  --similarity <threshold>     # Similarity threshold for vector search (0.0-1.0)
+```
+
+#### 3.2.4 `memory consolidate` - Trigger Consolidation
+
+```bash
+machine-dream memory consolidate [options]
+
+Options:
+  --session-ids <list>         # Comma-separated session IDs to consolidate
+  --compression-ratio <n>      # Target compression ratio (default: 10)
+  --min-success-rate <n>       # Minimum success rate for skills (default: 0.7)
+  --output <file>              # Save consolidated knowledge
+```
+
+#### 3.2.5 `memory optimize` - Optimize Memory
+
+```bash
+machine-dream memory optimize [options]
+
+Options:
+  --quantization <type>        # scalar|binary|product (default: scalar)
+  --prune-redundancy           # Remove redundant patterns
+  --similarity-threshold <n>   # Similarity threshold for deduplication (default: 0.95)
+```
+
+#### 3.2.6 `memory backup` - Backup Memory
+
+```bash
+machine-dream memory backup <output-dir> [options]
+
+Arguments:
+  <output-dir>                 # Backup destination directory
+
+Options:
+  --namespaces <list>          # Specific namespaces to backup (default: all)
+  --compress                   # Compress backup files
+```
+
+#### 3.2.7 `memory restore` - Restore Memory
+
+```bash
+machine-dream memory restore <backup-dir> [options]
+
+Arguments:
+  <backup-dir>                 # Backup source directory
+
+Options:
+  --validate                   # Validate integrity before restore
+  --merge                      # Merge with existing data
+```
+
+---
+
+### 3.3 Dream Command
+
+Trigger and manage night cycle (dreaming/consolidation) operations.
+
+```bash
+machine-dream dream [subcommand] [options]
+```
+
+**Subcommands:**
+
+#### 3.3.1 `dream run` - Run Dream Cycle
+
+```bash
+machine-dream dream run [options]
+
+Options:
+  --sessions <list>            # Comma-separated session IDs (default: all recent)
+  --phases <list>              # Phases to run: capture,triage,compress,abstract,integrate
+                               # (default: all)
+  --compression-ratio <n>      # Target compression ratio (default: 10)
+  --abstraction-levels <n>     # Number of abstraction levels (default: 4)
+  --visualize                  # Show consolidation visualization
+  --output <file>              # Save consolidated knowledge
+```
+
+**Example:**
+```bash
+# Run full dream cycle
+machine-dream dream run \
+  --sessions session-001,session-002,session-003 \
+  --compression-ratio 15 \
+  --abstraction-levels 5 \
+  --visualize
+
+# Quick consolidation
+machine-dream dream run --phases compress,abstract
+```
+
+#### 3.3.2 `dream schedule` - Configure Schedule
+
+```bash
+machine-dream dream schedule <schedule-type> [options]
+
+Arguments:
+  <schedule-type>              # after-session|periodic|manual
+
+Options:
+  --interval <n>               # Interval for periodic (sessions, default: 10)
+  --enable                     # Enable scheduled dreaming
+  --disable                    # Disable scheduled dreaming
+```
+
+#### 3.3.3 `dream status` - Check Dream Status
+
+```bash
+machine-dream dream status [options]
+
+Options:
+  --last <n>                   # Show last N dream cycles (default: 5)
+  --metrics                    # Include consolidation metrics
+```
+
+---
+
+### 3.4 Benchmark Command
+
+Run performance benchmarks and evaluations.
+
+```bash
+machine-dream benchmark <subcommand> [options]
+```
+
+**Subcommands:**
+
+#### 3.4.1 `benchmark run` - Run Benchmarks
+
+```bash
+machine-dream benchmark run <suite-name> [options]
+
+Arguments:
+  <suite-name>                 # full|quick|memory|solve|transfer|custom
+
+Options:
+  --baseline <type>            # single-shot|naive-continuous|grasp|all (default: all)
+  --difficulty <level>         # easy|medium|hard|expert|all (default: all)
+  --count <n>                  # Puzzles per difficulty (default: 50)
+  --output-dir <dir>           # Benchmark report directory
+  --parallel <n>               # Number of parallel workers (default: 1)
+  --compare-with <file>        # Compare with previous benchmark
+```
+
+**Benchmark Suites:**
+- **full**: Comprehensive benchmark (all baselines, all difficulties)
+- **quick**: Fast smoke test (10 puzzles, easy/medium only)
+- **memory**: Memory system performance (AgentDB vs ReasoningBank)
+- **solve**: Solving performance and accuracy
+- **transfer**: Transfer learning evaluation (9x9 → 16x16)
+
+**Example:**
+```bash
+# Run full benchmark suite
+machine-dream benchmark run full \
+  --baseline all \
+  --difficulty all \
+  --count 50 \
+  --output-dir benchmarks/$(date +%Y%m%d) \
+  --parallel 4
+
+# Quick smoke test
+machine-dream benchmark run quick \
+  --baseline grasp \
+  --difficulty easy,medium
+
+# Compare with previous run
+machine-dream benchmark run full \
+  --compare-with benchmarks/20260104/report.json
+```
+
+#### 3.4.2 `benchmark report` - Generate Report
+
+```bash
+machine-dream benchmark report <results-dir> [options]
+
+Arguments:
+  <results-dir>                # Directory with benchmark results
+
+Options:
+  --format <format>            # markdown|html|pdf|json (default: markdown)
+  --output <file>              # Output file path
+  --charts                     # Generate performance charts
+  --compare <files>            # Compare multiple benchmark runs
+```
+
+---
+
+### 3.5 Demo Command
+
+Run demonstration and presentation modes for puzzle solving.
+
+```bash
+machine-dream demo <script-name> [options]
+```
+
+**Arguments:**
+- `<script-name>`: Demo script to run
+
+**Available Scripts:**
+- `stakeholder-presentation` - Full 10-minute stakeholder demo (5 acts)
+- `quick-solve` - Quick puzzle solving demonstration
+- `transfer-learning` - Transfer learning demonstration (9x9 → 16x16)
+- `dreaming-visualization` - Consolidation process visualization
+- `baseline-comparison` - Side-by-side baseline comparison
+
+**Options:**
+```bash
+--pause-after-step           # Wait for keypress after each step
+--speed <speed>              # realtime|fast|instant (default: realtime)
+--export-recording <file>    # Export recording (.txt)
+--skip-act <number>          # Skip specified act (testing only)
+--act <number>               # Run specific act only
+```
+
+**Example:**
+```bash
+# Run full stakeholder presentation
+machine-dream demo stakeholder-presentation \
+  --pause-after-step \
+  --export-recording demo-presentation.txt
+
+# Quick solving demonstration
+machine-dream demo quick-solve --speed instant
+
+# Run specific act only
+machine-dream demo stakeholder-presentation --act 3
+```
+
+---
+
+### 3.6 Config Command
+
+Manage system configuration.
+
+```bash
+machine-dream config <subcommand> [options]
+```
+
+**Subcommands:**
+
+#### 3.6.1 `config show` - Show Configuration
+
+```bash
+machine-dream config show [options]
+
+Options:
+  --format <format>            # json|yaml|table (default: yaml)
+  --key <key>                  # Show specific config key
+```
+
+#### 3.6.2 `config set` - Set Configuration
+
+```bash
+machine-dream config set <key> <value> [options]
+
+Arguments:
+  <key>                        # Configuration key (dot notation)
+  <value>                      # Value to set
+
+Options:
+  --type <type>                # string|number|boolean|json (auto-detect if not specified)
+  --global                     # Set in global config
+```
+
+**Example:**
+```bash
+# Set memory system
+machine-dream config set memorySystem agentdb
+
+# Set nested value
+machine-dream config set agentdb.enableRL true
+
+# Set complex value
+machine-dream config set strategies '["naked-single","hidden-single"]' --type json
+```
+
+#### 3.6.3 `config validate` - Validate Configuration
+
+```bash
+machine-dream config validate [config-file] [options]
+
+Arguments:
+  [config-file]                # Config file to validate (default: .poc-config.json)
+
+Options:
+  --fix                        # Attempt to fix common issues
+```
+
+#### 3.6.4 `config export` - Export Configuration
+
+```bash
+machine-dream config export <output-file> [options]
+
+Arguments:
+  <output-file>                # Output file path
+
+Options:
+  --format <format>            # json|yaml (default: json)
+  --include-defaults           # Include default values
+```
+
+---
+
+### 3.7 Export Command
+
+Export data, metrics, and results.
+
+```bash
+machine-dream export <type> [options]
+```
+
+**Arguments:**
+- `<type>`: Data type to export (metrics|results|config|logs|memory|all)
+
+**Options:**
+```bash
+--output-dir <dir>           # Output directory (default: ./export)
+--format <format>            # json|csv|markdown (default: json)
+--sessions <list>            # Specific session IDs to export
+--compress                   # Compress exported data
+--include-raw                # Include raw data (not just summaries)
+```
+
+**Example:**
+```bash
+# Export all data
+machine-dream export all \
+  --output-dir export/$(date +%Y%m%d) \
+  --compress
+
+# Export specific sessions
+machine-dream export results \
+  --sessions session-001,session-002 \
+  --format csv
+
+# Export memory snapshots
+machine-dream export memory \
+  --format json \
+  --include-raw
+```
+
+---
+
+### 3.8 System Command
+
+System utilities and maintenance.
+
+```bash
+machine-dream system <subcommand> [options]
+```
+
+**Subcommands:**
+
+#### 3.8.1 `system init` - Initialize System
+
+```bash
+machine-dream system init [options]
+
+Options:
+  --force                      # Force re-initialization
+  --db-path <path>             # Custom database path
+  --preset <name>              # Configuration preset (default|minimal|full)
+```
+
+#### 3.8.2 `system status` - Check System Status
+
+```bash
+machine-dream system status [options]
+
+Options:
+  --verbose                    # Include detailed component status
+  --format <format>            # table|json|yaml (default: table)
+```
+
+#### 3.8.3 `system cleanup` - Clean Temporary Data
+
+```bash
+machine-dream system cleanup [options]
+
+Options:
+  --sessions                   # Clean session data
+  --logs                       # Clean old logs
+  --cache                      # Clean cache
+  --all                        # Clean everything
+  --older-than <days>          # Only clean data older than N days
+  --dry-run                    # Show what would be deleted
+```
+
+#### 3.8.4 `system health` - Health Check
+
+```bash
+machine-dream system health [options]
+
+Options:
+  --components <list>          # Check specific components (comma-separated)
+  --watch                      # Continuous monitoring
+```
+
+#### 3.8.5 `system migrate` - Database Migration
+
+```bash
+machine-dream system migrate [options]
+
+Options:
+  --from <system>              # Source memory system (reasoningbank|agentdb)
+  --to <system>                # Target memory system
+  --validate                   # Validate after migration
+  --dry-run                    # Preview migration without executing
+```
+
+---
+
+## 4. Advanced Features
+
+### 4.1 Interactive Mode
+
+Launch interactive REPL for exploratory operations:
+
+```bash
+machine-dream interactive
+
+# Or shorthand
+machine-dream -i
+```
+
+**Features:**
+- Command history and auto-completion
+- Multi-line input support
+- Live syntax highlighting
+- Contextual help
+- Session persistence
+
+### 4.2 Piping and Composition
+
+Commands support Unix-style piping:
+
+```bash
+# Solve and immediately dream
+machine-dream solve puzzles/hard-01.json | machine-dream dream run
+
+# Export and analyze
+machine-dream export results --format json | jq '.[] | select(.iterations > 50)'
+
+# Batch processing
+cat puzzle-list.txt | xargs -I {} machine-dream solve puzzles/{}.json
+```
+
+### 4.3 Watch Mode
+
+Monitor operations in real-time:
+
+```bash
+# Watch solving progress
+machine-dream solve --watch --visualize
+
+# Watch memory operations
+machine-dream memory list --watch --interval 2
+
+# Watch system health
+machine-dream system health --watch
+```
+
+### 4.4 Hooks Integration
+
+Execute custom hooks at key lifecycle events:
+
+```bash
+# Configure pre-task hook
+machine-dream config set hooks.preTask "./scripts/pre-task-hook.sh"
+
+# Configure post-task hook
+machine-dream config set hooks.postTask "./scripts/post-task-hook.sh"
+
+# Available hooks:
+# - hooks.preTask
+# - hooks.postTask
+# - hooks.preEdit
+# - hooks.postEdit
+# - hooks.sessionEnd
+# - hooks.sessionRestore
+```
+
+---
+
+## 5. Configuration File Format
+
+### 5.1 Complete Configuration Schema
+
+`.poc-config.json`:
+
+```json
+{
+  "memorySystem": "agentdb",
+  "enableRL": true,
+  "enableReflexion": true,
+  "enableSkillLibrary": true,
+
+  "solving": {
+    "maxIterations": 100,
+    "maxSolveTime": 300000,
+    "reflectionInterval": 5,
+    "attentionWindowSize": 10,
+    "backtrackEnabled": true,
+    "guessThreshold": 0.3,
+    "strategies": ["naked-single", "hidden-single", "pointing-pairs", "box-line-reduction"]
+  },
+
+  "dreaming": {
+    "schedule": "after-session",
+    "compressionRatio": 10,
+    "abstractionLevels": 4,
+    "minSuccessRate": 0.7
+  },
+
+  "agentdb": {
+    "dbPath": ".agentdb",
+    "preset": "large",
+    "quantization": "scalar",
+    "indexing": "hnsw"
+  },
+
+  "benchmarking": {
+    "enabled": true,
+    "outputDir": "./benchmarks",
+    "parallel": 4
+  },
+
+  "logging": {
+    "level": "info",
+    "outputDir": "./logs",
+    "format": "json"
+  },
+
+  "demo": {
+    "mode": false,
+    "speed": "realtime",
+    "pauseOnInsight": false
+  },
+
+  "hooks": {
+    "preTask": null,
+    "postTask": null,
+    "preEdit": null,
+    "postEdit": null,
+    "sessionEnd": null,
+    "sessionRestore": null
+  }
+}
+```
+
+### 5.2 Environment Variables
+
+All configuration can be set via environment variables:
+
+```bash
+# Memory System
+MACHINE_DREAM_MEMORY_SYSTEM=agentdb
+MACHINE_DREAM_ENABLE_RL=true
+
+# Solving
+MACHINE_DREAM_MAX_ITERATIONS=100
+MACHINE_DREAM_MAX_SOLVE_TIME=300000
+
+# Logging
+MACHINE_DREAM_LOG_LEVEL=debug
+MACHINE_DREAM_LOG_DIR=./logs
+
+# Database
+MACHINE_DREAM_DB_PATH=.agentdb
+```
+
+---
+
+## 6. Output Formats
+
+### 6.1 JSON Output
+
+All commands support `--output-format json`:
+
+```bash
+machine-dream solve puzzles/easy-01.json --output-format json
+```
+
+```json
+{
+  "status": "success",
+  "data": {
+    "puzzleId": "easy-01",
+    "solved": true,
+    "iterations": 15,
+    "solveTime": 3247
+  },
+  "metadata": {
+    "timestamp": "2026-01-05T10:30:00Z",
+    "version": "0.1.0"
+  }
+}
+```
+
+### 6.2 Table Output
+
+Default human-friendly format:
+
+```
+┌─────────────┬──────────┬────────────┬───────────┐
+│ Puzzle ID   │ Status   │ Iterations │ Time (ms) │
+├─────────────┼──────────┼────────────┼───────────┤
+│ easy-01     │ ✓ Solved │ 15         │ 3,247     │
+│ medium-01   │ ✓ Solved │ 47         │ 12,893    │
+│ hard-01     │ ✗ Failed │ 100        │ 300,000   │
+└─────────────┴──────────┴────────────┴───────────┘
+```
+
+### 6.3 YAML Output
+
+Structured but human-readable:
+
+```yaml
+status: success
+puzzle:
+  id: easy-01
+  difficulty: easy
+  solved: true
+metrics:
+  iterations: 15
+  solveTime: 3247
+  strategiesUsed:
+    - naked-single
+    - hidden-single
+```
+
+---
+
+## 7. Error Handling
+
+### 7.1 Exit Codes
+
+| Code | Meaning | Example |
+|------|---------|---------|
+| 0 | Success | Puzzle solved, no errors |
+| 1 | General failure | Puzzle unsolvable, critical error |
+| 2 | Partial success | Timeout with partial progress |
+| 3 | Configuration error | Invalid config, missing field |
+| 4 | Initialization error | Component failed to initialize |
+| 5 | System error | Unexpected exception |
+| 6 | User cancellation | User interrupted operation |
+
+### 7.2 Error Output Format
+
+```json
+{
+  "error": {
+    "code": "SOLVE_TIMEOUT",
+    "message": "Solving exceeded maximum time limit",
+    "severity": "warning",
+    "details": {
+      "maxTime": 300000,
+      "actualTime": 305432,
+      "partialProgress": 0.73
+    },
+    "suggestions": [
+      "Increase --max-time parameter",
+      "Try simpler strategies first",
+      "Enable --backtrack-enabled"
+    ]
+  }
+}
+```
+
+---
+
+## 8. Performance Optimization
+
+### 8.1 Parallel Execution
+
+```bash
+# Parallel benchmark execution
+machine-dream benchmark run full --parallel 8
+
+# Parallel batch solving
+ls puzzles/*.json | parallel -j 4 machine-dream solve {}
+```
+
+### 8.2 Caching
+
+```bash
+# Enable result caching
+machine-dream config set cache.enabled true
+machine-dream config set cache.ttl 3600
+
+# Clear cache
+machine-dream system cleanup --cache
+```
+
+### 8.3 Resource Limits
+
+```bash
+# Set memory limit
+machine-dream solve puzzles/hard-01.json \
+  --max-memory 2048  # MB
+
+# Set CPU limit
+machine-dream benchmark run full \
+  --max-cpu 80  # Percentage
+```
+
+---
+
+## 9. Integration Examples
+
+### 9.1 CI/CD Integration
+
+```yaml
+# .github/workflows/benchmark.yml
+name: Benchmark
+
+on: [push, pull_request]
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run benchmarks
+        run: |
+          machine-dream benchmark run quick \
+            --output-format json \
+            --output results.json
+
+      - name: Upload results
+        uses: actions/upload-artifact@v2
+        with:
+          name: benchmark-results
+          path: results.json
+```
+
+### 9.2 Scripting Integration
+
+```bash
+#!/bin/bash
+# automated-testing.sh
+
+set -e
+
+# Initialize system
+machine-dream system init --preset full
+
+# Run solve
+RESULT=$(machine-dream solve puzzles/test.json --output-format json)
+
+# Extract metrics
+ITERATIONS=$(echo $RESULT | jq '.data.iterations')
+SOLVE_TIME=$(echo $RESULT | jq '.data.solveTime')
+
+# Assertions
+if [ $ITERATIONS -gt 50 ]; then
+  echo "FAIL: Too many iterations"
+  exit 1
+fi
+
+if [ $SOLVE_TIME -gt 10000 ]; then
+  echo "FAIL: Solve time too slow"
+  exit 1
+fi
+
+echo "PASS: All tests passed"
+```
+
+### 9.3 API Integration
+
+```typescript
+// Using as a library
+import { MachineDream } from 'machine-dream-poc';
+
+const md = new MachineDream({
+  memorySystem: 'agentdb',
+  enableRL: true
+});
+
+await md.initialize();
+
+const result = await md.solve('puzzles/hard-01.json');
+console.log(`Solved in ${result.iterations} iterations`);
+
+await md.dream.run();
+```
+
+---
+
+## 10. Troubleshooting Guide
+
+### 10.1 Common Issues
+
+**Issue: Command not found**
+```bash
+# Solution: Add to PATH or use npx
+npx machine-dream <command>
+
+# Or install globally
+npm install -g machine-dream-poc
+```
+
+**Issue: Database locked**
+```bash
+# Solution: Kill hanging processes
+machine-dream system cleanup --sessions
+# Or force cleanup
+rm .agentdb/agent.db-wal .agentdb/agent.db-shm
+```
+
+**Issue: Out of memory**
+```bash
+# Solution: Reduce batch size or enable memory optimization
+machine-dream config set agentdb.quantization scalar
+machine-dream memory optimize --prune-redundancy
+```
+
+**Issue: Slow performance**
+```bash
+# Solution: Check and optimize
+machine-dream memory optimize
+machine-dream system cleanup --cache
+```
+
+### 10.2 Debug Mode
+
+```bash
+# Enable debug logging
+machine-dream --log-level debug solve puzzles/test.json
+
+# Trace execution
+MACHINE_DREAM_TRACE=1 machine-dream solve puzzles/test.json
+
+# Profile performance
+MACHINE_DREAM_PROFILE=1 machine-dream benchmark run quick
+```
+
+---
+
+## 11. Version Management
+
+### 11.1 Version Commands
+
+```bash
+# Show version
+machine-dream --version
+# Output: machine-dream v0.1.0
+
+# Show detailed version info
+machine-dream system status --verbose
+# Includes: Node version, dependencies, database schema version
+```
+
+### 11.2 Backward Compatibility
+
+```bash
+# Check compatibility
+machine-dream system migrate --dry-run --to agentdb
+
+# Force migration
+machine-dream system migrate --from reasoningbank --to agentdb --validate
+```
+
+---
+
+## 12. Security Considerations
+
+### 12.1 Sensitive Data
+
+```bash
+# Exclude sensitive data from exports
+machine-dream export all --exclude-sensitive
+
+# Encrypt exports
+machine-dream export all --encrypt --password-file secrets/export-key.txt
+```
+
+### 12.2 Access Control
+
+```bash
+# Set file permissions
+machine-dream config set security.fileMode 0600
+
+# Restrict database access
+chmod 600 .agentdb/agent.db
+```
+
+---
+
+## 13. Documentation and Help
+
+### 13.1 Built-in Help
+
+```bash
+# General help
+machine-dream --help
+machine-dream -h
+
+# Command-specific help
+machine-dream solve --help
+machine-dream memory --help
+
+# Examples for command
+machine-dream solve --examples
+```
+
+### 13.2 Man Pages
+
+```bash
+# View man page
+man machine-dream
+man machine-dream-solve
+man machine-dream-memory
+```
+
+---
+
+## 14. Success Criteria
+
+### 14.1 Functional Requirements
+
+- ✅ All commands execute without errors
+- ✅ Help documentation accurate and complete
+- ✅ Configuration loading supports all sources (CLI, env, file, defaults)
+- ✅ Output formats (JSON, table, YAML) work correctly
+- ✅ Error messages actionable with clear suggestions
+- ✅ Exit codes consistent and documented
+
+### 14.2 Performance Requirements
+
+- ✅ Command parsing: <50ms
+- ✅ Help display: <100ms
+- ✅ Configuration loading: <200ms
+- ✅ Interactive mode startup: <1s
+
+### 14.3 Usability Requirements
+
+- ✅ Commands follow Unix conventions
+- ✅ Tab completion works in common shells
+- ✅ Progress indicators for long operations
+- ✅ Confirmations for destructive operations
+- ✅ Consistent naming across commands
+
+---
+
+## 15. Implementation Roadmap
+
+### Phase 1: Core Commands (Week 1)
+- [ ] `solve` command with basic options
+- [ ] `config` command for configuration
+- [ ] `system init` and `system status`
+- [ ] JSON output format
+
+### Phase 2: Advanced Commands (Week 2)
+- [ ] `memory` command suite
+- [ ] `dream` command
+- [ ] Table and YAML output formats
+- [ ] Interactive mode
+
+### Phase 3: Integration (Week 3)
+- [ ] `benchmark` command
+- [ ] `demo` command
+- [ ] `config` command
+- [ ] Export utilities
+
+### Phase 4: Polish (Week 4)
+- [ ] `export` command enhancements
+- [ ] Error handling improvements
+- [ ] Performance optimization
+- [ ] Documentation completion
+- [ ] Advanced visualization options
+
+---
+
+**Document Status:** ✅ Complete and Ready for Implementation
+
+**Next Steps:**
+1. Review with development team
+2. Begin Phase 1 implementation
+3. Set up CI/CD for automated testing
+4. Create user documentation and tutorials
