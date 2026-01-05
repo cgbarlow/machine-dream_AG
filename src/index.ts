@@ -1,6 +1,5 @@
 
 import { SystemOrchestrator } from './orchestration/SystemOrchestrator';
-import { BenchmarkSuite } from './benchmarking/BenchmarkSuite';
 import { OrchestratorConfig } from './types';
 
 async function main() {

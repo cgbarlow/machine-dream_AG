@@ -27,7 +27,7 @@ export function registerBenchmarkCommand(program: Command): void {
         .option('--parallel <n>', 'Number of parallel workers', parseInt)
         .option('--compare-with <file>', 'Compare with previous benchmark')
         .action(async (suiteName, options) => {
-            const { config, outputFormat } = getCommandConfig(runCommand);
+            const { outputFormat } = getCommandConfig(runCommand);
 
             try {
                 logger.info(`📊 Running benchmark suite: ${suiteName}`);
@@ -71,7 +71,7 @@ export function registerBenchmarkCommand(program: Command): void {
         .option('--charts', 'Generate performance charts')
         .option('--compare <files>', 'Compare multiple benchmark runs')
         .action(async (resultsDir, options) => {
-            const { config, outputFormat } = getCommandConfig(reportCommand);
+            const { outputFormat } = getCommandConfig(reportCommand);
 
             try {
                 logger.info(`📈 Generating benchmark report from: ${resultsDir}`);

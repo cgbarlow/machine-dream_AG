@@ -3,8 +3,7 @@ import {
     BenchmarkResult,
     BenchmarkSuiteResult,
     BenchmarkType,
-    OrchestratorConfig,
-    PuzzleState
+    OrchestratorConfig
 } from '../types';
 import { SystemOrchestrator } from '../orchestration/SystemOrchestrator';
 
@@ -23,7 +22,6 @@ export class BenchmarkSuite {
         console.log(`📊 Starting Benchmark Suite: ${name} (${type})`);
 
         const results: BenchmarkResult[] = [];
-        const startTime = Date.now();
         let solvedCount = 0;
         let totalIterations = 0;
         let totalSolveTime = 0;
@@ -45,7 +43,6 @@ export class BenchmarkSuite {
             }
         }
 
-        const duration = Date.now() - startTime;
         const avgTime = solvedCount > 0 ? totalSolveTime / solvedCount : 0;
         const avgIter = solvedCount > 0 ? totalIterations / solvedCount : 0;
 

@@ -10,6 +10,7 @@ import { SolveOptions } from '../types';
 import { logger } from '../logger';
 import { SystemOrchestrator } from '../../orchestration/SystemOrchestrator';
 import { SolveError } from '../errors';
+import { OrchestratorConfig } from '../../types';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -78,7 +79,7 @@ export function registerSolveCommand(program: Command): void {
 
                 // Initialize orchestrator with merged configuration
                 // Convert CLI config to OrchestratorConfig format
-                const orchestratorConfig = {
+                const orchestratorConfig: OrchestratorConfig = {
                     agentDbPath: config.agentdb.dbPath,
                     embeddingModel: 'Xenova/all-MiniLM-L6-v2', // Default
                     enableReasoningBank: config.enableReflexion,
@@ -107,10 +108,10 @@ export function registerSolveCommand(program: Command): void {
                     quantization: config.agentdb.quantization,
                     indexing: config.agentdb.indexing,
                     cacheEnabled: true,
-                    maxIterations: solveOptions.maxIterations,
-                    reflectionInterval: solveOptions.reflectionInterval,
+                    maxIterations: solveOptions.maxIterations ?? config.solving.maxIterations,
+                    reflectionInterval: solveOptions.reflectionInterval ?? config.solving.reflectionInterval,
                     dreamingSchedule: config.dreaming.schedule,
-                    logLevel: 'info',
+                    logLevel: 'info' as const,
                     demoMode: solveOptions.demoMode || false
                 };
 
@@ -126,10 +127,8 @@ export function registerSolveCommand(program: Command): void {
                         success: result.success,
                         solveTime: result.metrics?.duration,
                         iterations: result.metrics?.iterations,
-                        strategiesUsed: result.metrics?.strategiesUsed || [],
                         insightsDiscovered: result.metrics?.insights || 0,
                         finalState: result.finalState,
-                        trajectory: result.trajectory,
                         sessionId: solveOptions.sessionId
                     });
                 } else if (outputFormat === 'yaml') {
@@ -145,7 +144,6 @@ export function registerSolveCommand(program: Command): void {
                     console.log(`Status:      ${result.success ? '✅ Solved' : '❌ Failed'}`);
                     console.log(`Iterations:  ${result.metrics?.iterations}`);
                     console.log(`Time (ms):   ${result.metrics?.duration}`);
-                    console.log(`Strategies:  ${result.metrics?.strategiesUsed?.join(', ') || 'N/A'}`);
                     console.log(`Session ID:  ${solveOptions.sessionId}`);
 
                     if (result.success && result.finalState) {

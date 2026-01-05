@@ -2,10 +2,7 @@
 import {
     PuzzleState,
     Move,
-    ValidationResult,
-    Insight,
-    AgentDBConfig,
-    Experience
+    ValidationResult
 } from '../types';
 import { AgentMemory } from '../memory/AgentMemory';
 import { PuzzleBoard } from '../engine/PuzzleBoard';
@@ -80,7 +77,7 @@ export class GRASPController {
         return moves;
     }
 
-    private async reviewPhase(candidates: Move[], state: PuzzleState): Promise<Move> {
+    private async reviewPhase(candidates: Move[], _state: PuzzleState): Promise<Move> {
         // HEURISTIC: Find first valid move (for now)
         // Since board.placeValue does validation, we mostly need to pick one to try.
         // Integrating with SudokuRules explicitly here would be better for "Review" 
@@ -104,7 +101,7 @@ export class GRASPController {
         }
     }
 
-    private async synthesizePhase(state: PuzzleState) {
+    private async synthesizePhase(_state: PuzzleState) {
         // Check for insights or patterns
         const insights = this.attention.detectInsights();
         for (const insight of insights) {

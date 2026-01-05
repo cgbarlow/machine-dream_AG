@@ -60,7 +60,7 @@ export function registerSystemCommand(program: Command): void {
         .option('--verbose', 'Include detailed component status')
         .option('--format <format>', 'table|json|yaml', 'table')
         .action(async (options) => {
-            const { config, outputFormat } = getCommandConfig(statusCommand);
+            const { outputFormat } = getCommandConfig(statusCommand);
 
             try {
                 logger.info('📊 Checking system status...');
@@ -111,7 +111,7 @@ export function registerSystemCommand(program: Command): void {
         .option('--older-than <days>', 'Only clean data older than N days', parseInt)
         .option('--dry-run', 'Show what would be deleted')
         .action(async (options) => {
-            const { config, outputFormat } = getCommandConfig(cleanupCommand);
+            const { outputFormat } = getCommandConfig(cleanupCommand);
 
             try {
                 logger.info('🧹 Cleaning up system data...');
@@ -150,7 +150,7 @@ export function registerSystemCommand(program: Command): void {
         .option('--components <list>', 'Check specific components (comma-separated)')
         .option('--watch', 'Continuous monitoring')
         .action(async (options) => {
-            const { config, outputFormat } = getCommandConfig(healthCommand);
+            const { outputFormat } = getCommandConfig(healthCommand);
 
             try {
                 logger.info('❤️  Checking system health...');
@@ -190,7 +190,7 @@ export function registerSystemCommand(program: Command): void {
         .option('--validate', 'Validate after migration')
         .option('--dry-run', 'Preview migration without executing')
         .action(async (options) => {
-            const { config, outputFormat } = getCommandConfig(migrateCommand);
+            const { outputFormat } = getCommandConfig(migrateCommand);
 
             try {
                 logger.info('🚛 Starting database migration...');

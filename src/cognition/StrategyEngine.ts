@@ -1,5 +1,5 @@
 
-import { PuzzleState, Move, Cell } from '../types';
+import { PuzzleState, Move } from '../types';
 
 export class StrategyEngine {
 

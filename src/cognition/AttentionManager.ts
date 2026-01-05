@@ -9,14 +9,11 @@ import {
     Constraint,
     ProgressMetrics,
     Insight,
-    InsightType,
-    MoveOutcome,
-    ReflectionResult
+    MoveOutcome
 } from '../types';
-import { SudokuRules } from '../engine/SudokuRules';
 
 export class AttentionManager {
-    private context: AttentionContext;
+    private context!: AttentionContext;
     private progressHistory: ProgressMetrics[] = [];
 
     // Weights (configurable in future)
@@ -130,7 +127,7 @@ export class AttentionManager {
         return maxRel;
     }
 
-    private calculateImportance(cell: Cell): number {
+    private calculateImportance(_cell: Cell): number {
         // Simplified: 1.0 if highly constrained (e.g. only 1 value possible in row), 0.0 otherwise
         // Real impl would analyze constraint network graph
         return 0.5;
@@ -160,7 +157,6 @@ export class AttentionManager {
         this.context.lastVisited.set(`${move.cell.row},${move.cell.col}`, Date.now());
 
         // Calculate metrics
-        const startCells = 0; // Would be passed in real impl
         const currentFilled = 81 - this.getEmptyCells(this.context.currentState.grid).length;
 
         this.progressHistory.push({
@@ -218,7 +214,7 @@ export class AttentionManager {
         return box1 === box2;
     }
 
-    private calculateConstraints(state: PuzzleState): Constraint[] {
+    private calculateConstraints(_state: PuzzleState): Constraint[] {
         // Stub: in real engine returning detailed constraint objects
         return [];
     }

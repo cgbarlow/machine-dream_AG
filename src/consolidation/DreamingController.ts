@@ -4,19 +4,15 @@ import {
     Experience,
     Pattern,
     ConsolidatedKnowledge,
-    AbstractionLadder,
-    TriageConfig,
-    CompressionConfig
+    AbstractionLadder
 } from '../types';
 import { AgentMemory } from '../memory/AgentMemory';
 
 export class DreamingController {
     private memory: AgentMemory;
-    private config: AgentDBConfig;
 
-    constructor(memory: AgentMemory, config: AgentDBConfig) {
+    constructor(memory: AgentMemory, _config: AgentDBConfig) {
         this.memory = memory;
-        this.config = config;
     }
 
     /**

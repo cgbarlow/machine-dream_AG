@@ -35,7 +35,6 @@ export class SudokuRules {
     static isValidGrid(grid: Grid): ValidationResult {
         // Basic implementation: check every non-zero cell
         // In a real optimized engine, we might do this more efficiently
-        let isValid = true;
         for (let r = 0; r < 9; r++) {
             for (let c = 0; c < 9; c++) {
                 const value = grid[r][c];
@@ -44,7 +43,6 @@ export class SudokuRules {
                     const tempGrid = grid.map(row => [...row]);
                     tempGrid[r][c] = 0;
                     if (!this.isValidMove(tempGrid, { row: r, col: c }, value)) {
-                        isValid = false;
                         // For now, simple return on first failure. 
                         // Full implementation would collect all conflicts.
                         return {

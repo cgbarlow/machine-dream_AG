@@ -24,8 +24,8 @@ export function registerMemoryCommand(program: Command): void {
         .option('--namespace <ns>', 'Memory namespace', 'default')
         .option('--ttl <seconds>', 'Time-to-live in seconds', parseInt)
         .option('--type <type>', 'experience|pattern|skill|insight')
-        .action(async (key, value, options) => {
-            const { config, outputFormat } = getCommandConfig(storeCommand);
+        .action(async (key, _value, options) => {
+            const { outputFormat } = getCommandConfig(storeCommand);
 
             try {
                 // TODO: Implement actual memory storage
@@ -66,7 +66,7 @@ export function registerMemoryCommand(program: Command): void {
         .option('--namespace <ns>', 'Memory namespace', 'default')
         .option('--format <format>', 'json|yaml|table', 'json')
         .action(async (key, options) => {
-            const { config, outputFormat } = getCommandConfig(retrieveCommand);
+            const { outputFormat } = getCommandConfig(retrieveCommand);
 
             try {
                 // TODO: Implement actual memory retrieval
@@ -107,7 +107,7 @@ export function registerMemoryCommand(program: Command): void {
         .option('--type <type>', 'Filter by type')
         .option('--similarity <threshold>', 'Similarity threshold for vector search (0.0-1.0)', parseFloat)
         .action(async (pattern, options) => {
-            const { config, outputFormat } = getCommandConfig(searchCommand);
+            const { outputFormat } = getCommandConfig(searchCommand);
 
             try {
                 logger.info(`🔍 Searching memory: pattern="${pattern}"`);
@@ -192,7 +192,7 @@ export function registerMemoryCommand(program: Command): void {
         .option('--prune-redundancy', 'Remove redundant patterns')
         .option('--similarity-threshold <n>', 'Similarity threshold for deduplication', parseFloat)
         .action(async (options) => {
-            const { config, outputFormat } = getCommandConfig(optimizeCommand);
+            const { outputFormat } = getCommandConfig(optimizeCommand);
 
             try {
                 logger.info('⚙️  Optimizing memory...');
@@ -230,7 +230,7 @@ export function registerMemoryCommand(program: Command): void {
         .option('--namespaces <list>', 'Specific namespaces to backup')
         .option('--compress', 'Compress backup files')
         .action(async (outputDir, options) => {
-            const { config, outputFormat } = getCommandConfig(backupCommand);
+            const { outputFormat } = getCommandConfig(backupCommand);
 
             try {
                 logger.info(`💾 Creating memory backup to: ${outputDir}`);
@@ -270,7 +270,7 @@ export function registerMemoryCommand(program: Command): void {
         .option('--validate', 'Validate integrity before restore')
         .option('--merge', 'Merge with existing data')
         .action(async (backupDir, options) => {
-            const { config, outputFormat } = getCommandConfig(restoreCommand);
+            const { outputFormat } = getCommandConfig(restoreCommand);
 
             try {
                 logger.info(`🔄 Restoring memory from: ${backupDir}`);

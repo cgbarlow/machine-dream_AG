@@ -26,7 +26,7 @@ export function registerDreamCommand(program: Command): void {
         .option('--visualize', 'Show consolidation visualization')
         .option('--output <file>', 'Save consolidated knowledge')
         .action(async (options) => {
-            const { config, outputFormat } = getCommandConfig(runCommand);
+            const { outputFormat } = getCommandConfig(runCommand);
 
             try {
                 logger.info('🌙 Starting dream cycle...');
@@ -65,7 +65,7 @@ export function registerDreamCommand(program: Command): void {
         .option('--enable', 'Enable scheduled dreaming')
         .option('--disable', 'Disable scheduled dreaming')
         .action(async (scheduleType, options) => {
-            const { config, outputFormat } = getCommandConfig(scheduleCommand);
+            const { outputFormat } = getCommandConfig(scheduleCommand);
 
             try {
                 logger.info(`⏰ Configuring dream schedule: ${scheduleType}`);
@@ -101,7 +101,7 @@ export function registerDreamCommand(program: Command): void {
         .option('--last <n>', 'Show last N dream cycles', parseInt)
         .option('--metrics', 'Include consolidation metrics')
         .action(async (options) => {
-            const { config, outputFormat } = getCommandConfig(statusCommand);
+            const { outputFormat } = getCommandConfig(statusCommand);
 
             try {
                 logger.info('📊 Checking dream status...');

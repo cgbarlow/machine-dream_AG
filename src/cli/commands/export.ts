@@ -21,7 +21,7 @@ export function registerExportCommand(program: Command): void {
         .option('--compress', 'Compress exported data')
         .option('--include-raw', 'Include raw data (not just summaries)')
         .action(async (type, options) => {
-            const { config, outputFormat } = getCommandConfig(exportCommand);
+            const { outputFormat } = getCommandConfig(exportCommand);
 
             try {
                 logger.info(`📤 Exporting ${type} data...`);

@@ -9,9 +9,10 @@
   },
   "scripts": {
     "build": "tsc",
-    "build:cli": "tsc && cp src/cli-bin.js dist/cli-bin.js",
+    "build:cli": "tsc && cp src/cli-bin.js dist/cli-bin.js && cp src/tui/tui-bin.js dist/tui-bin.js",
     "build:all": "npm run build:cli",
     "dev": "tsx watch src/index.ts",
+    "tui": "tsx src/tui/tui-bin.ts",
     "test": "vitest",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
@@ -47,6 +48,7 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.5.0",
+    "blessed": "^0.1.81",
     "chalk": "^5.6.2",
     "commander": "^14.0.2"
   }

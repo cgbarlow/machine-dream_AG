@@ -17,14 +17,13 @@ export class Logger {
     private logLevel: 'debug' | 'info' | 'warn' | 'error';
     private quiet: boolean;
     private noColor: boolean;
-    private verbose: boolean;
-    private opts?: any;
 
     constructor(options: LoggerOptions = {}) {
         this.logLevel = options.logLevel || 'info';
         this.quiet = options.quiet || false;
         this.noColor = options.noColor || false;
-        this.verbose = options.verbose || false;
+        // verbose option not yet implemented
+        void options.verbose;
     }
 
     private shouldLog(level: 'debug' | 'info' | 'warn' | 'error'): boolean {

@@ -21,7 +21,7 @@ export function registerDemoCommand(program: Command): void {
         .option('--skip-act <number>', 'Skip specified act (testing only)', parseInt)
         .option('--act <number>', 'Run specific act only', parseInt)
         .action(async (scriptName, options) => {
-            const { config, outputFormat } = getCommandConfig(demoCommand);
+            const { outputFormat } = getCommandConfig(demoCommand);
 
             try {
                 logger.info(`🎬 Starting demo: ${scriptName}`);
