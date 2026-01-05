@@ -7,11 +7,25 @@
  * - AgentDB Integration (Native Types)
  */
 
-import { 
-  ReasoningBank as AgentDBReasoningBank, 
-  ReflexionMemory as AgentDBReflexionMemory,
-  SkillLibrary as AgentDBSkillLibrary 
-} from 'agentdb';
+// MOCK: AgentDB Native Types (Simulating external library)
+export interface AgentDBReasoningBank {
+  logMove(move: Move, outcome: ValidationResult): Promise<void>;
+  logStrategy(strategy: string, result: ValidationResult): Promise<void>;
+  logInsight(insight: Insight): Promise<void>;
+  querySimilar(context: PuzzleState): Promise<Experience[]>;
+  distillPatterns(sessionId: string): Promise<Pattern[]>;
+  consolidate(experiences: Experience[]): Promise<ConsolidatedKnowledge>;
+}
+
+export interface AgentDBReflexionMemory {
+  storeReflexion(error: ReflexionError): Promise<void>;
+  getCorrections(error: Error): Promise<Move[]>;
+}
+
+export interface AgentDBSkillLibrary {
+  consolidateSkills(filter: { minSuccessRate: number }): Promise<Skill[]>;
+  applySkill(state: PuzzleState): Promise<Move | null>;
+}
 
 // ============================================================================
 // Puzzle Domain Types
@@ -124,3 +138,247 @@ export type POCConfig = {
   enableSkillLibrary: boolean;
   // Deprecated: memorySystem choice (now exclusively agentdb)
 };
+
+export type AgentDBConfig = POCConfig & {
+  dbPath: string;
+  preset: 'large';
+  rlPlugin: {
+    type: 'decision-transformer';
+    name: 'sudoku-solver';
+    stateDim: number;
+    actionDim: number;
+    sequenceLength: number;
+  };
+  reflexion: {
+    enabled: boolean;
+    maxEntries: number;
+    similarityThreshold: number;
+  };
+  skillLibrary: {
+    enabled: boolean;
+    minSuccessRate: number;
+    maxSkills: number;
+    autoConsolidate: boolean;
+  };
+  quantization: string;
+  indexing: string;
+  cacheEnabled: boolean;
+};
+
+export type Experience = {
+  id: string;
+  sessionId: string;
+  puzzleId: string;
+  timestamp: number;
+  trajectory: Move[];
+  outcome: ValidationResult['outcome'];
+  duration: number;
+  insights: Insight[];
+};
+
+export type Pattern = {
+  id: string;
+  type: string;
+  description: string;
+  conditions: string[];
+  actions: string[];
+  successRate: number;
+  usageCount: number;
+  examples: string[];
+  confidence: number;
+};
+
+export type ConsolidatedKnowledge = {
+  sessionIds: string[];
+  patterns: Pattern[];
+  abstractionLadder: any; // Simplified for now
+  compressionRatio: number;
+  verificationStatus: 'verified' | 'unverified';
+  timestamp: number;
+};
+
+export type ReflexionError = {
+  trajectory: Move[];
+  error: Error;
+  correction: Move;
+  timestamp: number;
+};
+
+export type RLAction = {
+  cell: Cell;
+  value: number;
+  confidence: number;
+};
+
+export type RichContext = {
+  similarExperiences: Experience[];
+  relevantPatterns: Pattern[];
+  suggestedStrategies: string[];
+  riskAssessment: {
+    riskLevel: 'low' | 'medium' | 'high';
+    warning: string;
+  };
+};
+
+export interface MemorySystem {
+  logMove(move: Move, outcome: ValidationResult): Promise<void>;
+  logStrategy(strategy: string, result: ValidationResult): Promise<void>;
+  querySimilar(context: PuzzleState): Promise<Experience[]>;
+  distillPatterns(sessionId: string): Promise<Pattern[]>;
+  consolidate(experiences: Experience[]): Promise<ConsolidatedKnowledge>;
+
+  // AgentDB specific
+  storeReflexion(error: ReflexionError): Promise<void>;
+  getCorrections(similarError: Error): Promise<Move[]>;
+  consolidateSkills(filter: { minSuccessRate: number }): Promise<Skill[]>;
+  applySkill(state: PuzzleState): Promise<Move | null>;
+  trainRL(config: { epochs: number; batchSize: number }): Promise<void>;
+  selectActionRL(state: PuzzleState, availableActions: Move[]): Promise<RLAction>;
+  synthesizeContext(state: PuzzleState, k: number): Promise<RichContext>;
+  optimizeMemory(): Promise<{ patternsConsolidated: number }>;
+}
+
+// ============================================================================
+// Attention Mechanism Types
+// ============================================================================
+
+export type AttentionScore = {
+  cell: Cell;
+  score: number;
+  uncertainty: number;
+  relevance: number;
+  importance: number;
+  recency: number;
+};
+
+export type Constraint = {
+  type: 'row' | 'column' | 'box';
+  index: number;
+  satisfiedValues: Set<number>;
+  remainingValues: Set<number>;
+};
+
+export type AttentionContext = {
+  currentState: PuzzleState;
+  recentMoves: Move[];
+  lastVisited: Map<string, number>;
+  constraints: Constraint[];
+};
+
+// ============================================================================
+// Metrics & Progress Types
+// ============================================================================
+
+export type Momentum = 'accelerating' | 'steady' | 'decelerating' | 'stuck';
+
+export type ProgressMetrics = {
+  cellsFilled: number;
+  percentComplete: number;
+  movesPerMinute: number;
+  successRate: number;
+  momentum: Momentum;
+  plateauDuration: number;
+  currentStrategy: string;
+  strategySuccessRate: number;
+  confidenceLevel: number;
+};
+
+export type ReflectionResult = {
+  patterns: Pattern[];
+  progress: ProgressMetrics;
+  insights: Insight[];
+  candidatesUpdated: number;
+  timestamp: number;
+};
+
+export type MoveOutcome = 'success' | 'failure' | 'progress';
+
+// ============================================================================
+// Dreaming & Consolidation Types
+// ============================================================================
+
+export type AbstractionLevel = {
+  level: number;
+  name: string;
+  patterns: Pattern[];
+  generalizations: string[];
+  exampleCount: number;
+};
+
+export type AbstractionLadder = {
+  levels: AbstractionLevel[];
+  domain: string;
+  createdAt: number;
+  metadata: {
+    sourcePatternCount: number;
+    abstractionMethod: string;
+    verificationScore: number;
+  };
+};
+
+export type TriageConfig = {
+  minImportance: number;
+  maxItems: number;
+};
+
+export type CompressionConfig = {
+  targetRatio: number;
+  clusteringMethod: 'semantic' | 'structural' | 'hybrid';
+};
+
+// ============================================================================
+// Orchestration & System Types
+// ============================================================================
+
+export type SystemStatus = 'initializing' | 'ready' | 'running' | 'dreaming' | 'error' | 'shutdown';
+
+export type OrchestratorConfig = AgentDBConfig & {
+  maxIterations: number;
+  reflectionInterval: number;
+  dreamingSchedule: 'after-session' | 'periodic' | 'manual';
+  logLevel: 'debug' | 'info' | 'warn' | 'error';
+  demoMode: boolean;
+};
+
+export type SolveResult = {
+  success: boolean;
+  finalState: PuzzleState;
+  metrics: {
+    iterations: number;
+    duration: number;
+    insights: number;
+  };
+  experiences: Experience[];
+};
+
+// ============================================================================
+// Benchmarking Types
+// ============================================================================
+
+export type BenchmarkType = 'single-shot' | 'naive-continuous' | 'grasp-baseline' | 'grasp-dreaming';
+
+export type BenchmarkResult = {
+  benchmarkType: BenchmarkType;
+  puzzleId: string;
+  difficulty: string;
+  success: boolean;
+  solveTime: number;
+  iterations: number;
+  strategiesUsed: string[];
+  param_patternsApplied?: number; // Specific to grasp-dreaming
+  timestamp: number;
+};
+
+export type BenchmarkSuiteResult = {
+  suiteName: string;
+  timestamp: number;
+  summary: {
+    total: number;
+    solved: number;
+    failed: number;
+    avgTime: number;
+    avIterations: number;
+  };
+  details: BenchmarkResult[];
+};
+
