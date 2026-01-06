@@ -10,9 +10,21 @@ import { TUIApplication } from './TUIApplication';
 import { detectTerminalCapabilities, validateTerminalEnvironment } from './utils/terminalDetect';
 
 async function main() {
+  // Parse command line arguments
+  const args = process.argv.slice(2);
+  const debugOutputIndex = args.indexOf('--debug-output');
+  const debugOutputPath = debugOutputIndex >= 0 ? args[debugOutputIndex + 1] : undefined;
+
+  // Check if debug mode is enabled (allows headless operation)
+  const isDebugMode = Boolean(
+    debugOutputPath ||
+    process.env.TUI_DEBUG_OUTPUT ||
+    process.env.TUI_DEBUG_STDOUT
+  );
+
   // Validate terminal environment
   const caps = detectTerminalCapabilities();
-  const validation = validateTerminalEnvironment(caps);
+  const validation = validateTerminalEnvironment(caps, { allowHeadless: isDebugMode });
 
   if (!validation.valid) {
     console.error('❌ Terminal environment validation failed:');
@@ -31,10 +43,6 @@ async function main() {
   }
 
   try {
-    // Parse command line arguments
-    const args = process.argv.slice(2);
-    const debugOutputIndex = args.indexOf('--debug-output');
-    const debugOutputPath = debugOutputIndex >= 0 ? args[debugOutputIndex + 1] : undefined;
 
     // Create and start TUI
     const app = new TUIApplication({

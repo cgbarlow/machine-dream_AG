@@ -57,7 +57,17 @@ export class StatusBar extends Component {
     const rightText = this.helpText;
 
     // Calculate padding to right-align help text
-    const totalWidth = (element.width as number) || 80;
+    // In headless/CI environments, width may be undefined - use fallback
+    let totalWidth = 80; // Default fallback
+
+    if (element && element.screen) {
+      totalWidth = (element.screen.width as number) || 80;
+    } else if (element && typeof element.width === 'number') {
+      totalWidth = element.width;
+    } else if (typeof process.stdout.columns === 'number') {
+      totalWidth = process.stdout.columns;
+    }
+
     const leftPart = `  ${sessionText}  ${this.statusMessage}`;
     const padding = totalWidth - leftPart.length - rightText.length - 2;
 

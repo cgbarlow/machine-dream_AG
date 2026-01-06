@@ -24,13 +24,21 @@ export class Screen {
       smartCSR?: boolean;
       fullUnicode?: boolean;
       dockBorders?: boolean;
+      allowHeadless?: boolean;
     } = {}
   ) {
     this.outputManager = outputManager;
     this.capabilities = detectTerminalCapabilities();
 
+    // Check if debug mode is enabled (allows headless operation)
+    const isDebugMode = Boolean(
+      process.env.TUI_DEBUG_OUTPUT ||
+      process.env.TUI_DEBUG_STDOUT ||
+      options.allowHeadless
+    );
+
     // Validate terminal
-    const validation = validateTerminalEnvironment(this.capabilities);
+    const validation = validateTerminalEnvironment(this.capabilities, { allowHeadless: isDebugMode });
     if (!validation.valid) {
       throw new Error(`Terminal validation failed: ${validation.errors.join(', ')}`);
     }

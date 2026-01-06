@@ -66,13 +66,23 @@ export function getTerminalName(): string {
   return 'unknown';
 }
 
-export function validateTerminalEnvironment(caps: TerminalCapabilities): {
+export function validateTerminalEnvironment(
+  caps: TerminalCapabilities,
+  options: { allowHeadless?: boolean } = {}
+): {
   valid: boolean;
   warnings: string[];
   errors: string[];
 } {
   const warnings: string[] = [];
   const errors: string[] = [];
+
+  // Check if we're in debug/test mode (allows headless operation)
+  const isDebugMode = Boolean(
+    process.env.TUI_DEBUG_OUTPUT ||
+    process.env.TUI_DEBUG_STDOUT ||
+    options.allowHeadless
+  );
 
   // Minimum dimensions check
   if (caps.columns < 80) {
@@ -102,9 +112,13 @@ export function validateTerminalEnvironment(caps: TerminalCapabilities): {
     warnings.push('Mouse not supported - keyboard navigation only');
   }
 
-  // Fatal error: no keyboard
+  // Keyboard check - only fatal if not in debug/headless mode
   if (!caps.supportsKeyboard) {
-    errors.push('Keyboard input not available - cannot run TUI');
+    if (isDebugMode) {
+      warnings.push('Keyboard input not available - running in non-interactive mode');
+    } else {
+      errors.push('Keyboard input not available - cannot run TUI (use TUI_DEBUG_OUTPUT=true for non-interactive mode)');
+    }
   }
 
   return {
