@@ -13,6 +13,7 @@
     "build:all": "npm run build:cli",
     "dev": "tsx watch src/index.ts",
     "tui": "tsx src/tui/tui-bin.ts",
+    "tui:poc": "tsx src/tui-ink/poc.tsx",
     "test": "vitest",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
@@ -37,6 +38,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/blessed": "^0.1.27",
     "@types/node": "^20.19.27",
+    "@types/react": "^19.2.7",
     "@typescript-eslint/eslint-plugin": "^6.13.0",
     "@typescript-eslint/parser": "^6.13.0",
     "eslint": "^8.54.0",
@@ -51,7 +53,9 @@
     "better-sqlite3": "^12.5.0",
     "chalk": "^5.6.2",
     "commander": "^14.0.2",
+    "ink": "^6.6.0",
     "neo-blessed": "^0.2.0",
+    "react": "^19.2.3",
     "string-width": "^8.1.0"
   }
 }
