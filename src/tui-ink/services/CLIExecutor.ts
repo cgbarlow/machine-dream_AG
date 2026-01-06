@@ -20,10 +20,15 @@ export interface SolveParams {
 }
 
 export interface ProgressEvent {
-  type: 'start' | 'progress' | 'complete' | 'error';
+  type: 'start' | 'progress' | 'iteration' | 'complete' | 'error';
   message: string;
   percentage?: number;
   data?: unknown;
+  // Live solve data
+  iteration?: number;
+  cellsFilled?: number;
+  currentGrid?: number[][];
+  currentStrategy?: string;
 }
 
 export type ProgressCallback = (event: ProgressEvent) => void;
@@ -97,14 +102,43 @@ export class CLIExecutor {
         percentage: 20,
       });
 
-      // Execute solve
+      // Execute solve with periodic updates
+      // Note: Current SystemOrchestrator doesn't support iteration callbacks
+      // So we'll poll or wrap it. For now, showing initial and final states.
+
+      // Show initial grid
+      onProgress({
+        type: 'iteration',
+        message: 'Starting solve...',
+        percentage: 20,
+        iteration: 0,
+        cellsFilled: this.countFilledCells(puzzleData),
+        currentGrid: puzzleData,
+        currentStrategy: 'Initializing',
+      });
+
       const result = await orchestrator.solvePuzzle(puzzleData);
+
+      // Show final grid
+      const finalGrid = result.finalState.grid;
+      onProgress({
+        type: 'iteration',
+        message: 'Solve complete',
+        percentage: 90,
+        iteration: result.metrics.iterations,
+        cellsFilled: this.countFilledCells(finalGrid),
+        currentGrid: finalGrid,
+        currentStrategy: 'Complete',
+      });
 
       onProgress({
         type: 'complete',
         message: result.success ? 'Puzzle solved successfully!' : 'Solving incomplete',
         percentage: 100,
         data: result,
+        iteration: result.metrics.iterations,
+        cellsFilled: this.countFilledCells(finalGrid),
+        currentGrid: finalGrid,
       });
     } catch (error) {
       onProgress({
@@ -168,5 +202,18 @@ export class CLIExecutor {
       collections: [],
       dbSize: '0 MB',
     };
+  }
+
+  /**
+   * Count filled cells in a grid
+   */
+  private static countFilledCells(grid: number[][]): number {
+    let count = 0;
+    for (const row of grid) {
+      for (const cell of row) {
+        if (cell !== 0) count++;
+      }
+    }
+    return count;
   }
 }

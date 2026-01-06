@@ -7,8 +7,9 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import Spinner from 'ink-spinner';
 import { CLIExecutor, SolveParams, ProgressEvent } from '../services/CLIExecutor.js';
+import { PuzzleGrid } from '../components/PuzzleGrid.js';
+import { SolveProgress } from '../components/SolveProgress.js';
 
 type FocusField = 'puzzleFile' | 'memorySystem' | 'enableRL' | 'enableReflexion' | 'maxIterations' | 'execute';
 
@@ -22,6 +23,19 @@ export const SolveScreenInteractive: React.FC = () => {
   const [isExecuting, setIsExecuting] = useState(false);
   const [progress, setProgress] = useState<ProgressEvent | null>(null);
   const [availablePuzzles, setAvailablePuzzles] = useState<string[]>([]);
+  const [startTime, setStartTime] = useState<number>(0);
+  const [elapsedTime, setElapsedTime] = useState<number>(0);
+
+  // Update elapsed time when executing
+  useEffect(() => {
+    if (!isExecuting) return;
+
+    const interval = setInterval(() => {
+      setElapsedTime(Date.now() - startTime);
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [isExecuting, startTime]);
 
   // Load available puzzles
   useEffect(() => {
@@ -30,6 +44,8 @@ export const SolveScreenInteractive: React.FC = () => {
 
   const handleExecute = async () => {
     setIsExecuting(true);
+    setStartTime(Date.now());
+    setElapsedTime(0);
     setProgress({ type: 'start', message: 'Starting...', percentage: 0 });
 
     const params: SolveParams = {
@@ -52,11 +68,20 @@ export const SolveScreenInteractive: React.FC = () => {
   useInput((input, key) => {
     if (isExecuting) return;
 
+    // Tab navigation (forward and backward with Shift)
     if (key.tab) {
       const fields: FocusField[] = ['puzzleFile', 'memorySystem', 'enableRL', 'enableReflexion', 'maxIterations', 'execute'];
       const currentIndex = fields.indexOf(focusField);
-      const nextIndex = (currentIndex + 1) % fields.length;
-      setFocusField(fields[nextIndex]);
+
+      if (key.shift) {
+        // Shift-Tab: Go to previous field
+        const prevIndex = currentIndex === 0 ? fields.length - 1 : currentIndex - 1;
+        setFocusField(fields[prevIndex]);
+      } else {
+        // Tab: Go to next field
+        const nextIndex = (currentIndex + 1) % fields.length;
+        setFocusField(fields[nextIndex]);
+      }
     }
 
     if (key.return && focusField === 'execute') {
@@ -162,29 +187,42 @@ export const SolveScreenInteractive: React.FC = () => {
         </Text>
       </Box>
 
-      {/* Progress Display */}
-      {progress && (
+      {/* Live Visualization */}
+      {progress && (progress.type === 'iteration' || progress.type === 'complete') && progress.currentGrid && (
+        <Box flexDirection="row" gap={2}>
+          {/* Puzzle Grid */}
+          <PuzzleGrid grid={progress.currentGrid} size={9} />
+
+          {/* Progress Metrics */}
+          <SolveProgress
+            isRunning={isExecuting}
+            iteration={progress.iteration || 0}
+            maxIterations={parseInt(maxIterations) || 100}
+            cellsFilled={progress.cellsFilled || 0}
+            totalCells={81}
+            currentStrategy={progress.currentStrategy}
+            elapsedTime={elapsedTime}
+            status={progress.type === 'complete' ? 'success' : 'running'}
+            errorMessage={undefined}
+          />
+        </Box>
+      )}
+
+      {/* Simple Progress (before visualization) */}
+      {progress && progress.type !== 'iteration' && progress.type !== 'complete' && (
         <Box
           flexDirection="column"
           borderStyle="single"
-          borderColor={progress.type === 'error' ? 'red' : 'green'}
+          borderColor={progress.type === 'error' ? 'red' : 'cyan'}
           padding={1}
         >
-          <Text bold color={progress.type === 'error' ? 'red' : 'green'}>
-            {isExecuting && <Text color="cyan"><Spinner type="dots" /></Text>} {progress.message}
+          <Text bold color={progress.type === 'error' ? 'red' : 'cyan'}>
+            {progress.message}
           </Text>
           {progress.percentage !== undefined && (
             <Text color="cyan">
               Progress: {progress.percentage}%
             </Text>
-          )}
-          {progress.type === 'complete' && (
-            <Box flexDirection="column" marginTop={1}>
-              <Text color="green">✓ Solution found!</Text>
-            </Box>
-          )}
-          {progress.type === 'error' && (
-            <Text color="red">Error occurred. Check logs for details.</Text>
           )}
         </Box>
       )}
