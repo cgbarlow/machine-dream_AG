@@ -44,51 +44,51 @@ export class ExportScreen extends Component {
 
   private getExportContent(): string {
     return `
-{bold}{center}📤 Data Export{/center}{/bold}
+{center}Data Export{/center}
 
-{cyan-fg}═══════════════════════════════════════════════════════════════════{/cyan-fg}
+===================================================================
 
-{bold}Available Export Options:{/bold}
+Available Export Options:
 
-{bold}1. Session Data{/bold}
+1. Session Data
    Export complete session history
-   • Formats: JSON, CSV, Markdown
-   • Includes: States, actions, metrics
-   • Command: machine-dream export session <id>
+   - Formats: JSON, CSV, Markdown
+   - Includes: States, actions, metrics
+   - Command: machine-dream export session <id>
 
-{bold}2. Memory Database{/bold}
+2. Memory Database
    Backup memory system data
-   • Full database dump
-   • Incremental backups
-   • Vector embeddings included
-   • Command: machine-dream export memory
+   - Full database dump
+   - Incremental backups
+   - Vector embeddings included
+   - Command: machine-dream export memory
 
-{bold}3. Performance Reports{/bold}
+3. Performance Reports
    Generate performance analytics
-   • Benchmark results
-   • Resource utilization
-   • Trend analysis
-   • Command: machine-dream export metrics
+   - Benchmark results
+   - Resource utilization
+   - Trend analysis
+   - Command: machine-dream export metrics
 
-{bold}4. Dream Summaries{/bold}
+4. Dream Summaries
    Export dream cycle results
-   • Pattern discoveries
-   • Abstracted knowledge
-   • Learning insights
-   • Command: machine-dream export dreams
+   - Pattern discoveries
+   - Abstracted knowledge
+   - Learning insights
+   - Command: machine-dream export dreams
 
-{cyan-fg}───────────────────────────────────────────────────────────────────{/cyan-fg}
+-------------------------------------------------------------------
 
-{bold}Export Formats:{/bold}
+Export Formats:
 
   JSON        Structured data, machine-readable
   CSV         Spreadsheet import, analytics
   Markdown    Human-readable reports
   SQLite      Database backup format
 
-{cyan-fg}───────────────────────────────────────────────────────────────────{/cyan-fg}
+-------------------------------------------------------------------
 
-{bold}Quick Export Commands:{/bold}
+Quick Export Commands:
 
   # Export last session
   $ machine-dream export session latest
@@ -102,7 +102,7 @@ export class ExportScreen extends Component {
   # Export dream results
   $ machine-dream export dreams --format md
 
-{cyan-fg}═══════════════════════════════════════════════════════════════════{/cyan-fg}
+===================================================================
 
 Default export location: ~/.machine-dream/exports/
 `;

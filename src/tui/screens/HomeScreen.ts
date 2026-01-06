@@ -46,32 +46,32 @@ export class HomeScreen extends Component {
     return `
 {bold}{center}Welcome to Machine Dream TUI{/center}{/bold}
 
-{cyan-fg}═══════════════════════════════════════════════════════════════════{/cyan-fg}
+===================================================================
 
-{bold}System Status{/bold}
-  Memory System:  ✓ AgentDB (Ready)
+System Status:
+  Memory System:  AgentDB (Ready)
   Sessions:       0 total
-  Database:       ✓ Healthy
+  Database:       Healthy
   Uptime:         Just started
 
-{cyan-fg}───────────────────────────────────────────────────────────────────{/cyan-fg}
+-------------------------------------------------------------------
 
-{bold}Quick Start{/bold}
-  1. Press {bold}S{/bold} to solve a puzzle
-  2. Press {bold}M{/bold} to browse memory
-  3. Press {bold}D{/bold} to run dream cycle
-  4. Press {bold}B{/bold} to run benchmarks
+Quick Start:
+  1. Press [S] to solve a puzzle
+  2. Press [M] to browse memory
+  3. Press [D] to run dream cycle
+  4. Press [B] to run benchmarks
 
-{cyan-fg}───────────────────────────────────────────────────────────────────{/cyan-fg}
+-------------------------------------------------------------------
 
-{bold}Keyboard Shortcuts{/bold}
-  {bold}F1{/bold}          - Help
-  {bold}Ctrl+C{/bold}      - Exit
-  {bold}Ctrl+R{/bold}      - Refresh
-  {bold}Tab{/bold}         - Next field
-  {bold}Enter{/bold}       - Select/Submit
+Keyboard Shortcuts:
+  F1          - Help
+  Ctrl+C      - Exit
+  Ctrl+R      - Refresh
+  Tab         - Next field
+  Enter       - Select/Submit
 
-{cyan-fg}═══════════════════════════════════════════════════════════════════{/cyan-fg}
+===================================================================
 
 Navigate using the menu on the left or press keyboard shortcuts above.
 `;

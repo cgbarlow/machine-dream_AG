@@ -44,31 +44,31 @@ export class DemoScreen extends Component {
 
   private getDemoContent(): string {
     return `
-{bold}{center}🎮 Interactive Demonstrations{/center}{/bold}
+{bold}{center} Interactive Demonstrations{/center}{/bold}
 
 {cyan-fg}═══════════════════════════════════════════════════════════════════{/cyan-fg}
 
-{bold}Available Demos:{/bold}
+Available Demos:
 
-{bold}1. GRASP Loop Visualization{/bold}
+1. GRASP Loop Visualization
    Watch the Generate-Reflect-Assess-Select-Persist loop in action
    • Live state visualization
    • Step-by-step execution
    • Real-time metrics
 
-{bold}2. Memory System Tour{/bold}
+2. Memory System Tour
    Explore AgentDB vector database capabilities
    • Vector similarity search
    • Session persistence
    • Memory consolidation
 
-{bold}3. Neural Pattern Learning{/bold}
+3. Neural Pattern Learning
    See how the system learns from experience
    • Pattern recognition
    • Strategy optimization
    • Performance improvement
 
-{bold}4. Dream Cycle Walkthrough{/bold}
+4. Dream Cycle Walkthrough
    Experience the 5-phase dream process
    • Capture recent experiences
    • Triage by importance
@@ -78,7 +78,7 @@ export class DemoScreen extends Component {
 
 {cyan-fg}───────────────────────────────────────────────────────────────────{/cyan-fg}
 
-{bold}How to Run Demos:{/bold}
+How to Run Demos:
 
 From CLI:
   $ machine-dream demo grasp-loop
@@ -88,13 +88,13 @@ From CLI:
 
 {cyan-fg}═══════════════════════════════════════════════════════════════════{/cyan-fg}
 
-{bold}Interactive Features:{/bold}
+Interactive Features:
   • Pause/Resume execution
   • Step through processes
   • Inspect internal state
   • Export session data
 
-Press {bold}Ctrl+R{/bold} to refresh this screen
+Press Ctrl+R to refresh this screen
 `;
   }
 }

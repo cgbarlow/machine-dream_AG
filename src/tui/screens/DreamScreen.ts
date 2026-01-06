@@ -50,7 +50,7 @@ export class DreamScreen extends Component {
       left: 0,
       width: '100%',
       height: 1,
-      content: '{bold}{cyan-fg}💤 Dream Cycle{/cyan-fg}{/bold}',
+      content: '{bold}{cyan-fg} Dream Cycle{/cyan-fg}{/bold}',
       tags: true
     });
     container.append(title);
@@ -184,7 +184,7 @@ export class DreamScreen extends Component {
             const phaseData = event.data as { phase: string; phaseIndex: number };
             const phases = ['Capture', 'Triage', 'Compress', 'Abstract', 'Integrate'];
             const phaseStatus = phases.map((p, i) => {
-              const status = i < phaseData.phaseIndex ? '✓' : i === phaseData.phaseIndex ? '⏵' : '○';
+              const status = i < phaseData.phaseIndex ? '[OK]' : i === phaseData.phaseIndex ? '⏵' : '○';
               return `  ${status} ${p}`;
             }).join('\n');
             this.phaseBox?.setContent(`\n${phaseStatus}`);
@@ -201,17 +201,17 @@ export class DreamScreen extends Component {
     this.resultBox?.show();
 
     if (result.success) {
-      this.statusText?.setContent('{green-fg}✓ Dream cycle completed successfully!{/green-fg}');
+      this.statusText?.setContent('{green-fg}[OK] Dream cycle completed successfully!{/green-fg}');
       this.resultBox?.setContent(
-        `\n{bold}Dream Cycle Complete{/bold}\n\n` +
+        `\nDream Cycle Complete\n\n` +
         `Phases completed: ${(result.data as any)?.phases || 5}\n` +
         `Execution time: ${result.executionTime}ms\n\n` +
         `Results:\n${JSON.stringify(result.data, null, 2)}`
       );
     } else {
-      this.statusText?.setContent('{red-fg}✗ Dream cycle failed{/red-fg}');
+      this.statusText?.setContent('{red-fg}[X] Dream cycle failed{/red-fg}');
       this.resultBox?.setContent(
-        `\n{bold}Error:{/bold}\n\n` +
+        `\nError:\n\n` +
         `${result.error?.message || 'Unknown error'}`
       );
     }

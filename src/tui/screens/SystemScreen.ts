@@ -50,56 +50,56 @@ export class SystemScreen extends Component {
     const memUsage = process.memoryUsage();
 
     return `
-{bold}{center}🖥️  System Information{/center}{/bold}
+{center}System Information{/center}
 
-{cyan-fg}═══════════════════════════════════════════════════════════════════{/cyan-fg}
+===================================================================
 
-{bold}Runtime Environment:{/bold}
+Runtime Environment:
   Node.js version:    ${nodeVersion}
   Platform:           ${platform}
   Architecture:       ${arch}
   Process uptime:     ${Math.floor(uptime)} seconds
 
-{bold}Memory Usage:{/bold}
+Memory Usage:
   Heap used:          ${Math.floor(memUsage.heapUsed / 1024 / 1024)} MB
   Heap total:         ${Math.floor(memUsage.heapTotal / 1024 / 1024)} MB
-  RSS:               ${Math.floor(memUsage.rss / 1024 / 1024)} MB
-  External:          ${Math.floor(memUsage.external / 1024 / 1024)} MB
+  RSS:                ${Math.floor(memUsage.rss / 1024 / 1024)} MB
+  External:           ${Math.floor(memUsage.external / 1024 / 1024)} MB
 
-{bold}Machine Dream:{/bold}
-  Version:           1.0.0
-  Memory system:     AgentDB
-  Database status:   ✓ Healthy
-  Active sessions:   0
+Machine Dream:
+  Version:            1.0.0
+  Memory system:      AgentDB
+  Database status:    Healthy
+  Active sessions:    0
 
-{cyan-fg}───────────────────────────────────────────────────────────────────{/cyan-fg}
+-------------------------------------------------------------------
 
-{bold}Dependencies:{/bold}
-  AgentDB:           ^1.0.0
-  blessed:           ^0.1.81
-  @anthropic-ai/sdk: ^0.30.1
-  vitest:            ^2.1.8
-  typescript:        ^5.7.2
+Dependencies:
+  AgentDB:            ^1.0.0
+  blessed:            ^0.1.81
+  @anthropic-ai/sdk:  ^0.30.1
+  vitest:             ^2.1.8
+  typescript:         ^5.7.2
 
-{cyan-fg}───────────────────────────────────────────────────────────────────{/cyan-fg}
+-------------------------------------------------------------------
 
-{bold}File Locations:{/bold}
-  Home directory:    ~/.machine-dream
-  Database:          ~/.machine-dream/agentdb
-  Configuration:     ~/.machine-dream/config.json
-  Logs:             ~/.machine-dream/logs
-  Exports:          ~/.machine-dream/exports
+File Locations:
+  Home directory:     ~/.machine-dream
+  Database:           ~/.machine-dream/agentdb
+  Configuration:      ~/.machine-dream/config.json
+  Logs:               ~/.machine-dream/logs
+  Exports:            ~/.machine-dream/exports
 
-{cyan-fg}───────────────────────────────────────────────────────────────────{/cyan-fg}
+-------------------------------------------------------------------
 
-{bold}Diagnostics:{/bold}
-  ✓ Memory system operational
-  ✓ Configuration valid
-  ✓ Database accessible
-  ✓ Terminal capabilities detected
-  ✓ All core systems functional
+Diagnostics:
+  [OK] Memory system operational
+  [OK] Configuration valid
+  [OK] Database accessible
+  [OK] Terminal capabilities detected
+  [OK] All core systems functional
 
-{cyan-fg}═══════════════════════════════════════════════════════════════════{/cyan-fg}
+===================================================================
 
 For detailed diagnostics: $ machine-dream system check
 For logs: $ machine-dream system logs

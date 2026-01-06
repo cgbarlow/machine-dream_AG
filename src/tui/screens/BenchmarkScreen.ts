@@ -44,7 +44,7 @@ export class BenchmarkScreen extends Component {
       left: 0,
       width: '100%',
       height: 1,
-      content: '{bold}{cyan-fg}⚡ Performance Benchmarks{/cyan-fg}{/bold}',
+      content: '{bold}{cyan-fg} Performance Benchmarks{/cyan-fg}{/bold}',
       tags: true
     });
     container.append(title);
@@ -106,7 +106,7 @@ export class BenchmarkScreen extends Component {
 
   private async runBenchmarks(): Promise<void> {
     this.statusText?.setContent('{yellow-fg}Running benchmarks...{/yellow-fg}');
-    this.resultBox?.setContent('\n{bold}Running benchmarks...{/bold}\n\nPlease wait...');
+    this.resultBox?.setContent('\nRunning benchmarks...\n\nPlease wait...');
     this.refresh();
 
     const result = await this.cliExecutor.execute(
@@ -116,29 +116,29 @@ export class BenchmarkScreen extends Component {
     );
 
     if (result.success) {
-      this.statusText?.setContent('{green-fg}✓ Benchmarks completed!{/green-fg}');
+      this.statusText?.setContent('{green-fg}[OK] Benchmarks completed!{/green-fg}');
 
       // Display formatted results
       const resultsText = `
-{bold}Benchmark Results{/bold}
+Benchmark Results
 {cyan-fg}═══════════════════════════════════════════════════════════{/cyan-fg}
 
-{bold}Memory Operations:{/bold}
+Memory Operations:
   • Write throughput:    1,234,567 ops/sec
   • Read throughput:     2,345,678 ops/sec
   • Vector search:       12,345 queries/sec
 
-{bold}Neural Inference:{/bold}
+Neural Inference:
   • Single inference:    5.2 ms
   • Batch inference:     45.8 ms (100 items)
   • Model load time:     123 ms
 
-{bold}GRASP Loop:{/bold}
+GRASP Loop:
   • Simple puzzle:       234 ms
   • Medium puzzle:       1,456 ms
   • Complex puzzle:      5,678 ms
 
-{bold}System Resources:{/bold}
+System Resources:
   • Memory usage:        256 MB
   • CPU utilization:     45%
   • Disk I/O:           12 MB/s
@@ -150,9 +150,9 @@ Execution time: ${result.executionTime}ms
 
       this.resultBox?.setContent(resultsText);
     } else {
-      this.statusText?.setContent('{red-fg}✗ Benchmarks failed{/red-fg}');
+      this.statusText?.setContent('{red-fg}[X] Benchmarks failed{/red-fg}');
       this.resultBox?.setContent(
-        `\n{bold}Error:{/bold}\n\n` +
+        `\nError:\n\n` +
         `${result.error?.message || 'Unknown error'}`
       );
     }

@@ -48,28 +48,28 @@ export class ConfigScreen extends Component {
 
 {cyan-fg}═══════════════════════════════════════════════════════════════════{/cyan-fg}
 
-{bold}Current Configuration:{/bold}
+Current Configuration:
 
-{bold}Memory System:{/bold}
+Memory System:
   Database:           AgentDB
   Storage path:       ~/.machine-dream/agentdb
   Cache size:         256 MB
   Vector dimensions:  384
   Index type:         HNSW
 
-{bold}Neural Models:{/bold}
+Neural Models:
   Embedding model:    all-MiniLM-L6-v2
   LLM provider:       Local
   Max context:        8192 tokens
   Temperature:        0.7
 
-{bold}GRASP Parameters:{/bold}
+GRASP Parameters:
   Max iterations:     50
   Timeout:           30000 ms
   Reflection depth:   3
   Selection strategy: best-first
 
-{bold}Dream Cycle:{/bold}
+Dream Cycle:
   Auto-run:          Enabled
   Interval:          24 hours
   Compression ratio:  0.3
@@ -77,7 +77,7 @@ export class ConfigScreen extends Component {
 
 {cyan-fg}───────────────────────────────────────────────────────────────────{/cyan-fg}
 
-{bold}Environment Variables:{/bold}
+Environment Variables:
 
   MACHINE_DREAM_HOME      ~/.machine-dream
   AGENTDB_PATH            ~/.machine-dream/agentdb
@@ -87,7 +87,7 @@ export class ConfigScreen extends Component {
 
 {cyan-fg}───────────────────────────────────────────────────────────────────{/cyan-fg}
 
-{bold}Configuration Files:{/bold}
+Configuration Files:
 
   Config:    ~/.machine-dream/config.json
   Secrets:   ~/.machine-dream/secrets.env
