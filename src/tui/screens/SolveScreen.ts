@@ -49,7 +49,7 @@ export class SolveScreen extends Component {
       left: 0,
       width: '100%',
       height: 1,
-      content: '{bold}{cyan-fg}Solve Puzzle{/cyan-fg}{/bold}',
+      content: '{bold}Solve Puzzle{/bold}',
       tags: true
     });
     container.append(title);
@@ -158,7 +158,7 @@ export class SolveScreen extends Component {
   }
 
   private async handleSubmit(formData: SolveFormData): Promise<void> {
-    this.statusText?.setContent('{yellow-fg}Starting solve...{/yellow-fg}');
+    this.statusText?.setContent('Starting solve...');
     this.progressBox?.show();
     this.resultBox?.hide();
     this.refresh();
@@ -184,14 +184,14 @@ export class SolveScreen extends Component {
     this.resultBox?.show();
 
     if (result.success) {
-      this.statusText?.setContent('{green-fg}[OK] Solve completed successfully!{/green-fg}');
+      this.statusText?.setContent('[OK] Solve completed successfully!');
       this.resultBox?.setContent(
         `\n{bold}Success!{/bold}\n\n` +
         `Result:\n${JSON.stringify(result.data, null, 2)}\n\n` +
         `Execution time: ${result.executionTime}ms`
       );
     } else {
-      this.statusText?.setContent('{red-fg}[ERROR] Solve failed{/red-fg}');
+      this.statusText?.setContent('[ERROR] Solve failed');
       this.resultBox?.setContent(
         `\n{bold}Error:{/bold}\n\n` +
         `${result.error?.message || 'Unknown error'}`

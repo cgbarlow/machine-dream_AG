@@ -44,7 +44,7 @@ export class BenchmarkScreen extends Component {
       left: 0,
       width: '100%',
       height: 1,
-      content: '{bold}{cyan-fg} Performance Benchmarks{/cyan-fg}{/bold}',
+      content: '{bold} Performance Benchmarks{/bold}',
       tags: true
     });
     container.append(title);
@@ -105,7 +105,7 @@ export class BenchmarkScreen extends Component {
   }
 
   private async runBenchmarks(): Promise<void> {
-    this.statusText?.setContent('{yellow-fg}Running benchmarks...{/yellow-fg}');
+    this.statusText?.setContent('Running benchmarks...');
     this.resultBox?.setContent('\nRunning benchmarks...\n\nPlease wait...');
     this.refresh();
 
@@ -116,41 +116,41 @@ export class BenchmarkScreen extends Component {
     );
 
     if (result.success) {
-      this.statusText?.setContent('{green-fg}[OK] Benchmarks completed!{/green-fg}');
+      this.statusText?.setContent('[OK] Benchmarks completed!');
 
       // Display formatted results
       const resultsText = `
 Benchmark Results
-{cyan-fg}═══════════════════════════════════════════════════════════{/cyan-fg}
+═══════════════════════════════════════════════════════════
 
 Memory Operations:
-  • Write throughput:    1,234,567 ops/sec
-  • Read throughput:     2,345,678 ops/sec
-  • Vector search:       12,345 queries/sec
+  - Write throughput:    1,234,567 ops/sec
+  - Read throughput:     2,345,678 ops/sec
+  - Vector search:       12,345 queries/sec
 
 Neural Inference:
-  • Single inference:    5.2 ms
-  • Batch inference:     45.8 ms (100 items)
-  • Model load time:     123 ms
+  - Single inference:    5.2 ms
+  - Batch inference:     45.8 ms (100 items)
+  - Model load time:     123 ms
 
 GRASP Loop:
-  • Simple puzzle:       234 ms
-  • Medium puzzle:       1,456 ms
-  • Complex puzzle:      5,678 ms
+  - Simple puzzle:       234 ms
+  - Medium puzzle:       1,456 ms
+  - Complex puzzle:      5,678 ms
 
 System Resources:
-  • Memory usage:        256 MB
-  • CPU utilization:     45%
-  • Disk I/O:           12 MB/s
+  - Memory usage:        256 MB
+  - CPU utilization:     45%
+  - Disk I/O:           12 MB/s
 
-{cyan-fg}═══════════════════════════════════════════════════════════{/cyan-fg}
+═══════════════════════════════════════════════════════════
 
 Execution time: ${result.executionTime}ms
 `;
 
       this.resultBox?.setContent(resultsText);
     } else {
-      this.statusText?.setContent('{red-fg}[X] Benchmarks failed{/red-fg}');
+      this.statusText?.setContent('[X] Benchmarks failed');
       this.resultBox?.setContent(
         `\nError:\n\n` +
         `${result.error?.message || 'Unknown error'}`

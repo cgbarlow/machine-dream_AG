@@ -46,37 +46,37 @@ export class DemoScreen extends Component {
     return `
 {bold}{center} Interactive Demonstrations{/center}{/bold}
 
-{cyan-fg}═══════════════════════════════════════════════════════════════════{/cyan-fg}
+═══════════════════════════════════════════════════════════════════
 
 Available Demos:
 
 1. GRASP Loop Visualization
    Watch the Generate-Reflect-Assess-Select-Persist loop in action
-   • Live state visualization
-   • Step-by-step execution
-   • Real-time metrics
+   - Live state visualization
+   - Step-by-step execution
+   - Real-time metrics
 
 2. Memory System Tour
    Explore AgentDB vector database capabilities
-   • Vector similarity search
-   • Session persistence
-   • Memory consolidation
+   - Vector similarity search
+   - Session persistence
+   - Memory consolidation
 
 3. Neural Pattern Learning
    See how the system learns from experience
-   • Pattern recognition
-   • Strategy optimization
-   • Performance improvement
+   - Pattern recognition
+   - Strategy optimization
+   - Performance improvement
 
 4. Dream Cycle Walkthrough
    Experience the 5-phase dream process
-   • Capture recent experiences
-   • Triage by importance
-   • Compress similar patterns
-   • Abstract key concepts
-   • Integrate into long-term memory
+   - Capture recent experiences
+   - Triage by importance
+   - Compress similar patterns
+   - Abstract key concepts
+   - Integrate into long-term memory
 
-{cyan-fg}───────────────────────────────────────────────────────────────────{/cyan-fg}
+───────────────────────────────────────────────────────────────────
 
 How to Run Demos:
 
@@ -86,13 +86,13 @@ From CLI:
   $ machine-dream demo neural-learning
   $ machine-dream demo dream-cycle
 
-{cyan-fg}═══════════════════════════════════════════════════════════════════{/cyan-fg}
+═══════════════════════════════════════════════════════════════════
 
 Interactive Features:
-  • Pause/Resume execution
-  • Step through processes
-  • Inspect internal state
-  • Export session data
+  - Pause/Resume execution
+  - Step through processes
+  - Inspect internal state
+  - Export session data
 
 Press Ctrl+R to refresh this screen
 `;

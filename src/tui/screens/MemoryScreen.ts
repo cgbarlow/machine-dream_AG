@@ -49,7 +49,7 @@ export class MemoryScreen extends Component {
       left: 0,
       width: '100%',
       height: 1,
-      content: '{bold}{cyan-fg}Memory Browser{/cyan-fg}{/bold}',
+      content: '{bold}Memory Browser{/bold}',
       tags: true
     });
     container.append(title);
@@ -159,7 +159,7 @@ export class MemoryScreen extends Component {
   }
 
   private async handleStore(formData: MemoryStoreFormData): Promise<void> {
-    this.statusText?.setContent('{yellow-fg}Storing value...{/yellow-fg}');
+    this.statusText?.setContent('Storing value...');
     this.refresh();
 
     const result = await this.cliExecutor.execute(
@@ -171,17 +171,17 @@ export class MemoryScreen extends Component {
     );
 
     if (result.success) {
-      this.statusText?.setContent('{green-fg}[OK] Value stored successfully!{/green-fg}');
+      this.statusText?.setContent('[OK] Value stored successfully!');
       await this.handleList();
     } else {
-      this.statusText?.setContent('{red-fg}[ERROR] Failed to store value{/red-fg}');
+      this.statusText?.setContent('[ERROR] Failed to store value');
     }
 
     this.refresh();
   }
 
   private async handleList(): Promise<void> {
-    this.statusText?.setContent('{yellow-fg}Loading memory entries...{/yellow-fg}');
+    this.statusText?.setContent('Loading memory entries...');
     this.refresh();
 
     const result = await this.cliExecutor.execute(
@@ -191,7 +191,7 @@ export class MemoryScreen extends Component {
     );
 
     if (result.success) {
-      this.statusText?.setContent('{green-fg}[OK] Loaded memory entries{/green-fg}');
+      this.statusText?.setContent('[OK] Loaded memory entries');
 
       // Display keys (simulated data for now)
       const keys = ['session-state', 'puzzle-cache', 'dream-results', 'my-key'];
@@ -199,7 +199,7 @@ export class MemoryScreen extends Component {
 
       this.detailBox?.setContent('\nSelect a key to view its value');
     } else {
-      this.statusText?.setContent('{red-fg}[ERROR] Failed to load entries{/red-fg}');
+      this.statusText?.setContent('[ERROR] Failed to load entries');
     }
 
     this.refresh();

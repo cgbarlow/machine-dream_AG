@@ -50,7 +50,7 @@ export class DreamScreen extends Component {
       left: 0,
       width: '100%',
       height: 1,
-      content: '{bold}{cyan-fg} Dream Cycle{/cyan-fg}{/bold}',
+      content: '{bold} Dream Cycle{/bold}',
       tags: true
     });
     container.append(title);
@@ -161,7 +161,7 @@ export class DreamScreen extends Component {
   }
 
   private async handleSubmit(formData: DreamFormData): Promise<void> {
-    this.statusText?.setContent('{yellow-fg}Starting dream cycle...{/yellow-fg}');
+    this.statusText?.setContent('Starting dream cycle...');
     this.progressBox?.show();
     this.phaseBox?.show();
     this.resultBox?.hide();
@@ -201,7 +201,7 @@ export class DreamScreen extends Component {
     this.resultBox?.show();
 
     if (result.success) {
-      this.statusText?.setContent('{green-fg}[OK] Dream cycle completed successfully!{/green-fg}');
+      this.statusText?.setContent('[OK] Dream cycle completed successfully!');
       this.resultBox?.setContent(
         `\nDream Cycle Complete\n\n` +
         `Phases completed: ${(result.data as any)?.phases || 5}\n` +
@@ -209,7 +209,7 @@ export class DreamScreen extends Component {
         `Results:\n${JSON.stringify(result.data, null, 2)}`
       );
     } else {
-      this.statusText?.setContent('{red-fg}[X] Dream cycle failed{/red-fg}');
+      this.statusText?.setContent('[X] Dream cycle failed');
       this.resultBox?.setContent(
         `\nError:\n\n` +
         `${result.error?.message || 'Unknown error'}`

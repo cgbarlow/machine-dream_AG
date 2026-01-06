@@ -46,7 +46,7 @@ export class ConfigScreen extends Component {
     return `
 {bold}{center}System Configuration{/center}{/bold}
 
-{cyan-fg}═══════════════════════════════════════════════════════════════════{/cyan-fg}
+═══════════════════════════════════════════════════════════════════
 
 Current Configuration:
 
@@ -75,7 +75,7 @@ Dream Cycle:
   Compression ratio:  0.3
   Min importance:     0.5
 
-{cyan-fg}───────────────────────────────────────────────────────────────────{/cyan-fg}
+───────────────────────────────────────────────────────────────────
 
 Environment Variables:
 
@@ -85,7 +85,7 @@ Environment Variables:
   MEMORY_SYSTEM           agentdb
   ENABLE_TELEMETRY        false
 
-{cyan-fg}───────────────────────────────────────────────────────────────────{/cyan-fg}
+───────────────────────────────────────────────────────────────────
 
 Configuration Files:
 
@@ -93,7 +93,7 @@ Configuration Files:
   Secrets:   ~/.machine-dream/secrets.env
   Logs:      ~/.machine-dream/logs/
 
-{cyan-fg}═══════════════════════════════════════════════════════════════════{/cyan-fg}
+═══════════════════════════════════════════════════════════════════
 
 To modify configuration, edit files above or use:
   $ machine-dream config set <key> <value>
