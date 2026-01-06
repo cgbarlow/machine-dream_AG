@@ -44,7 +44,7 @@ export class ConfigScreen extends Component {
 
   private getConfigContent(): string {
     return `
-{bold}{center}⚙️  System Configuration{/center}{/bold}
+{bold}{center}System Configuration{/center}{/bold}
 
 {cyan-fg}═══════════════════════════════════════════════════════════════════{/cyan-fg}
 

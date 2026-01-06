@@ -228,55 +228,55 @@ export class TUIApplication {
   private getMenuItems(): MenuItem[] {
     return [
       {
-        icon: '🏠',
+        icon: '*',
         label: 'Home',
         screen: 'home',
         shortcut: 'H'
       },
       {
-        icon: '🧩',
+        icon: '#',
         label: 'Solve',
         screen: 'solve',
         shortcut: 'S'
       },
       {
-        icon: '💾',
+        icon: '@',
         label: 'Memory',
         screen: 'memory',
         shortcut: 'M'
       },
       {
-        icon: '💤',
+        icon: '~',
         label: 'Dream',
         screen: 'dream',
         shortcut: 'D'
       },
       {
-        icon: '⚡',
+        icon: '+',
         label: 'Benchmark',
         screen: 'benchmark',
         shortcut: 'B'
       },
       {
-        icon: '🎮',
+        icon: '>',
         label: 'Demo',
         screen: 'demo',
         shortcut: 'E'
       },
       {
-        icon: '⚙️',
+        icon: '%',
         label: 'Config',
         screen: 'config',
         shortcut: 'C'
       },
       {
-        icon: '📤',
+        icon: '^',
         label: 'Export',
         screen: 'export',
         shortcut: 'X'
       },
       {
-        icon: '🖥️',
+        icon: '=',
         label: 'System',
         screen: 'system',
         shortcut: 'Y'

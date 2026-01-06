@@ -49,7 +49,7 @@ export class MemoryScreen extends Component {
       left: 0,
       width: '100%',
       height: 1,
-      content: '{bold}{cyan-fg}💾 Memory Browser{/cyan-fg}{/bold}',
+      content: '{bold}{cyan-fg}Memory Browser{/cyan-fg}{/bold}',
       tags: true
     });
     container.append(title);
@@ -171,10 +171,10 @@ export class MemoryScreen extends Component {
     );
 
     if (result.success) {
-      this.statusText?.setContent('{green-fg}✓ Value stored successfully!{/green-fg}');
+      this.statusText?.setContent('{green-fg}[OK] Value stored successfully!{/green-fg}');
       await this.handleList();
     } else {
-      this.statusText?.setContent('{red-fg}✗ Failed to store value{/red-fg}');
+      this.statusText?.setContent('{red-fg}[ERROR] Failed to store value{/red-fg}');
     }
 
     this.refresh();
@@ -191,7 +191,7 @@ export class MemoryScreen extends Component {
     );
 
     if (result.success) {
-      this.statusText?.setContent('{green-fg}✓ Loaded memory entries{/green-fg}');
+      this.statusText?.setContent('{green-fg}[OK] Loaded memory entries{/green-fg}');
 
       // Display keys (simulated data for now)
       const keys = ['session-state', 'puzzle-cache', 'dream-results', 'my-key'];
@@ -199,7 +199,7 @@ export class MemoryScreen extends Component {
 
       this.detailBox?.setContent('\nSelect a key to view its value');
     } else {
-      this.statusText?.setContent('{red-fg}✗ Failed to load entries{/red-fg}');
+      this.statusText?.setContent('{red-fg}[ERROR] Failed to load entries{/red-fg}');
     }
 
     this.refresh();
