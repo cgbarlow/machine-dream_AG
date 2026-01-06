@@ -1318,6 +1318,223 @@ This section specifies the integration between the CLI interface and existing ba
 
 
 
+---
+
+## 17. TUI Integration Interface
+
+### 17.1 Programmatic Command Execution
+
+**Purpose**: Enable the TUI to execute CLI commands programmatically without spawning subprocess.
+
+**Core Interface**:
+```typescript
+// src/cli/executor.ts
+export interface CommandExecutor {
+  execute(
+    command: string,
+    args: string[],
+    options: Record<string, unknown>,
+    callbacks?: ExecutionCallbacks
+  ): Promise<CommandResult>;
+}
+
+export interface ExecutionCallbacks {
+  onProgress?: (event: CommandProgressEvent) => void;
+  onOutput?: (data: string) => void;
+  onError?: (error: Error) => void;
+}
+
+export interface CommandProgressEvent {
+  type: 'start' | 'progress' | 'complete' | 'error';
+  command: string;
+  percentage?: number;
+  message?: string;
+  data?: unknown;
+}
+
+export interface CommandResult {
+  success: boolean;
+  data?: unknown;
+  error?: Error;
+  executionTime?: number;
+}
+```
+
+### 17.2 Implementation Pattern
+
+```typescript
+// Example: TUI executes solve command
+import { executeCommand } from './cli/executor';
+import { OutputManager } from './tui/services/OutputManager';
+
+class SolveScreen {
+  private outputManager: OutputManager;
+
+  async handleSubmit(formData: SolveFormData): Promise<void> {
+    // Emit TUI event
+    this.outputManager.emit({
+      timestamp: Date.now(),
+      eventType: 'command',
+      component: 'SolveScreen',
+      data: {
+        command: 'solve',
+        args: [formData.puzzleFile],
+        status: 'started'
+      }
+    });
+
+    // Execute CLI command programmatically
+    const result = await executeCommand(
+      'solve',
+      [formData.puzzleFile],
+      {
+        memorySystem: formData.memorySystem,
+        enableRL: formData.enableRL,
+        maxIterations: formData.maxIterations
+      },
+      {
+        onProgress: (event) => {
+          // Update TUI progress bar
+          this.progressBar.setProgress(event.percentage || 0);
+          this.statusText.setContent(event.message || '');
+
+          // Emit progress event for tests
+          this.outputManager.emit({
+            timestamp: Date.now(),
+            eventType: 'command',
+            component: 'SolveScreen',
+            data: { ...event, status: 'progress' }
+          });
+        }
+      }
+    );
+
+    // Emit completion event
+    this.outputManager.emit({
+      timestamp: Date.now(),
+      eventType: 'command',
+      component: 'SolveScreen',
+      data: {
+        command: 'solve',
+        status: result.success ? 'complete' : 'error',
+        result
+      }
+    });
+  }
+}
+```
+
+### 17.3 Progress Event Streaming
+
+**Progress events for different commands**:
+
+| Command | Progress Events |
+|---------|----------------|
+| `solve` | Iteration count, current cell, insights generated |
+| `dream run` | Phase (capture/triage/compress/abstract/integrate), patterns processed |
+| `benchmark run` | Puzzle completion, metrics collected |
+| `memory consolidate` | Patterns compressed, abstraction level |
+
+**Example progress sequence**:
+```typescript
+// solve command progress events
+{ type: 'start', command: 'solve', message: 'Initializing...' }
+{ type: 'progress', command: 'solve', percentage: 10, message: 'Iteration 1/10', data: { iteration: 1, cell: 'r0c0' } }
+{ type: 'progress', command: 'solve', percentage: 50, message: 'Iteration 5/10', data: { iteration: 5, insights: 3 } }
+{ type: 'complete', command: 'solve', percentage: 100, message: 'Solved!', data: { solved: true, iterations: 8 } }
+```
+
+### 17.4 Output Capturing
+
+**Redirect stdout/stderr for TUI display**:
+
+```typescript
+interface OutputCapture {
+  stdout: string[];  // Captured stdout lines
+  stderr: string[];  // Captured stderr lines
+  logs: LogEntry[];  // Structured log entries
+}
+
+interface LogEntry {
+  level: 'debug' | 'info' | 'warn' | 'error';
+  message: string;
+  timestamp: number;
+  context?: Record<string, unknown>;
+}
+
+// Example: Capture command output for TUI log viewer
+const result = await executeCommand('solve', args, options, {
+  onOutput: (line) => {
+    this.logViewer.appendLine(line);
+  }
+});
+```
+
+### 17.5 Error Handling
+
+**Map CLI errors to TUI-friendly messages**:
+
+```typescript
+try {
+  const result = await executeCommand('solve', args, options);
+  if (!result.success && result.error) {
+    this.showErrorDialog({
+      title: 'Command Failed',
+      message: result.error.message,
+      details: result.error.stack,
+      suggestions: result.error.suggestions || []
+    });
+  }
+} catch (error) {
+  this.showErrorDialog({
+    title: 'Unexpected Error',
+    message: error instanceof Error ? error.message : String(error),
+    suggestions: ['Check logs', 'Try again', 'Report issue']
+  });
+}
+```
+
+### 17.6 Session Management
+
+**Share configuration between CLI and TUI**:
+
+```typescript
+// Both CLI and TUI use same configuration
+import { Configuration } from './config/Configuration';
+
+const config = Configuration.load('.poc-config.json');
+
+// CLI uses config
+await executeCommand('solve', args, { config });
+
+// TUI uses config
+const tui = new TUIApplication({ config });
+```
+
+### 17.7 Command Discovery
+
+**TUI automatically discovers available CLI commands**:
+
+```typescript
+import { getAvailableCommands } from './cli/registry';
+
+const commands = getAvailableCommands();
+/*
+Returns:
+[
+  { name: 'solve', description: '...', options: [...] },
+  { name: 'memory store', description: '...', options: [...] },
+  { name: 'dream run', description: '...', options: [...] },
+  ...
+]
+*/
+
+// TUI builds menus from command registry
+const menus = buildMenusFromCommands(commands);
+```
+
+---
+
 **Document Status:** 🟡 Implementation-In-Progress (75% Complete)
 
 **Next Steps:**

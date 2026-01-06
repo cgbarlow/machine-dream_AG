@@ -13,7 +13,6 @@ import { version } from '../../package.json';
 import { CLIError } from './errors';
 import { configureGlobalOptions } from './global-options';
 import { registerCommands } from './commands';
-import { loadConfiguration } from './config';
 import { logger } from './logger';
 
 // CLI Entry Point

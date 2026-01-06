@@ -1,9 +1,9 @@
 # Machine Dream - Terminal Menu Interface (TUI) Specification
 
 **Component:** Terminal User Interface (TUI)
-**Version:** 1.0.0
-**Date:** January 5, 2026
-**Status:** Implementation-Ready
+**Version:** 2.0.0
+**Date:** January 6, 2026
+**Status:** Implementation-Ready (ink-based)
 
 ---
 
@@ -28,21 +28,54 @@ This specification defines a comprehensive Terminal User Interface (TUI) for the
 
 ### 2.1 Technology Stack
 
-**Primary Framework**: `blessed` (Node.js TUI library)
-- Mature, feature-rich terminal UI framework
-- Supports mouse and keyboard events
-- Rich widget library (boxes, lists, forms, tables, etc.)
-- Cross-platform (Linux, macOS, Windows)
+**Primary Framework**: `ink` (React-based TUI library)
+- Modern React-based architecture using virtual DOM
+- **Used by Claude Code** - proven in production
+- **Node.js v24 + WSL compatible** - no stack overflow issues
+- Component-based with React hooks for state management
+- Declarative UI with JSX syntax
+- Active maintenance with weekly updates
+- Cross-platform (Linux, macOS, Windows, WSL)
 
-**Alternative**: `ink` (React-based TUI)
-- Modern React-based approach
-- Component-based architecture
-- Excellent for dynamic updates
+**Why ink over blessed**:
+- ❌ blessed/neo-blessed: Stack overflow on Node.js v24 + WSL (regex parsing bug)
+- ✅ ink: Virtual DOM rendering, no regex issues
+- ✅ ink: Modern React ecosystem and tooling
+- ✅ ink: Better testing with React Testing Library
+- ✅ ink: Same framework Claude Code uses successfully
 
-**Recommended**: `blessed` for stability and features
+**Dependencies**:
+- `ink` v5.x - Terminal rendering framework
+- `react` v18.x - Component model and virtual DOM
+- TypeScript with JSX support
 
-### 2.2 Component Architecture
+### 2.2 Component Architecture (React + ink)
 
+**React Component Hierarchy**:
+```tsx
+<App>                           // Main application component
+  <Box>                         // Root layout container
+    <Header />                  // Title, subtitle
+    <Box horizontal>            // Main content area
+      <Sidebar                  // Navigation menu
+        items={menuItems}
+        onSelect={handleNav}
+      />
+      <ContentArea>             // Dynamic screen content
+        {currentScreen === 'home' && <HomeScreen />}
+        {currentScreen === 'solve' && <SolveScreen />}
+        {/* ... other screens */}
+      </ContentArea>
+    </Box>
+    <StatusBar                  // Bottom status line
+      session={sessionId}
+      status={statusText}
+    />
+  </Box>
+</App>
+```
+
+**Layout Visual**:
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     Terminal Window                         │
@@ -51,16 +84,17 @@ This specification defines a comprehensive Terminal User Interface (TUI) for the
 │ │             │ │                                         │ │
 │ │   Main      │ │        Content Area                     │ │
 │ │   Menu      │ │                                         │ │
-│ │   (Left)    │ │  - Forms                                │ │
-│ │             │ │  - Dashboards                           │ │
-│ │   - Solve   │ │  - Visualizations                       │ │
-│ │   - Memory  │ │  - Tables                               │ │
-│ │   - Dream   │ │  - Logs                                 │ │
-│ │   - Bench   │ │                                         │ │
-│ │   - Demo    │ │                                         │ │
-│ │   - Config  │ │                                         │ │
-│ │   - Export  │ │                                         │ │
-│ │   - System  │ │                                         │ │
+│ │   (Left)    │ │  - React Components                     │ │
+│ │             │ │  - Hooks for State                      │ │
+│ │   * Home    │ │  - Dynamic Rendering                    │ │
+│ │   # Solve   │ │  - Real-time Updates                    │ │
+│ │   @ Memory  │ │                                         │ │
+│ │   ~ Dream   │ │                                         │ │
+│ │   + Bench   │ │                                         │ │
+│ │   > Demo    │ │                                         │ │
+│ │   % Config  │ │                                         │ │
+│ │   ^ Export  │ │                                         │ │
+│ │   = System  │ │                                         │ │
 │ │             │ │                                         │ │
 │ └─────────────┘ └─────────────────────────────────────────┘ │
 ├─────────────────────────────────────────────────────────────┤
@@ -1475,6 +1509,430 @@ See Section 9.1 for `.machine-dream-tui.json`
 - 256 colors minimum (truecolor recommended)
 - Mouse support (optional)
 - Minimum 80x24 characters
+
+---
+
+## 20. Machine-Readable Output Architecture
+
+### 20.1 JSON Event Stream
+
+**Purpose**: Enable complete testability by making all TUI actions observable and machine-readable.
+
+**Core Interface**:
+```typescript
+interface TUIOutputEvent {
+  timestamp: number;
+  eventType: 'render' | 'input' | 'navigation' | 'command' | 'state' | 'error';
+  component: string;
+  data: Record<string, unknown>;
+}
+```
+
+### 20.2 Event Types
+
+| Event Type | Description | Example Data |
+|------------|-------------|--------------|
+| `render` | Component rendered to screen | `{ screen: 'solve', component: 'form', content: {...} }` |
+| `input` | User input received | `{ key: 'enter', component: 'form-field' }` |
+| `navigation` | Menu/screen navigation | `{ from: 'home', to: 'solve' }` |
+| `command` | CLI command execution | `{ command: 'solve', args: [...], status: 'started' }` |
+| `state` | Application state change | `{ field: 'sessionState.currentScreen', value: 'solve' }` |
+| `error` | Error occurred | `{ code: 'INVALID_INPUT', message: '...' }` |
+
+### 20.3 Output Configuration
+
+**Environment Variable**:
+```bash
+TUI_DEBUG_OUTPUT=/tmp/tui-events.jsonl machine-dream tui
+```
+
+**CLI Flag**:
+```bash
+machine-dream tui --debug-output /tmp/tui-events.jsonl
+```
+
+**Output Targets**:
+- `stdout` - Write to standard output (interleaved with TUI)
+- `<file>` - Write to file (one JSON event per line)
+- `/dev/null` - Disable output (production mode)
+
+### 20.4 Test Integration
+
+```typescript
+// Example: E2E test using event stream
+const driver = new TestDriver({ debugOutput: '/tmp/test.jsonl' });
+await driver.start();
+await driver.pressKey('s'); // Navigate to Solve
+
+const navEvent = await driver.waitForEvent('navigation', 5000);
+expect(navEvent.data.to).toBe('solve');
+```
+
+---
+
+## 21. Text Alignment and Emoji Handling
+
+### 21.1 String Width Library
+
+**Dependency**: `string-width` npm package
+
+**Purpose**: Accurate character width calculation for terminals, accounting for:
+- Emoji (usually 2 cells wide)
+- Wide characters (CJK characters)
+- Zero-width joiners
+- ANSI escape codes
+
+**Usage**:
+```typescript
+import stringWidth from 'string-width';
+
+// Emoji takes 2 cells
+stringWidth('🧩');  // Returns: 2
+stringWidth('A');   // Returns: 1
+
+// Proper padding
+function padMenuItem(icon: string, label: string): string {
+  const iconWidth = stringWidth(icon);
+  const iconPadding = 4 - iconWidth;
+  const labelPadded = label.padEnd(14);
+  return `${icon}${' '.repeat(iconPadding)}${labelPadded}`;
+}
+```
+
+### 21.2 Fixed Column Widths
+
+**Menu Item Layout**:
+```
+┌────┬──────────────┬─────┐
+│Icon│ Label        │Short│
+├────┼──────────────┼─────┤
+│ 4  │ 14           │ 5   │
+└────┴──────────────┴─────┘
+
+🧩   Solve Puzzle   [S]
+🧠   Memory         [M]
+```
+
+**Width Specifications**:
+- Icon column: 4 characters (emoji + trailing space)
+- Label column: 14 characters (padded with spaces)
+- Shortcut column: 5 characters (e.g., "[S]" + space)
+
+### 21.3 Box Drawing Fallbacks
+
+**Unicode Box Drawing** (default, when supported):
+```
+┌─────────┐
+│ Content │
+└─────────┘
+```
+
+**ASCII Fallback** (for limited terminals):
+```
++---------+
+| Content |
++---------+
+```
+
+**Detection Logic**:
+```typescript
+function getBoxChars(): BoxCharacters {
+  if (terminalInfo.supportsUnicode && !terminalInfo.isCI) {
+    return {
+      topLeft: '┌', topRight: '┐',
+      bottomLeft: '└', bottomRight: '┘',
+      horizontal: '─', vertical: '│'
+    };
+  }
+  return {
+    topLeft: '+', topRight: '+',
+    bottomLeft: '+', bottomRight: '+',
+    horizontal: '-', vertical: '|'
+  };
+}
+```
+
+---
+
+## 22. Enhanced Terminal Detection
+
+### 22.1 Environment Detection Matrix
+
+| Environment | Detection Method | Capabilities |
+|-------------|------------------|--------------|
+| **VS Code Terminal** | `TERM_PROGRAM=vscode` | Full features (mouse, colors, unicode) |
+| **iTerm2** | `TERM_PROGRAM=iTerm.app` | Full features |
+| **Windows Terminal** | `WT_SESSION` env var defined | Full features |
+| **Docker** | `/.dockerenv` file exists | Headless mode (no mouse, limited colors) |
+| **GitHub Actions** | `GITHUB_ACTIONS=true` | Headless mode, CI mode |
+| **Generic CI** | `CI=true` | Headless mode, CI mode |
+| **WSL** | `WSL_DISTRO_NAME` defined | Full features |
+| **cmd.exe** | Windows + no `WT_SESSION` | ASCII borders, no mouse, 16 colors |
+| **SSH** | `SSH_TTY` or `SSH_CONNECTION` | Full features (remote terminal) |
+
+### 22.2 Capability Detection
+
+```typescript
+interface TerminalCapabilities {
+  supportsUnicode: boolean;
+  supportsColor: boolean;
+  colorDepth: 16 | 256 | 16777216; // 16, 256, or truecolor
+  supportsMouse: boolean;
+  supportsKeyboard: boolean;
+  isHeadless: boolean; // CI/Docker
+  columns: number;
+  rows: number;
+}
+
+function detectCapabilities(): TerminalCapabilities {
+  const isCI = Boolean(process.env.CI || process.env.GITHUB_ACTIONS);
+  const isDocker = fs.existsSync('/.dockerenv');
+  const isTTY = process.stdout.isTTY;
+
+  return {
+    supportsUnicode: !isCI && !isDocker && hasUTF8Locale(),
+    supportsColor: isTTY && !isCI,
+    colorDepth: process.stdout.getColorDepth?.() || 16,
+    supportsMouse: isTTY && !isCI && !isDocker,
+    supportsKeyboard: isTTY,
+    isHeadless: isCI || isDocker || !isTTY,
+    columns: process.stdout.columns || 80,
+    rows: process.stdout.rows || 24
+  };
+}
+```
+
+### 22.3 Headless Mode
+
+When running in CI/Docker/non-TTY environments:
+- Disable interactive features
+- Use simple output mode
+- Skip mouse/keyboard setup
+- Use ASCII-only characters
+- Provide clear error messages
+
+---
+
+## 23. Component-Based Architecture
+
+### 23.1 Directory Structure
+
+```
+src/tui/
+├── index.ts                    # Public API exports
+├── TUIApplication.ts           # Main application orchestrator
+├── types.ts                    # TypeScript interfaces
+│
+├── components/
+│   ├── base/
+│   │   ├── Component.ts        # Base component class
+│   │   └── FocusManager.ts     # Focus and navigation
+│   │
+│   ├── layout/
+│   │   ├── Screen.ts           # blessed.screen wrapper
+│   │   ├── Header.ts           # Title bar component
+│   │   ├── Sidebar.ts          # Menu sidebar
+│   │   ├── ContentArea.ts      # Main content area
+│   │   └── StatusBar.ts        # Bottom status bar
+│   │
+│   ├── widgets/
+│   │   ├── Menu.ts             # Navigation menu
+│   │   ├── Form.ts             # Form container
+│   │   ├── TextField.ts        # Text input field
+│   │   ├── Select.ts           # Dropdown select
+│   │   ├── Checkbox.ts         # Boolean checkbox
+│   │   ├── Button.ts           # Action button
+│   │   ├── Table.ts            # Data table
+│   │   ├── ProgressBar.ts      # Progress indicator
+│   │   └── LogViewer.ts        # Scrolling log viewer
+│   │
+│   └── modals/
+│       ├── Modal.ts            # Base modal dialog
+│       ├── Alert.ts            # Alert dialog
+│       ├── Confirm.ts          # Confirmation dialog
+│       └── HelpModal.ts        # Help overlay
+│
+├── screens/                    # Full screen implementations
+│   ├── HomeScreen.ts           # Dashboard/home
+│   ├── SolveScreen.ts          # Puzzle solving
+│   ├── MemoryScreen.ts         # Memory browser
+│   ├── DreamScreen.ts          # Dream cycle viewer
+│   ├── BenchmarkScreen.ts      # Benchmark runner
+│   ├── DemoScreen.ts           # Demo launcher
+│   ├── ConfigScreen.ts         # Configuration editor
+│   ├── ExportScreen.ts         # Export wizard
+│   └── SystemScreen.ts         # System utilities
+│
+├── services/
+│   ├── CLIExecutor.ts          # CLI command execution
+│   ├── OutputManager.ts        # JSON event stream
+│   ├── StateManager.ts         # Application state
+│   └── ThemeManager.ts         # Theme management
+│
+└── utils/
+    ├── textAlign.ts            # string-width alignment
+    ├── boxDrawing.ts           # Box character utilities
+    └── terminalDetect.ts       # Environment detection
+```
+
+### 23.2 Base Component Pattern
+
+```typescript
+// components/base/Component.ts
+export abstract class Component {
+  protected element: Widgets.Node;
+  protected outputManager: OutputManager;
+
+  abstract render(): void;
+
+  protected emit(eventType: string, data: unknown): void {
+    this.outputManager.emit({
+      timestamp: Date.now(),
+      eventType,
+      component: this.constructor.name,
+      data
+    });
+  }
+}
+```
+
+### 23.3 Screen Implementation Pattern
+
+```typescript
+// screens/SolveScreen.ts
+export class SolveScreen extends Component {
+  private form: Form;
+  private submitButton: Button;
+
+  render(): void {
+    this.form = new Form({ /* config */ });
+    this.submitButton = new Button({
+      label: 'Start Solve',
+      onClick: () => this.handleSubmit()
+    });
+
+    this.emit('render', { screen: 'solve' });
+  }
+
+  private async handleSubmit(): Promise<void> {
+    const formData = this.form.getData();
+    this.emit('command', {
+      command: 'solve',
+      args: [formData.puzzleFile],
+      options: formData
+    });
+
+    await this.cliExecutor.execute('solve', [formData.puzzleFile], formData);
+  }
+}
+```
+
+---
+
+## 24. E2E Test Protocol
+
+### 24.1 TestDriver Interface
+
+```typescript
+interface TUITestDriver {
+  // Lifecycle
+  start(options?: TUITestOptions): Promise<void>;
+  stop(): Promise<void>;
+
+  // Input simulation
+  pressKey(key: string): Promise<void>;
+  pressKeys(keys: string[]): Promise<void>;
+  typeText(text: string): Promise<void>;
+
+  // State inspection (from JSON event stream)
+  waitForEvent(type: string, timeout?: number): Promise<TUIOutputEvent>;
+  getEvents(filter?: Partial<TUIOutputEvent>): TUIOutputEvent[];
+  getLastEvent(type?: string): TUIOutputEvent | undefined;
+  clearEvents(): void;
+
+  // Assertions
+  assertScreen(screenName: string): void;
+  assertFocus(componentId: string): void;
+  assertText(pattern: string | RegExp): void;
+  assertEventEmitted(type: string, data?: Partial<unknown>): void;
+}
+
+interface TUITestOptions {
+  debugOutput?: string;        // Path to event log file
+  headless?: boolean;           // Run in headless mode
+  dimensions?: { cols: number; rows: number };
+  theme?: 'dark' | 'light';
+}
+```
+
+### 24.2 Test Example
+
+```typescript
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { TestDriver } from '../helpers/TestDriver';
+
+describe('Solve Workflow E2E', () => {
+  let driver: TestDriver;
+
+  beforeAll(async () => {
+    driver = new TestDriver({
+      debugOutput: '/tmp/test-solve.jsonl',
+      headless: true
+    });
+    await driver.start();
+  });
+
+  afterAll(async () => {
+    await driver.stop();
+  });
+
+  it('should complete solve workflow', async () => {
+    // Navigate to Solve screen
+    await driver.pressKey('s');
+
+    const navEvent = await driver.waitForEvent('navigation', 5000);
+    expect(navEvent.data.to).toBe('solve');
+
+    // Fill form
+    await driver.typeText('puzzles/easy-01.json');
+    await driver.pressKey('tab');
+    await driver.typeText('test-session');
+
+    // Submit form
+    await driver.pressKeys(['ctrl', 'enter']);
+
+    // Wait for command execution
+    const cmdEvent = await driver.waitForEvent('command', 5000);
+    expect(cmdEvent.data.command).toBe('solve');
+    expect(cmdEvent.data.args).toContain('puzzles/easy-01.json');
+
+    // Wait for completion
+    const completeEvent = await driver.waitForEvent('command-complete', 30000);
+    expect(completeEvent.data.success).toBe(true);
+  });
+});
+```
+
+### 24.3 Mock Screen Utility
+
+```typescript
+// tests/tui/helpers/MockScreen.ts
+export class MockScreen {
+  private events: TUIOutputEvent[] = [];
+
+  emit(event: TUIOutputEvent): void {
+    this.events.push(event);
+  }
+
+  getEvents(): TUIOutputEvent[] {
+    return [...this.events];
+  }
+
+  render(): void {
+    // No-op in test mode
+  }
+}
+```
 
 ---
 

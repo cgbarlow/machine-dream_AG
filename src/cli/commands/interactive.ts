@@ -16,7 +16,7 @@ export function registerInteractiveCommand(program: Command): void {
         .description('Launch interactive REPL for exploratory operations')
         .alias('-i')
         .action(async () => {
-            const { config, outputFormat } = getCommandConfig(interactiveCommand);
+            const { outputFormat: _outputFormat } = getCommandConfig(interactiveCommand);
 
             try {
                 logger.info('🎯 Starting interactive mode...');

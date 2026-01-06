@@ -2,7 +2,6 @@
 import {
     OrchestratorConfig,
     SystemStatus,
-    PuzzleState,
     SolveResult
 } from '../types';
 import { AgentMemory } from '../memory/AgentMemory';
@@ -16,7 +15,7 @@ export class SystemOrchestrator {
 
     // Components
     private memory: AgentMemory;
-    private grasp: GRASPController;
+    private grasp!: GRASPController;
     private dreaming: DreamingController;
 
     constructor(config: OrchestratorConfig) {

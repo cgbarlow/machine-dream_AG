@@ -8,7 +8,6 @@
  * - CLI arguments
  */
 
-import path from 'path';
 import { ConfigurationError } from './errors';
 import { Configuration } from './types';
 import fs from 'fs/promises';
@@ -165,18 +164,24 @@ export function parseEnvironmentVariables(): Partial<Configuration> {
 
     // Solving parameters
     if (process.env.MACHINE_DREAM_MAX_ITERATIONS) {
-        envConfig.solving = envConfig.solving || {};
+        if (!envConfig.solving) {
+            envConfig.solving = { ...DEFAULT_CONFIG.solving };
+        }
         envConfig.solving.maxIterations = parseInt(process.env.MACHINE_DREAM_MAX_ITERATIONS);
     }
 
     if (process.env.MACHINE_DREAM_MAX_SOLVE_TIME) {
-        envConfig.solving = envConfig.solving || {};
+        if (!envConfig.solving) {
+            envConfig.solving = { ...DEFAULT_CONFIG.solving };
+        }
         envConfig.solving.maxSolveTime = parseInt(process.env.MACHINE_DREAM_MAX_SOLVE_TIME);
     }
 
     // Database
     if (process.env.MACHINE_DREAM_DB_PATH) {
-        envConfig.agentdb = envConfig.agentdb || {};
+        if (!envConfig.agentdb) {
+            envConfig.agentdb = { ...DEFAULT_CONFIG.agentdb };
+        }
         envConfig.agentdb.dbPath = process.env.MACHINE_DREAM_DB_PATH;
     }
 

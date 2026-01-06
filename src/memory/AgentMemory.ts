@@ -23,12 +23,12 @@ import { LocalAgentDB } from '../agentdb/LocalAgentDB';
 
 export class AgentMemory implements MemorySystem {
     private config: AgentDBConfig;
-    private db: LocalAgentDB; // Replaces 'any' mock
+    private db!: LocalAgentDB; // Replaces 'any' mock
 
     // Sub-modules
-    public reasoningBank: AgentDBReasoningBank;
-    public reflexionMemory: AgentDBReflexionMemory;
-    public skillLibrary: AgentDBSkillLibrary;
+    public reasoningBank!: AgentDBReasoningBank;
+    public reflexionMemory!: AgentDBReflexionMemory;
+    public skillLibrary!: AgentDBSkillLibrary;
 
     constructor(config: AgentDBConfig) {
         this.config = config;
@@ -108,7 +108,7 @@ export class AgentMemory implements MemorySystem {
         // Placeholder for Decision Transformer logic
     }
 
-    async selectActionRL(state: PuzzleState, availableActions: Move[]): Promise<RLAction> {
+    async selectActionRL(_state: PuzzleState, availableActions: Move[]): Promise<RLAction> {
         // Random fallback for POC
         const randomAction = availableActions[Math.floor(Math.random() * availableActions.length)];
         return {
@@ -118,7 +118,7 @@ export class AgentMemory implements MemorySystem {
         };
     }
 
-    async synthesizeContext(state: PuzzleState, k: number): Promise<RichContext> {
+    async synthesizeContext(_state: PuzzleState, _k: number): Promise<RichContext> {
         return {
             similarExperiences: [],
             relevantPatterns: [],

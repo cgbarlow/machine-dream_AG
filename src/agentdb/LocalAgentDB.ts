@@ -1,9 +1,8 @@
 
 import Database from 'better-sqlite3';
 import {
-    Experience, Move, ValidationResult, PuzzleState, Insight,
     Pattern, ConsolidatedKnowledge, AgentDBReasoningBank,
-    ReflexionError, AgentDBReflexionMemory, AgentDBSkillLibrary, Skill
+    AgentDBReflexionMemory, AgentDBSkillLibrary
 } from '../types';
 import fs from 'fs';
 import path from 'path';
@@ -88,7 +87,7 @@ export class LocalAgentDB {
                 );
                 stmt.run(insight.type, insight.content, insight.confidence, insight.timestamp);
             },
-            querySimilar: async (context) => {
+            querySimilar: async (_context) => {
                 // Simple SQL query to find successful moves in same cell or value
                 // This replaces the mock with a real DB lookup
                 const stmt = this.db.prepare(
@@ -96,14 +95,14 @@ export class LocalAgentDB {
                 );
                 return stmt.all() as any[];
             },
-            distillPatterns: async (sessionId) => {
+            distillPatterns: async (_sessionId) => {
                 // Return high-success strategies as 'patterns'
                 const stmt = this.db.prepare(
                     "SELECT name as id, outcome as description, 1.0 as success_rate, count(*) as usage_count FROM strategies WHERE outcome='success' GROUP BY name"
                 );
                 return stmt.all() as Pattern[];
             },
-            consolidate: async (experiences) => {
+            consolidate: async (_experiences) => {
                 return {
                     sessionIds: [],
                     patterns: [],
@@ -118,21 +117,21 @@ export class LocalAgentDB {
 
     public get reflexionMemory(): AgentDBReflexionMemory {
         return {
-            storeReflexion: async (error) => {
+            storeReflexion: async (_error) => {
                 // Use strategies table to log failures for now
                 const stmt = this.db.prepare(
                     'INSERT INTO strategies (name, outcome, timestamp) VALUES (?, ?, ?)'
                 );
                 stmt.run('failure-event', 'failure', Date.now());
             },
-            getCorrections: async (error) => []
+            getCorrections: async (_error) => []
         };
     }
 
     public get skillLibrary(): AgentDBSkillLibrary {
         return {
-            consolidateSkills: async (filter) => [],
-            applySkill: async (state) => null
+            consolidateSkills: async (_filter) => [],
+            applySkill: async (_state) => null
         };
     }
 }

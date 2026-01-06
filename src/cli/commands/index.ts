@@ -14,6 +14,7 @@ import { registerConfigCommand } from './config';
 import { registerExportCommand } from './export';
 import { registerSystemCommand } from './system';
 import { registerInteractiveCommand } from './interactive';
+import { registerTUICommand } from './tui';
 
 export function registerCommands(program: Command): void {
     // Core commands
@@ -28,4 +29,7 @@ export function registerCommands(program: Command): void {
 
     // Interactive mode
     registerInteractiveCommand(program);
+
+    // TUI mode
+    registerTUICommand(program);
 }

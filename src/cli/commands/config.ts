@@ -143,11 +143,11 @@ export function registerConfigCommand(program: Command): void {
         .description('Validate configuration')
         .argument('[config-file]', 'Config file to validate')
         .option('--fix', 'Attempt to fix common issues')
-        .action(async (configFile, options) => {
-            const { config, outputFormat } = getCommandConfig(validateCommand);
+        .action(async (configFile, _options) => {
+            const { outputFormat } = getCommandConfig(validateCommand);
 
             try {
-                const fileToValidate = configFile || config.opts().config;
+                const fileToValidate = configFile || '.machine-dream.json';
                 logger.info(`🔍 Validating configuration: ${fileToValidate}`);
 
                 // TODO: Implement actual validation
@@ -183,7 +183,7 @@ export function registerConfigCommand(program: Command): void {
         .option('--format <format>', 'json|yaml', 'json')
         .option('--include-defaults', 'Include default values')
         .action(async (outputFile, options) => {
-            const { config, outputFormat } = getCommandConfig(exportCommand);
+            const { outputFormat } = getCommandConfig(exportCommand);
 
             try {
                 logger.info(`💾 Exporting configuration to: ${outputFile}`);
