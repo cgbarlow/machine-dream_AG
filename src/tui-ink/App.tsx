@@ -10,7 +10,7 @@ import { Header } from './components/Header.js';
 import { Sidebar } from './components/Sidebar.js';
 import { StatusBar } from './components/StatusBar.js';
 import { HomeScreen } from './screens/HomeScreen.js';
-import { SolveScreen } from './screens/SolveScreen.js';
+import { SolveScreenInteractive } from './screens/SolveScreen.interactive.js';
 import { MemoryScreen } from './screens/MemoryScreen.js';
 import { DreamScreen } from './screens/DreamScreen.js';
 import { BenchmarkScreen } from './screens/BenchmarkScreen.js';
@@ -85,7 +85,7 @@ export const App: React.FC = () => {
       case 'home':
         return <HomeScreen />;
       case 'solve':
-        return <SolveScreen />;
+        return <SolveScreenInteractive />;
       case 'memory':
         return <MemoryScreen />;
       case 'dream':
