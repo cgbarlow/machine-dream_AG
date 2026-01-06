@@ -37,11 +37,12 @@ npx tsx src/index.ts
 Great for interactive exploration and visual feedback:
 
 ```bash
-# Launch the TUI
+# Launch the TUI (after building)
+npm run build
+machine-dream tui
+
+# Or directly with tsx (development)
 npx tsx src/tui/tui-bin.ts
-# OR after building
-npm run build:cli
-node dist/tui-bin.js
 ```
 
 **What you will see in both interfaces:**
@@ -157,118 +158,124 @@ machine-dream system cleanup --all
 
 ## 🎯 Terminal User Interface (TUI)
 
-> **⚠️ TUI Under Reconstruction**
-> The TUI is currently being rebuilt with enhanced testability, improved text alignment, and component-based architecture.
-> See [TUI Specification](specs/10-terminal-menu-interface-spec.md) for details on the new architecture.
-> **Expected completion**: TBD
+The TUI provides an intuitive, menu-driven interface to all Machine Dream functionality with enhanced testability, proper text alignment, and component-based architecture.
 
-The TUI will provide an intuitive, menu-driven interface to all Machine Dream functionality.
+### Features
 
-### Launching the TUI (Coming Soon)
+- ✅ **Component-Based Architecture** - Clean separation of concerns with reusable components
+- ✅ **Machine-Readable Output** - JSON event stream for testing and debugging
+- ✅ **Terminal Detection** - Automatic capability detection for CI/Docker/WSL environments
+- ✅ **Proper Alignment** - Emoji-aware text alignment using string-width library
+- ✅ **Real-Time Progress** - Live progress updates during command execution
+- ✅ **Theme Support** - Dark and light themes
+- ✅ **Keyboard Navigation** - Full keyboard support with shortcuts
 
-The `machine-dream tui` command is currently disabled during the rebuild. Running it will show:
+See [TUI Specification](specs/10-terminal-menu-interface-spec.md) for architectural details.
 
-```bash
-machine-dream tui
-# ⚠️  TUI is currently being rebuilt with enhanced testability and architecture.
-# 📖 See docs/specs/10-terminal-menu-interface-spec.md for details.
-# 🔜 TUI will be available again soon with improved features.
-```
+### Launching the TUI
 
-Once the rebuild is complete, you'll be able to launch it with:
+Launch the TUI with:
 ```bash
 # Quick launch
 machine-dream tui
 
-# With options
-machine-dream tui --theme light --no-mouse --debug-output /tmp/tui-events.jsonl
+# With theme selection
+machine-dream tui --theme light
+
+# With debug output for testing
+machine-dream tui --debug-output /tmp/tui-events.jsonl
 ```
+
+**Available Options:**
+- `--theme <dark|light>` - Set color theme (default: dark)
+- `--debug-output <path>` - Enable JSON event stream logging to file
+
+**Environment Variables:**
+- `TUI_DEBUG_OUTPUT=<path>` - Same as --debug-output flag
+- `TUI_DEBUG_STDOUT=true` - Output events to stdout in CI mode
 
 ### TUI Navigation
 
 #### Keyboard Shortcuts
 
 **Global Shortcuts:**
-- `F1` - Help (context-sensitive)
-- `F10` - Toggle menu
+- `F1` - Help
 - `Ctrl+C` - Exit application
-- `Ctrl+P` - Open command palette
 - `Ctrl+R` - Refresh current view
-- `Ctrl+S` - Save current state
 
 **Navigation:**
-- `↑↓` - Navigate menu items / table rows
-- `←→` - Navigate menu hierarchy / table columns
-- `Tab` - Next field / Next section
-- `Shift+Tab` - Previous field / Previous section
-- `Enter` - Select / Submit / Execute
-- `Esc` - Cancel / Go back / Close modal
+- `↑↓` - Navigate menu items
+- `Tab` - Next field in forms
+- `Shift+Tab` - Previous field in forms
+- `Enter` - Select menu item / Submit form
+- `Ctrl+Enter` - Submit form (alternative)
+- `Esc` - Cancel input
 
 **Menu Shortcuts:**
+- `H` - Home Dashboard
 - `S` - Solve Puzzle
 - `M` - Memory Browser
 - `D` - Dream Cycle
 - `B` - Benchmark
-- `O` - Demo
+- `E` - Demo
 - `C` - Config
-- `E` - Export
-- `Y` - System Utilities
-- `H` - Help
-- `Q` - Quit
+- `X` - Export
+- `Y` - System Info
 
 ### TUI Screens
 
 #### 🏠 Home Dashboard
 Displays system status, recent activity, quick actions, and performance metrics.
 
-#### 🧩 Solve Puzzle Form
-Interactive form with all solving options:
-- Puzzle file selection
-- Memory system configuration
-- Solving parameters (iterations, time limits)
-- Strategy selection (checkboxes)
-- Output options (visualization, export)
+#### 🧩 Solve Puzzle Screen
+Interactive form for puzzle solving:
+- **Puzzle File** - Path to puzzle JSON file (default: puzzles/easy-01.json)
+- **Session ID** - Unique session identifier (default: tui-session)
+- **Max Iterations** - Maximum solve iterations (default: 10)
+- **Real-Time Progress** - Live updates during solving process
+- **Results Display** - Shows solution, execution time, and success status
 
-#### 🧠 Memory Browser
-Browse and manage learned patterns, skills, and experiences:
-- Search and filter functionality
+#### 💾 Memory Browser
+Browse and manage AgentDB memory:
+- **Store Values** - Add key-value pairs to memory
+- **List Keys** - View all stored memory entries
+- **Value Display** - View details of selected entries
+- Real-time memory operations
 - Detailed pattern information
 - Store, retrieve, delete operations
 - Export and backup options
 
-#### 💭 Dream Controls
-Manage the dreaming/consolidation process:
-- Run dream cycles with phase selection
-- Configure dream scheduling
-- View dream status and metrics
-- Visualize consolidation process
+#### 🎮 Demo Screen
+View interactive demonstrations:
+- **GRASP Loop Visualization** - Watch the solve process in action
+- **Memory System Tour** - Explore AgentDB capabilities
+- **Neural Pattern Learning** - See learning in action
+- **Dream Cycle Walkthrough** - Experience the 5-phase dream process
+- Instructions for running demos from CLI
 
-#### 📊 Benchmark Suite
-Run and analyze performance benchmarks:
-- Select benchmark suites
-- Configure parameters
-- View results and comparisons
-- Generate reports
+#### ⚙️ Configuration Screen
+View system configuration:
+- **Current Settings** - Memory system, neural models, GRASP parameters, dream cycle settings
+- **Environment Variables** - System paths and configuration
+- **Configuration Files** - Locations of config, secrets, and logs
+- Instructions for modifying settings via CLI
 
-#### 🎬 Demo Center
-Run pre-configured demonstrations:
-- Stakeholder presentation (5 acts)
-- Quick solve demonstration
-- Transfer learning demo
-- Dreaming visualization
-- Baseline comparison
+#### 📤 Export Screen
+Export data and reports:
+- **Session Data** - Export complete session history (JSON, CSV, Markdown)
+- **Memory Database** - Backup AgentDB data
+- **Performance Reports** - Generate analytics and metrics
+- **Dream Summaries** - Export dream cycle results
+- Quick export commands and default locations
 
-#### ⚙️ Configuration
-View and edit system settings:
-- Memory system configuration
-- Solving parameters
-- Dreaming settings
-- Theme and display options
-
-#### 📤 Export Center
-Export system data and results:
-- Metrics and performance data
-- Solving results and trajectories
+#### 🖥️ System Screen
+View system information and diagnostics:
+- **Runtime Environment** - Node.js version, platform, architecture, uptime
+- **Memory Usage** - Heap, RSS, external memory consumption
+- **Machine Dream Status** - Version, database health, active sessions
+- **Dependencies** - Installed packages and versions
+- **File Locations** - Home directory, database, config, logs, exports
+- **Diagnostics** - System health checks and status
 - Memory patterns and knowledge
 - Configuration settings
 
