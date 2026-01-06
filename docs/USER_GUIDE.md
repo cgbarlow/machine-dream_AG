@@ -9,7 +9,7 @@ This guide will help you install, configure, and run the system using either the
 ## ⚡ Quick Start
 
 ### Prerequisites
-- **Node.js**: v20 or higher.
+- **Node.js**: v20 or higher (v24+ fully supported with neo-blessed).
 - **npm**: Installed with Node.
 
 ### 1. Installation
@@ -169,8 +169,25 @@ The TUI provides an intuitive, menu-driven interface to all Machine Dream functi
 - ✅ **Real-Time Progress** - Live progress updates during command execution
 - ✅ **Theme Support** - Dark and light themes
 - ✅ **Keyboard Navigation** - Full keyboard support with shortcuts
+- ✅ **Node.js v24 Compatible** - Uses neo-blessed for modern Node.js support
 
 See [TUI Specification](specs/10-terminal-menu-interface-spec.md) for architectural details.
+
+### Technical Implementation
+
+The TUI is built using **neo-blessed**, a modern fork of blessed.js with Node.js v20+ compatibility fixes. This ensures compatibility with the latest Node.js versions, including v24, and fixes stack overflow issues on WSL environments.
+
+**System Requirements:**
+- Node.js v20+ (v24 fully supported)
+- Terminal with UTF-8 support
+- Works on: Linux, macOS, WSL (Windows), Windows Terminal
+- CI/Docker support via headless mode
+
+**Why neo-blessed?**
+The original blessed.js library (from 2016) has fundamental incompatibilities with modern Node.js versions. We migrated to neo-blessed to fix:
+- Stack overflow errors in regex engine on Node.js v24
+- WSL terminal compatibility issues
+- Modern JavaScript runtime support
 
 ### Launching the TUI
 
@@ -461,9 +478,20 @@ Many users find a hybrid approach works best:
 - This is normal! The agent may make a wrong guess (`guess` strategy). The `Reflexion` system catches this, logs the error, and the agent backtracks or tries a different number in the next GRASP iteration.
 
 **TUI not launching**
-- Ensure Node.js 20+ is installed
+- Ensure Node.js 20+ is installed (v24+ recommended)
 - Check terminal supports UTF-8 and 256 colors
 - Try `machine-dream tui --no-mouse` if mouse support causes issues
+- On WSL, ensure you're using Windows Terminal or VSCode terminal
+
+**Stack overflow errors on Node.js v24**
+- The TUI now uses **neo-blessed** (modern fork) instead of blessed.js (legacy)
+- If you see regex stack overflow errors, ensure you have the latest version:
+  ```bash
+  npm install
+  npm run build
+  ```
+- neo-blessed fixes compatibility issues with Node.js v20+ and WSL environments
+- See `docs/TUI-BLESSED-INCOMPATIBILITY-ANALYSIS.md` for technical details
 
 **CLI command not found**
 - Make sure you're in the project directory
