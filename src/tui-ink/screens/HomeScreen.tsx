@@ -1,7 +1,7 @@
 /**
- * POC Home Screen - Ink + React
+ * Home Screen - Full Version
  *
- * Simple proof-of-concept to validate ink works on Node.js v24 + WSL
+ * Dashboard with system status and quick actions
  */
 
 import React from 'react';
@@ -10,64 +10,115 @@ import { Box, Text } from 'ink';
 export const HomeScreen: React.FC = () => {
   return (
     <Box flexDirection="column" padding={1}>
-      {/* Header */}
-      <Box marginBottom={1}>
+      {/* Welcome Header */}
+      <Box marginBottom={1} justifyContent="center">
         <Text bold color="cyan">
-          ✨ Machine Dream TUI - ink POC ✨
+          🧠 Welcome to Machine Dream
         </Text>
       </Box>
 
       {/* System Status */}
       <Box
         flexDirection="column"
-        borderStyle="single"
+        borderStyle="double"
         borderColor="green"
         padding={1}
         marginBottom={1}
       >
-        <Text bold>System Status:</Text>
-        <Box marginLeft={2} flexDirection="column">
-          <Text>Memory System:  <Text color="green">AgentDB (Ready)</Text></Text>
-          <Text>Sessions:       <Text color="yellow">0 total</Text></Text>
-          <Text>Database:       <Text color="green">Healthy</Text></Text>
-          <Text>Uptime:         <Text>Just started</Text></Text>
+        <Text bold color="green">
+          ⚡ System Status
+        </Text>
+        <Box flexDirection="column" marginLeft={2} marginTop={1}>
+          <Text>
+            <Text color="gray">Memory System: </Text>
+            <Text color="green" bold>✓ AgentDB (Ready)</Text>
+          </Text>
+          <Text>
+            <Text color="gray">Active Sessions: </Text>
+            <Text color="yellow">0 total</Text>
+          </Text>
+          <Text>
+            <Text color="gray">Database Health: </Text>
+            <Text color="green" bold>✓ Healthy</Text>
+          </Text>
+          <Text>
+            <Text color="gray">Neural Networks: </Text>
+            <Text color="cyan">Ready</Text>
+          </Text>
+          <Text>
+            <Text color="gray">Uptime: </Text>
+            <Text>Just started</Text>
+          </Text>
         </Box>
       </Box>
 
       {/* Quick Start */}
       <Box flexDirection="column" marginBottom={1}>
-        <Text bold underline>Quick Start:</Text>
-        <Box marginLeft={2} flexDirection="column">
-          <Text>1. Press <Text bold color="cyan">[S]</Text> to solve a puzzle</Text>
-          <Text>2. Press <Text bold color="cyan">[M]</Text> to browse memory</Text>
-          <Text>3. Press <Text bold color="cyan">[D]</Text> to run dream cycle</Text>
-          <Text>4. Press <Text bold color="cyan">[B]</Text> to run benchmarks</Text>
+        <Text bold color="cyan" underline>
+          🚀 Quick Start
+        </Text>
+        <Box flexDirection="column" marginLeft={2} marginTop={1}>
+          <Text>
+            1. Press <Text bold color="green">[S]</Text> to solve a puzzle 🧩
+          </Text>
+          <Text>
+            2. Press <Text bold color="green">[M]</Text> to browse memory 💾
+          </Text>
+          <Text>
+            3. Press <Text bold color="green">[D]</Text> to run dream cycle 💭
+          </Text>
+          <Text>
+            4. Press <Text bold color="green">[B]</Text> to run benchmarks 📊
+          </Text>
+        </Box>
+      </Box>
+
+      {/* Recent Activity */}
+      <Box
+        flexDirection="column"
+        borderStyle="single"
+        borderColor="yellow"
+        padding={1}
+        marginBottom={1}
+      >
+        <Text bold color="yellow">
+          📈 Recent Activity
+        </Text>
+        <Box marginLeft={2} marginTop={1}>
+          <Text dimColor>
+            No recent activity - Start by solving a puzzle!
+          </Text>
         </Box>
       </Box>
 
       {/* Keyboard Shortcuts */}
-      <Box flexDirection="column" marginBottom={1}>
-        <Text bold underline>Keyboard Shortcuts:</Text>
-        <Box marginLeft={2} flexDirection="column">
-          <Text><Text color="gray">F1         </Text> - Help</Text>
-          <Text><Text color="gray">Ctrl+C     </Text> - Exit</Text>
-          <Text><Text color="gray">Ctrl+R     </Text> - Refresh</Text>
-          <Text><Text color="gray">Tab        </Text> - Next field</Text>
-          <Text><Text color="gray">Enter      </Text> - Select/Submit</Text>
+      <Box flexDirection="column">
+        <Text bold color="magenta" underline>
+          ⌨️  Keyboard Shortcuts
+        </Text>
+        <Box flexDirection="column" marginLeft={2} marginTop={1}>
+          <Text>
+            <Text color="gray">F1         </Text> - Show help
+          </Text>
+          <Text>
+            <Text color="gray">Ctrl+C     </Text> - Exit application
+          </Text>
+          <Text>
+            <Text color="gray">Ctrl+R     </Text> - Refresh current view
+          </Text>
+          <Text>
+            <Text color="gray">↑↓         </Text> - Navigate menu
+          </Text>
+          <Text>
+            <Text color="gray">Enter      </Text> - Select item
+          </Text>
         </Box>
       </Box>
 
-      {/* Footer */}
-      <Box borderStyle="single" borderColor="gray" padding={1}>
-        <Text dimColor>
-          Navigate using the menu on the left or press keyboard shortcuts above.
-        </Text>
-      </Box>
-
-      {/* Success Message */}
-      <Box marginTop={1}>
-        <Text bold color="green">
-          ✅ If you see this, ink is working perfectly on Node.js v24 + WSL!
+      {/* Footer Note */}
+      <Box marginTop={1} justifyContent="center">
+        <Text dimColor italic>
+          Navigate using the menu on the left or press keyboard shortcuts above
         </Text>
       </Box>
     </Box>

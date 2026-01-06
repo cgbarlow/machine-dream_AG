@@ -9,10 +9,10 @@
   },
   "scripts": {
     "build": "tsc",
-    "build:cli": "tsc && cp src/cli-bin.js dist/cli-bin.js && cp src/tui/tui-bin.js dist/tui-bin.js",
+    "build:cli": "tsc && cp src/cli-bin.js dist/cli-bin.js",
     "build:all": "npm run build:cli",
     "dev": "tsx watch src/index.ts",
-    "tui": "tsx src/tui/tui-bin.ts",
+    "tui": "tsx src/tui-ink/tui.tsx",
     "tui:poc": "tsx src/tui-ink/poc.tsx",
     "test": "vitest",
     "test:unit": "vitest run tests/unit",

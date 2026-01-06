@@ -1,9 +1,9 @@
 # Machine Dream - Terminal Menu Interface (TUI) Specification
 
 **Component:** Terminal User Interface (TUI)
-**Version:** 1.0.0
-**Date:** January 5, 2026
-**Status:** Implementation-Ready
+**Version:** 2.0.0
+**Date:** January 6, 2026
+**Status:** Implementation-Ready (ink-based)
 
 ---
 
@@ -28,21 +28,54 @@ This specification defines a comprehensive Terminal User Interface (TUI) for the
 
 ### 2.1 Technology Stack
 
-**Primary Framework**: `blessed` (Node.js TUI library)
-- Mature, feature-rich terminal UI framework
-- Supports mouse and keyboard events
-- Rich widget library (boxes, lists, forms, tables, etc.)
-- Cross-platform (Linux, macOS, Windows)
+**Primary Framework**: `ink` (React-based TUI library)
+- Modern React-based architecture using virtual DOM
+- **Used by Claude Code** - proven in production
+- **Node.js v24 + WSL compatible** - no stack overflow issues
+- Component-based with React hooks for state management
+- Declarative UI with JSX syntax
+- Active maintenance with weekly updates
+- Cross-platform (Linux, macOS, Windows, WSL)
 
-**Alternative**: `ink` (React-based TUI)
-- Modern React-based approach
-- Component-based architecture
-- Excellent for dynamic updates
+**Why ink over blessed**:
+- ❌ blessed/neo-blessed: Stack overflow on Node.js v24 + WSL (regex parsing bug)
+- ✅ ink: Virtual DOM rendering, no regex issues
+- ✅ ink: Modern React ecosystem and tooling
+- ✅ ink: Better testing with React Testing Library
+- ✅ ink: Same framework Claude Code uses successfully
 
-**Recommended**: `blessed` for stability and features
+**Dependencies**:
+- `ink` v5.x - Terminal rendering framework
+- `react` v18.x - Component model and virtual DOM
+- TypeScript with JSX support
 
-### 2.2 Component Architecture
+### 2.2 Component Architecture (React + ink)
 
+**React Component Hierarchy**:
+```tsx
+<App>                           // Main application component
+  <Box>                         // Root layout container
+    <Header />                  // Title, subtitle
+    <Box horizontal>            // Main content area
+      <Sidebar                  // Navigation menu
+        items={menuItems}
+        onSelect={handleNav}
+      />
+      <ContentArea>             // Dynamic screen content
+        {currentScreen === 'home' && <HomeScreen />}
+        {currentScreen === 'solve' && <SolveScreen />}
+        {/* ... other screens */}
+      </ContentArea>
+    </Box>
+    <StatusBar                  // Bottom status line
+      session={sessionId}
+      status={statusText}
+    />
+  </Box>
+</App>
+```
+
+**Layout Visual**:
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     Terminal Window                         │
@@ -51,16 +84,17 @@ This specification defines a comprehensive Terminal User Interface (TUI) for the
 │ │             │ │                                         │ │
 │ │   Main      │ │        Content Area                     │ │
 │ │   Menu      │ │                                         │ │
-│ │   (Left)    │ │  - Forms                                │ │
-│ │             │ │  - Dashboards                           │ │
-│ │   - Solve   │ │  - Visualizations                       │ │
-│ │   - Memory  │ │  - Tables                               │ │
-│ │   - Dream   │ │  - Logs                                 │ │
-│ │   - Bench   │ │                                         │ │
-│ │   - Demo    │ │                                         │ │
-│ │   - Config  │ │                                         │ │
-│ │   - Export  │ │                                         │ │
-│ │   - System  │ │                                         │ │
+│ │   (Left)    │ │  - React Components                     │ │
+│ │             │ │  - Hooks for State                      │ │
+│ │   * Home    │ │  - Dynamic Rendering                    │ │
+│ │   # Solve   │ │  - Real-time Updates                    │ │
+│ │   @ Memory  │ │                                         │ │
+│ │   ~ Dream   │ │                                         │ │
+│ │   + Bench   │ │                                         │ │
+│ │   > Demo    │ │                                         │ │
+│ │   % Config  │ │                                         │ │
+│ │   ^ Export  │ │                                         │ │
+│ │   = System  │ │                                         │ │
 │ │             │ │                                         │ │
 │ └─────────────┘ └─────────────────────────────────────────┘ │
 ├─────────────────────────────────────────────────────────────┤
