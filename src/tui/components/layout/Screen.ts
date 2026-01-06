@@ -4,7 +4,7 @@
  * Wrapper for blessed.screen with terminal detection and event handling.
  */
 
-import blessed, { Widgets } from 'blessed';
+import blessed, { Widgets } from 'neo-blessed';
 import { OutputManager } from '../../services/OutputManager';
 import { ThemeManager } from '../../services/ThemeManager';
 import { TerminalCapabilities } from '../../types';

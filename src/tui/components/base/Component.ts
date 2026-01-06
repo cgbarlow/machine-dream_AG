@@ -5,7 +5,7 @@
  * Provides event emission and common lifecycle methods.
  */
 
-import { Widgets } from 'blessed';
+import { Widgets } from 'neo-blessed';
 import { OutputManager } from '../../services/OutputManager';
 import { ComponentProps } from '../../types';
 

@@ -4,7 +4,7 @@
  * Dashboard showing system status and recent activity.
  */
 
-import blessed, { Widgets } from 'blessed';
+import blessed, { Widgets } from 'neo-blessed';
 import { Component } from '../components/base/Component';
 import { OutputManager } from '../services/OutputManager';
 import { ThemeManager } from '../services/ThemeManager';

@@ -49,9 +49,9 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.5.0",
-    "blessed": "^0.1.81",
     "chalk": "^5.6.2",
     "commander": "^14.0.2",
+    "neo-blessed": "^0.2.0",
     "string-width": "^8.1.0"
   }
 }

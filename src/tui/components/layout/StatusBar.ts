@@ -4,7 +4,7 @@
  * Bottom status bar showing session info, help hints, and system status.
  */
 
-import blessed, { Widgets } from 'blessed';
+import blessed, { Widgets } from 'neo-blessed';
 import { Component } from '../base/Component';
 import { OutputManager } from '../../services/OutputManager';
 import { ThemeManager } from '../../services/ThemeManager';
