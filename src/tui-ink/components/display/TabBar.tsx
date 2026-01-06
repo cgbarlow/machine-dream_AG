@@ -22,7 +22,7 @@ interface TabBarProps {
 export const TabBar: React.FC<TabBarProps> = ({
   tabs,
   activeTab,
-  onTabChange
+  onTabChange: _onTabChange
 }) => {
   return (
     <Box gap={1}>

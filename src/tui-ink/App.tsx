@@ -11,12 +11,12 @@ import { Sidebar } from './components/Sidebar.js';
 import { StatusBar } from './components/StatusBar.js';
 import { HomeScreen } from './screens/HomeScreen.js';
 import { SolveScreenInteractive } from './screens/SolveScreen.interactive.js';
-import { MemoryScreen } from './screens/MemoryScreen.js';
-import { DreamScreen } from './screens/DreamScreen.js';
-import { BenchmarkScreen } from './screens/BenchmarkScreen.js';
-import { DemoScreen } from './screens/DemoScreen.js';
-import { ConfigScreen } from './screens/ConfigScreen.js';
-import { ExportScreen } from './screens/ExportScreen.js';
+import { MemoryScreenInteractive } from './screens/MemoryScreen.interactive.js';
+import { DreamScreenInteractive } from './screens/DreamScreen.interactive.js';
+import { BenchmarkScreenInteractive } from './screens/BenchmarkScreen.interactive.js';
+import { DemoScreenInteractive } from './screens/DemoScreen.interactive.js';
+import { ConfigScreenInteractive } from './screens/ConfigScreen.interactive.js';
+import { ExportScreenInteractive } from './screens/ExportScreen.interactive.js';
 import { SystemScreen } from './screens/SystemScreen.js';
 
 interface MenuItem {
@@ -78,7 +78,7 @@ export const App: React.FC = () => {
     }
   });
 
-  // Render current screen
+  // Render current screen - ALL INTERACTIVE NOW!
   const renderScreen = () => {
     const currentScreen = menuItems[selectedIndex].id;
     switch (currentScreen) {
@@ -87,17 +87,17 @@ export const App: React.FC = () => {
       case 'solve':
         return <SolveScreenInteractive />;
       case 'memory':
-        return <MemoryScreen />;
+        return <MemoryScreenInteractive />;
       case 'dream':
-        return <DreamScreen />;
+        return <DreamScreenInteractive />;
       case 'benchmark':
-        return <BenchmarkScreen />;
+        return <BenchmarkScreenInteractive />;
       case 'demo':
-        return <DemoScreen />;
+        return <DemoScreenInteractive />;
       case 'config':
-        return <ConfigScreen />;
+        return <ConfigScreenInteractive />;
       case 'export':
-        return <ExportScreen />;
+        return <ExportScreenInteractive />;
       case 'system':
         return <SystemScreen />;
       default:

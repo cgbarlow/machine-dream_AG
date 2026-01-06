@@ -18,7 +18,7 @@ interface CheckboxFieldProps {
 export const CheckboxField: React.FC<CheckboxFieldProps> = ({
   label,
   checked,
-  onChange,
+  onChange: _onChange,
   isFocused = false,
   disabled = false
 }) => {

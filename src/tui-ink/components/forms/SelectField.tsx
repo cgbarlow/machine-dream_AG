@@ -19,7 +19,7 @@ export const SelectField: React.FC<SelectFieldProps> = ({
   label,
   value,
   options,
-  onChange,
+  onChange: _onChange,
   isFocused = false
 }) => {
   const selectedOption = options.find(opt => opt.value === value);

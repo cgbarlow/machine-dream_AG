@@ -17,7 +17,7 @@ interface CheckboxGroupProps {
 export const CheckboxGroup: React.FC<CheckboxGroupProps> = ({
   label,
   options,
-  onChange,
+  onChange: _onChange,
   focusedIndex
 }) => {
   return (

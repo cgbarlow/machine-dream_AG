@@ -24,7 +24,7 @@ interface ScrollableListProps {
 export const ScrollableList: React.FC<ScrollableListProps> = ({
   items,
   selectedIndex,
-  onSelect,
+  onSelect: _onSelect,
   maxHeight = 10,
   showIndex = false
 }) => {

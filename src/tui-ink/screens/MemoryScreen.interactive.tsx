@@ -29,7 +29,7 @@ export const MemoryScreenInteractive: React.FC = () => {
   // Search tab state
   const [pattern, setPattern] = useState('');
   const [searchResults, setSearchResults] = useState<Array<{ key: string; value: unknown; similarity: number }>>([]);
-  const [searchStatus, setSearchStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
+  const [_searchStatus, setSearchStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
 
   // List tab state
   const [listNamespace, setListNamespace] = useState('default');

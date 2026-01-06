@@ -19,7 +19,7 @@ export const RadioGroup: React.FC<RadioGroupProps> = ({
   label,
   options,
   value,
-  onChange,
+  onChange: _onChange,
   focusedIndex
 }) => {
   return (

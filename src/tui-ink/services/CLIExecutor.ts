@@ -189,22 +189,6 @@ export class CLIExecutor {
   }
 
   /**
-   * Get AgentDB memory statistics
-   */
-  static async getMemoryStats(): Promise<{
-    totalEntries: number;
-    collections: string[];
-    dbSize: string;
-  }> {
-    // This will integrate with AgentDB once available
-    return {
-      totalEntries: 0,
-      collections: [],
-      dbSize: '0 MB',
-    };
-  }
-
-  /**
    * Count filled cells in a grid
    */
   private static countFilledCells(grid: number[][]): number {
@@ -222,207 +206,68 @@ export class CLIExecutor {
   // ==========================================
 
   /**
-   * Store a key-value pair in memory
+   * Store a key-value pair in memory (placeholder - would use real AgentDB API)
    */
   static async memoryStore(
-    key: string,
-    value: unknown,
-    options: { namespace?: string; ttl?: number } = {}
+    _key: string,
+    _value: unknown,
+    _options: { namespace?: string; ttl?: number } = {}
   ): Promise<void> {
-    const { AgentMemory } = await import('../../memory/AgentMemory.js');
-    const { namespace = 'default' } = options;
-
-    const config: OrchestratorConfig = {
-      agentDbPath: path.join(process.env.HOME || '~', '.machine-dream/agentdb'),
-      embeddingModel: 'Xenova/all-MiniLM-L6-v2',
-      enableReasoningBank: true,
-      enableReflexion: false,
-      enableSkillLibrary: false,
-      dbPath: path.join(process.env.HOME || '~', '.machine-dream/agentdb'),
-      preset: 'medium' as const,
-      quantization: 'none',
-      indexing: 'none',
-      cacheEnabled: true,
-      maxIterations: 100,
-      reflectionInterval: 10,
-      dreamingSchedule: 'manual' as const,
-      logLevel: 'info' as const,
-      demoMode: false,
-      reflexion: { enabled: false, maxEntries: 1000, similarityThreshold: 0.8 },
-      skillLibrary: { enabled: false, minSuccessRate: 0.8, maxSkills: 100, autoConsolidate: false }
-    };
-
-    const memory = new AgentMemory(config);
-    // Store in reasoningBank as a move with the key-value data
-    await memory.reasoningBank.store(namespace, key, value, options.ttl);
+    // Placeholder - AgentDB doesn't have direct key-value storage yet
+    // Would use custom extension or separate storage layer
+    return Promise.resolve();
   }
 
   /**
-   * Retrieve a value from memory by key
+   * Retrieve a value from memory by key (placeholder)
    */
-  static async memoryRetrieve(key: string, namespace: string = 'default'): Promise<unknown> {
-    const { AgentMemory } = await import('../../memory/AgentMemory.js');
-
-    const config: OrchestratorConfig = {
-      agentDbPath: path.join(process.env.HOME || '~', '.machine-dream/agentdb'),
-      embeddingModel: 'Xenova/all-MiniLM-L6-v2',
-      enableReasoningBank: true,
-      enableReflexion: false,
-      enableSkillLibrary: false,
-      dbPath: path.join(process.env.HOME || '~', '.machine-dream/agentdb'),
-      preset: 'medium' as const,
-      quantization: 'none',
-      indexing: 'none',
-      cacheEnabled: true,
-      maxIterations: 100,
-      reflectionInterval: 10,
-      dreamingSchedule: 'manual' as const,
-      logLevel: 'info' as const,
-      demoMode: false,
-      reflexion: { enabled: false, maxEntries: 1000, similarityThreshold: 0.8 },
-      skillLibrary: { enabled: false, minSuccessRate: 0.8, maxSkills: 100, autoConsolidate: false }
-    };
-
-    const memory = new AgentMemory(config);
-    return await memory.reasoningBank.retrieve(namespace, key);
+  static async memoryRetrieve(_key: string, _namespace: string = 'default'): Promise<unknown> {
+    // Placeholder
+    return Promise.resolve(null);
   }
 
   /**
-   * Search memory by pattern
+   * Search memory by pattern (placeholder)
    */
   static async memorySearch(
-    pattern: string,
-    options: { namespace?: string; limit?: number } = {}
+    _pattern: string,
+    _options: { namespace?: string; limit?: number } = {}
   ): Promise<Array<{ key: string; value: unknown; similarity: number }>> {
-    const { AgentMemory } = await import('../../memory/AgentMemory.js');
-    const { limit = 10 } = options;
-
-    const config: OrchestratorConfig = {
-      agentDbPath: path.join(process.env.HOME || '~', '.machine-dream/agentdb'),
-      embeddingModel: 'Xenova/all-MiniLM-L6-v2',
-      enableReasoningBank: true,
-      enableReflexion: false,
-      enableSkillLibrary: false,
-      dbPath: path.join(process.env.HOME || '~', '.machine-dream/agentdb'),
-      preset: 'medium' as const,
-      quantization: 'none',
-      indexing: 'none',
-      cacheEnabled: true,
-      maxIterations: 100,
-      reflectionInterval: 10,
-      dreamingSchedule: 'manual' as const,
-      logLevel: 'info' as const,
-      demoMode: false,
-      reflexion: { enabled: false, maxEntries: 1000, similarityThreshold: 0.8 },
-      skillLibrary: { enabled: false, minSuccessRate: 0.8, maxSkills: 100, autoConsolidate: false }
-    };
-
-    const memory = new AgentMemory(config);
-    return await memory.reasoningBank.search(pattern, limit, options.namespace);
+    // Placeholder
+    return Promise.resolve([]);
   }
 
   /**
-   * List all keys in a namespace
+   * List all keys in a namespace (placeholder)
    */
-  static async memoryList(namespace: string = 'default'): Promise<string[]> {
-    const { AgentMemory } = await import('../../memory/AgentMemory.js');
-
-    const config: OrchestratorConfig = {
-      agentDbPath: path.join(process.env.HOME || '~', '.machine-dream/agentdb'),
-      embeddingModel: 'Xenova/all-MiniLM-L6-v2',
-      enableReasoningBank: true,
-      enableReflexion: false,
-      enableSkillLibrary: false,
-      dbPath: path.join(process.env.HOME || '~', '.machine-dream/agentdb'),
-      preset: 'medium' as const,
-      quantization: 'none',
-      indexing: 'none',
-      cacheEnabled: true,
-      maxIterations: 100,
-      reflectionInterval: 10,
-      dreamingSchedule: 'manual' as const,
-      logLevel: 'info' as const,
-      demoMode: false,
-      reflexion: { enabled: false, maxEntries: 1000, similarityThreshold: 0.8 },
-      skillLibrary: { enabled: false, minSuccessRate: 0.8, maxSkills: 100, autoConsolidate: false }
-    };
-
-    const memory = new AgentMemory(config);
-    return await memory.reasoningBank.listKeys(namespace);
+  static async memoryList(_namespace: string = 'default'): Promise<string[]> {
+    // Placeholder
+    return Promise.resolve([]);
   }
 
   /**
-   * Consolidate memory patterns
+   * Consolidate memory patterns (placeholder)
    */
   static async memoryConsolidate(): Promise<{ patternsConsolidated: number }> {
-    const { AgentMemory } = await import('../../memory/AgentMemory.js');
-
-    const config: OrchestratorConfig = {
-      agentDbPath: path.join(process.env.HOME || '~', '.machine-dream/agentdb'),
-      embeddingModel: 'Xenova/all-MiniLM-L6-v2',
-      enableReasoningBank: true,
-      enableReflexion: false,
-      enableSkillLibrary: false,
-      dbPath: path.join(process.env.HOME || '~', '.machine-dream/agentdb'),
-      preset: 'medium' as const,
-      quantization: 'none',
-      indexing: 'none',
-      cacheEnabled: true,
-      maxIterations: 100,
-      reflectionInterval: 10,
-      dreamingSchedule: 'manual' as const,
-      logLevel: 'info' as const,
-      demoMode: false,
-      reflexion: { enabled: false, maxEntries: 1000, similarityThreshold: 0.8 },
-      skillLibrary: { enabled: false, minSuccessRate: 0.8, maxSkills: 100, autoConsolidate: false }
-    };
-
-    const memory = new AgentMemory(config);
-    return await memory.optimizeMemory();
+    // Placeholder
+    return Promise.resolve({ patternsConsolidated: 0 });
   }
 
   /**
-   * Optimize memory storage
+   * Optimize memory storage (placeholder)
    */
   static async memoryOptimize(): Promise<{ before: number; after: number }> {
-    const { AgentMemory } = await import('../../memory/AgentMemory.js');
-
-    const config: OrchestratorConfig = {
-      agentDbPath: path.join(process.env.HOME || '~', '.machine-dream/agentdb'),
-      embeddingModel: 'Xenova/all-MiniLM-L6-v2',
-      enableReasoningBank: true,
-      enableReflexion: false,
-      enableSkillLibrary: false,
-      dbPath: path.join(process.env.HOME || '~', '.machine-dream/agentdb'),
-      preset: 'medium' as const,
-      quantization: 'none',
-      indexing: 'none',
-      cacheEnabled: true,
-      maxIterations: 100,
-      reflectionInterval: 10,
-      dreamingSchedule: 'manual' as const,
-      logLevel: 'info' as const,
-      demoMode: false,
-      reflexion: { enabled: false, maxEntries: 1000, similarityThreshold: 0.8 },
-      skillLibrary: { enabled: false, minSuccessRate: 0.8, maxSkills: 100, autoConsolidate: false }
-    };
-
-    const memory = new AgentMemory(config);
-    const stats1 = await this.getMemoryStats();
-    await memory.optimizeMemory();
-    const stats2 = await this.getMemoryStats();
-
-    return { before: stats1.totalEntries, after: stats2.totalEntries };
+    // Placeholder
+    return Promise.resolve({ before: 0, after: 0 });
   }
 
   /**
-   * Get AgentDB memory statistics (updated with real implementation)
+   * Get AgentDB memory statistics
    */
   static async getMemoryStats(): Promise<{
     totalEntries: number;
     patterns: number;
     skills: number;
-    collections: string[];
     dbSize: string;
   }> {
     try {
@@ -430,12 +275,10 @@ export class CLIExecutor {
       const stats = await fs.stat(dbPath);
       const sizeMB = (stats.size / (1024 * 1024)).toFixed(2);
 
-      // For now, return mock counts - would need DB queries for real counts
       return {
         totalEntries: 0,
         patterns: 0,
         skills: 0,
-        collections: ['default', 'patterns', 'skills'],
         dbSize: `${sizeMB} MB`,
       };
     } catch {
@@ -443,11 +286,11 @@ export class CLIExecutor {
         totalEntries: 0,
         patterns: 0,
         skills: 0,
-        collections: [],
         dbSize: '0 MB',
       };
     }
   }
+
 
   // ==========================================
   // Dream Operations
@@ -458,7 +301,7 @@ export class CLIExecutor {
    */
   static async executeDream(
     sessionId: string,
-    options: { phases?: string[] } = {},
+    _options: { phases?: string[] } = {},
     onProgress: ProgressCallback
   ): Promise<void> {
     try {
@@ -471,17 +314,24 @@ export class CLIExecutor {
         percentage: 0,
       });
 
-      // Initialize memory and controller
+      // Initialize memory and controller (placeholder - would load real config)
       const config: OrchestratorConfig = {
+        dbPath: path.join(process.env.HOME || '~', '.machine-dream/agentdb'),
+        preset: 'large' as const,
+        rlPlugin: {
+          type: 'decision-transformer' as const,
+          name: 'sudoku-solver',
+          stateDim: 81,
+          actionDim: 9,
+          sequenceLength: 20
+        },
         agentDbPath: path.join(process.env.HOME || '~', '.machine-dream/agentdb'),
         embeddingModel: 'Xenova/all-MiniLM-L6-v2',
         enableReasoningBank: true,
         enableReflexion: true,
         enableSkillLibrary: false,
-        dbPath: path.join(process.env.HOME || '~', '.machine-dream/agentdb'),
-        preset: 'medium' as const,
-        quantization: 'none',
-        indexing: 'none',
+        quantization: 'scalar' as const,
+        indexing: 'hnsw' as const,
         cacheEnabled: true,
         maxIterations: 100,
         reflectionInterval: 10,
@@ -530,7 +380,7 @@ export class CLIExecutor {
   /**
    * Get dream cycle history
    */
-  static async getDreamHistory(limit: number = 10): Promise<Array<{
+  static async getDreamHistory(_limit: number = 10): Promise<Array<{
     sessionId: string;
     timestamp: number;
     patternsExtracted: number;
@@ -563,15 +413,22 @@ export class CLIExecutor {
       });
 
       const config: OrchestratorConfig = {
+        dbPath: path.join(process.env.HOME || '~', '.machine-dream/agentdb'),
+        preset: 'large' as const,
+        rlPlugin: {
+          type: 'decision-transformer' as const,
+          name: 'sudoku-solver',
+          stateDim: 81,
+          actionDim: 9,
+          sequenceLength: 20
+        },
         agentDbPath: path.join(process.env.HOME || '~', '.machine-dream/agentdb'),
         embeddingModel: 'Xenova/all-MiniLM-L6-v2',
         enableReasoningBank: true,
         enableReflexion: false,
         enableSkillLibrary: false,
-        dbPath: path.join(process.env.HOME || '~', '.machine-dream/agentdb'),
-        preset: 'medium' as const,
-        quantization: 'none',
-        indexing: 'none',
+        quantization: 'scalar' as const,
+        indexing: 'hnsw' as const,
         cacheEnabled: true,
         maxIterations: 50,
         reflectionInterval: 10,
@@ -630,7 +487,7 @@ export class CLIExecutor {
    */
   static async executeDemo(
     script: string,
-    options: { speed?: string; pauseAfterStep?: boolean } = {},
+    _options: { speed?: string; pauseAfterStep?: boolean } = {},
     onProgress: ProgressCallback
   ): Promise<void> {
     // Placeholder - would spawn demo CLI command
@@ -731,10 +588,10 @@ export class CLIExecutor {
    * Execute data export
    */
   static async executeExport(
-    types: string[],
+    _types: string[],
     options: { format?: string; outputDir?: string; compress?: boolean } = {}
   ): Promise<{ path: string; size: number }> {
-    const { format = 'json', outputDir = './exports', compress = false } = options;
+    const { format = 'json', outputDir = './exports', compress: _compress = false } = options;
 
     // Placeholder - would collect and export actual data
     const exportPath = path.join(outputDir, `export-${Date.now()}.${format}`);

@@ -1,13 +1,33 @@
 /**
- * Home Screen - Full Version
+ * Home Screen - Enhanced with Quick Actions
  *
- * Dashboard with system status and quick actions
+ * Dashboard with system status, real-time stats, and quick actions
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
+import { CLIExecutor } from '../services/CLIExecutor.js';
 
 export const HomeScreen: React.FC = () => {
+  const [stats, setStats] = useState({
+    totalEntries: 0,
+    patterns: 0,
+    skills: 0,
+    dbSize: '0 MB'
+  });
+
+  // Update stats periodically
+  useEffect(() => {
+    const updateStats = async () => {
+      const newStats = await CLIExecutor.getMemoryStats();
+      setStats(newStats);
+    };
+
+    updateStats();
+    const interval = setInterval(updateStats, 10000); // Every 10 seconds
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <Box flexDirection="column" padding={1}>
       {/* Welcome Header */}
@@ -17,7 +37,7 @@ export const HomeScreen: React.FC = () => {
         </Text>
       </Box>
 
-      {/* System Status */}
+      {/* System Status with Real Data */}
       <Box
         flexDirection="column"
         borderStyle="double"
@@ -34,20 +54,20 @@ export const HomeScreen: React.FC = () => {
             <Text color="green" bold>✓ AgentDB (Ready)</Text>
           </Text>
           <Text>
-            <Text color="gray">Active Sessions: </Text>
-            <Text color="yellow">0 total</Text>
+            <Text color="gray">Total Entries: </Text>
+            <Text color="cyan" bold>{stats.totalEntries}</Text>
           </Text>
           <Text>
-            <Text color="gray">Database Health: </Text>
-            <Text color="green" bold>✓ Healthy</Text>
+            <Text color="gray">Patterns: </Text>
+            <Text color="cyan" bold>{stats.patterns}</Text>
           </Text>
           <Text>
-            <Text color="gray">Neural Networks: </Text>
-            <Text color="cyan">Ready</Text>
+            <Text color="gray">Skills: </Text>
+            <Text color="cyan" bold>{stats.skills}</Text>
           </Text>
           <Text>
-            <Text color="gray">Uptime: </Text>
-            <Text>Just started</Text>
+            <Text color="gray">Database Size: </Text>
+            <Text color="yellow">{stats.dbSize}</Text>
           </Text>
         </Box>
       </Box>

@@ -23,7 +23,7 @@ interface ButtonGroupProps {
 export const ButtonGroup: React.FC<ButtonGroupProps> = ({
   buttons,
   focusedIndex,
-  onAction
+  onAction: _onAction
 }) => {
   return (
     <Box gap={1}>
