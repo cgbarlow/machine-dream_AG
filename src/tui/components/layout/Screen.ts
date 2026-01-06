@@ -52,7 +52,7 @@ export class Screen {
       });
     });
 
-    // Create blessed screen
+    // Create blessed screen (even in headless mode, but with safeguards)
     this.screen = blessed.screen({
       smartCSR: options.smartCSR ?? true,
       fullUnicode: options.fullUnicode ?? this.capabilities.supportsUnicode,
@@ -66,6 +66,30 @@ export class Screen {
       },
       title: options.title || 'Machine Dream TUI'
     });
+
+    // In headless mode, set up auto-exit to prevent infinite loops
+    if (this.capabilities.isHeadless && !this.capabilities.supportsKeyboard) {
+      outputManager.emit({
+        eventType: 'state',
+        component: 'Screen',
+        data: {
+          action: 'created_headless',
+          message: 'Running in headless mode - will auto-exit after initialization',
+          capabilities: this.capabilities
+        }
+      });
+
+      // Auto-exit after 2 seconds in headless mode
+      setTimeout(() => {
+        outputManager.emit({
+          eventType: 'state',
+          component: 'Screen',
+          data: { action: 'auto_exit_headless', message: 'Headless mode timeout reached' }
+        });
+        this.destroy();
+        process.exit(0);
+      }, 2000);
+    }
 
     // Set up global key handlers
     this.setupKeyHandlers();
@@ -82,6 +106,11 @@ export class Screen {
   }
 
   private setupKeyHandlers(): void {
+    // Skip keyboard setup in headless mode
+    if (this.capabilities.isHeadless && !this.capabilities.supportsKeyboard) {
+      return;
+    }
+
     // Global exit handler (Ctrl+C)
     this.screen.key(['C-c'], () => {
       this.outputManager.emit({
