@@ -19,7 +19,7 @@
 | AgentDB (Local) | ✅ Complete | SQLite-based persistence |
 | CLI Interface | ✅ Complete | Full command set |
 | TUI (Ink) | ✅ Complete | Interactive terminal UI |
-| **LLM Integration** | 🚧 **In Progress** | Pure LLM Sudoku player |
+| **LLM Integration** | ✅ **Phase 1 Complete** | Pure LLM Sudoku player (MVP) |
 
 ### The Critical Gap
 
@@ -45,6 +45,11 @@ npm run dev
 
 # Run Tests
 npm test
+
+# LLM Sudoku Player (Phase 2)
+cp .env.example .env           # Configure LM Studio endpoint
+npm run llm:play puzzles/easy-01.json  # Play with LLM
+npm run llm:stats              # View learning statistics
 ```
 
 ## 🤖 LLM Integration (Phase 2)
