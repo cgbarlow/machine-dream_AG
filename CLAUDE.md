@@ -350,3 +350,48 @@ NEVER create files unless they're absolutely necessary for achieving your goal.
 ALWAYS prefer editing an existing file to creating a new one.
 NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
 Never save working files, text/mds and tests to the root folder.
+
+## 📋 Spec-Based Development (MANDATORY)
+
+**CRITICAL RULE**: Always build to spec. No implementation changes unless outlined in specification documents.
+
+### Specification-First Workflow
+
+1. **Before implementing ANY feature**:
+   - Check if feature is defined in `/docs/specs/`
+   - If NOT defined → Update the spec first, then implement
+   - If defined → Implement exactly as specified
+
+2. **Specification Documents** (in order of dependency):
+   | Spec | Document | Purpose |
+   |------|----------|---------|
+   | 01 | Core Types | Base type definitions |
+   | 02 | Puzzle Engine | Sudoku rules and validation |
+   | 03 | GRASP Loop | Cognitive loop framework |
+   | 04 | Strategy Engine | Move generation strategies |
+   | 05 | Dreaming Pipeline | Experience consolidation |
+   | 06 | AgentDB Types | Memory interfaces |
+   | 07 | Integration Orchestration | System events and lifecycle |
+   | 08 | AgentDB Integration | Persistence layer |
+   | 09 | CLI Interface | Command-line commands |
+   | 10 | TUI Interface | Terminal UI screens |
+   | 11 | LLM Sudoku Player | Pure LLM player (Phase 2) |
+
+3. **When specs conflict with implementation ideas**:
+   - Specs are authoritative
+   - Propose spec updates if needed
+   - Never implement unspecified behavior
+
+4. **Verification Checklist** (before any PR):
+   - [ ] All new types defined in specs
+   - [ ] All event types registered in Spec 07
+   - [ ] All CLI commands match Spec 09
+   - [ ] All TUI screens match Spec 10
+   - [ ] Tests verify spec compliance
+
+### Why Spec-Based Development?
+
+- **Consistency**: All components follow the same contracts
+- **Traceability**: Every feature maps to a specification
+- **Reviewability**: Changes are validated against specs
+- **Maintainability**: Specs serve as living documentation

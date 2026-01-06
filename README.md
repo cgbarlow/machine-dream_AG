@@ -2,8 +2,35 @@
 
 **Continuous Machine Cognition & AgentDB Integration**
 
-> [!NOTE]
-> **Functional POC**: This repository is a fully functional Proof-of-Concept. It implements the complete GRASP loop and Dreaming pipeline using a Local AgentDB (SQLite) for persistence.
+> [!IMPORTANT]
+> **Current Status: Phase 1 Complete, Phase 2 In Progress**
+>
+> ✅ **Phase 1 (Complete)**: TUI, CLI, GRASP loop, Dreaming pipeline, AgentDB persistence
+>
+> 🚧 **Phase 2 (In Progress)**: True LLM integration - an actual LLM playing Sudoku
+
+## 🎯 Project Status
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Puzzle Engine | ✅ Complete | Sudoku generation, validation, rules |
+| GRASP Loop | ✅ Complete | Generate, Review, Absorb, Synthesize, Persist |
+| Dreaming Pipeline | ✅ Complete | 5-phase consolidation |
+| AgentDB (Local) | ✅ Complete | SQLite-based persistence |
+| CLI Interface | ✅ Complete | Full command set |
+| TUI (Ink) | ✅ Complete | Interactive terminal UI |
+| **LLM Integration** | 🚧 **In Progress** | Pure LLM Sudoku player |
+
+### The Critical Gap
+
+The current system uses **deterministic rule-based solving** (naked singles, hidden singles, backtracking). While architecturally sound, **the LLM never actually plays Sudoku**.
+
+Phase 2 will implement a **true LLM Sudoku player** where:
+- The LLM receives puzzle state and proposes moves
+- Moves are validated (correct/invalid/wrong)
+- The LLM learns from feedback
+- Experiences persist for "dreaming" consolidation
+- No hints, no fallbacks - pure LLM reasoning
 
 ## 🚀 Quick Start
 
@@ -19,6 +46,53 @@ npm run dev
 # Run Tests
 npm test
 ```
+
+## 🤖 LLM Integration (Phase 2)
+
+### Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| LLM Provider | **LM Studio (local)** | Privacy, no API costs, offline |
+| Target Model | **Qwen3 30B** | Capable reasoning, runs locally |
+| Deterministic Fallback | **None** | Pure LLM - must learn on its own |
+| Hints | **None** | LLM must struggle and learn |
+| Memory Persistence | **Yes** | Experiences persist across sessions |
+| Memory Toggle | **Yes** | Enable/disable to verify learning |
+
+### LM Studio Setup
+
+1. Download [LM Studio](https://lmstudio.ai/)
+2. Load **Qwen3 30B** (or similar capable model)
+3. Start local server (default: `localhost:1234`)
+4. The system connects via OpenAI-compatible API
+
+### How It Works
+
+```
+┌─────────────────────────────────────────────────────┐
+│                LLM Sudoku Player                    │
+├─────────────────────────────────────────────────────┤
+│  1. Show puzzle state to LLM                        │
+│  2. LLM proposes a move (row, col, value)           │
+│  3. System validates move                           │
+│  4. Feedback: "CORRECT" / "INVALID: reason"         │
+│  5. Store experience in AgentDB                     │
+│  6. Repeat until solved                             │
+│  7. Consolidate patterns during "dreaming"          │
+└─────────────────────────────────────────────────────┘
+```
+
+### Memory Toggle
+
+To verify learning is working:
+- `--no-memory`: Fresh start, no history (baseline)
+- `--memory`: Include past experiences (should improve over time)
+
+### Documentation
+
+- [LLM Integration Plan](docs/LLM_INTEGRATION_PLAN.md) - Architecture overview
+- [Spec 11: LLM Sudoku Player](docs/specs/11-llm-sudoku-player.md) - Formal specification
 
 ## 📖 Overview
 

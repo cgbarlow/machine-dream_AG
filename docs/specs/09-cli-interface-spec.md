@@ -544,7 +544,85 @@ machine-dream export memory \
 
 ---
 
-### 3.8 System Command
+### 3.8 LLM Command
+
+LLM Sudoku Player operations (see [Spec 11: LLM Sudoku Player](./11-llm-sudoku-player.md)).
+
+```bash
+machine-dream llm <subcommand> [options]
+```
+
+**Subcommands:**
+
+#### 3.8.1 `llm play` - Play Puzzle with LLM
+
+```bash
+machine-dream llm play <puzzle-file> [options]
+
+Arguments:
+  <puzzle-file>                # Path to puzzle file (JSON format)
+
+Options:
+  --no-memory                  # Disable memory (baseline mode for A/B testing)
+  --model <model>              # LLM model name (default: qwen3-30b)
+  --endpoint <url>             # LM Studio endpoint (default: http://localhost:1234/v1)
+  --max-moves <n>              # Maximum moves before abandoning (default: 200)
+  --temperature <n>            # LLM temperature (default: 0.7)
+  --output <file>              # Save session results to file
+  --visualize                  # Show live solving visualization
+```
+
+**Example:**
+```bash
+# Play with memory enabled (default)
+machine-dream llm play puzzles/easy-01.json --visualize
+
+# Play without memory (baseline for comparison)
+machine-dream llm play puzzles/easy-01.json --no-memory
+
+# Custom LM Studio configuration
+machine-dream llm play puzzles/medium-01.json \
+  --endpoint http://localhost:1234/v1 \
+  --model qwen3-30b \
+  --temperature 0.5
+```
+
+#### 3.8.2 `llm stats` - View Learning Statistics
+
+```bash
+machine-dream llm stats [options]
+
+Options:
+  --sessions <n>               # Number of recent sessions to analyze (default: 10)
+  --compare                    # Compare memory ON vs OFF performance
+  --format <format>            # json|table|yaml (default: table)
+```
+
+#### 3.8.3 `llm dream` - Consolidate LLM Experiences
+
+```bash
+machine-dream llm dream [options]
+
+Options:
+  --sessions <list>            # Specific session IDs to consolidate
+  --update-fewshots            # Update few-shot examples from best moves
+  --output <file>              # Save consolidation report
+```
+
+#### 3.8.4 `llm benchmark` - Compare Memory ON vs OFF
+
+```bash
+machine-dream llm benchmark [options]
+
+Options:
+  --puzzles <n>                # Number of puzzles per mode (default: 5)
+  --difficulty <level>         # easy|medium|hard (default: easy)
+  --output <dir>               # Benchmark report directory
+```
+
+---
+
+### 3.9 System Command
 
 System utilities and maintenance.
 

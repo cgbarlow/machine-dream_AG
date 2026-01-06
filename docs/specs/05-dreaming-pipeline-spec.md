@@ -56,6 +56,9 @@ The Dreaming Pipeline is the "night cycle" consolidation system that transforms 
 | **GRASP Loop** | Input Provider | Generates experiences during solving |
 | **Attention Mechanism** | Metadata Source | Importance scores for triage |
 | **Puzzle Engine** | Domain Context | Validation of strategy correctness |
+| **LLM Sudoku Player (Spec 11)** | Optional | LLM experiences for consolidation when using pure LLM mode |
+
+> **Note**: When operating in LLM mode (see [Spec 11: LLM Sudoku Player](./11-llm-sudoku-player.md)), the Dreaming Pipeline consolidates LLM move experiences, extracting successful patterns and synthesizing few-shot examples for improved future performance.
 
 ---
 
@@ -1334,7 +1337,96 @@ Status: VERIFIED
 
 ---
 
-## 8. References
+## 8. LLM Experience Consolidation
+
+When operating in LLM mode (Spec 11), the Dreaming Pipeline consolidates LLM-specific experiences:
+
+### 8.1 LLM Experience Types
+
+```typescript
+interface LLMExperienceConsolidation {
+  // Source experiences from LLM solving
+  llmExperiences: LLMExperience[];
+
+  // Consolidation outputs
+  successfulPatterns: LLMPattern[];      // Moves that matched solution
+  commonErrors: LLMErrorPattern[];       // Repeated invalid moves
+  wrongPathPatterns: LLMWrongPath[];     // Valid but incorrect moves
+
+  // Few-shot examples for prompts
+  fewShotExamples: FewShotExample[];     // Best examples for future prompts
+}
+
+interface LLMPattern {
+  gridContext: string;                   // Puzzle state description
+  reasoning: string;                     // LLM's reasoning chain
+  move: { row: number; col: number; value: number };
+  successRate: number;                   // How often this pattern succeeds
+}
+
+interface FewShotExample {
+  puzzleState: string;                   // Grid representation
+  analysis: string;                      // Step-by-step reasoning
+  move: { row: number; col: number; value: number };
+  outcome: 'CORRECT';                    // Only successful examples
+}
+```
+
+### 8.2 LLM Consolidation Process
+
+```typescript
+async function consolidateLLMExperiences(
+  experiences: LLMExperience[]
+): Promise<LLMExperienceConsolidation> {
+  // 1. Group by outcome
+  const successful = experiences.filter(e => e.validation.isCorrect);
+  const invalid = experiences.filter(e => !e.validation.isValid);
+  const wrong = experiences.filter(e =>
+    e.validation.isValid && !e.validation.isCorrect
+  );
+
+  // 2. Extract patterns using LLM synthesis
+  const patterns = await this.llmClient.chat([
+    { role: 'system', content: 'Analyze these Sudoku solving experiences and extract patterns...' },
+    { role: 'user', content: JSON.stringify({
+      successful: successful.slice(0, 20),  // Best examples
+      invalid: invalid.slice(0, 10),        // Common errors
+      wrong: wrong.slice(0, 10)             // Wrong paths
+    })}
+  ]);
+
+  // 3. Generate few-shot examples from best successes
+  const fewShots = successful
+    .sort((a, b) => b.validation.isCorrect ? 1 : -1)
+    .slice(0, 5)
+    .map(exp => ({
+      puzzleState: formatGrid(exp.gridState),
+      analysis: exp.move.reasoning,
+      move: exp.move,
+      outcome: 'CORRECT' as const
+    }));
+
+  // 4. Store consolidated knowledge
+  return {
+    llmExperiences: experiences,
+    successfulPatterns: patterns.strategies,
+    commonErrors: patterns.errors,
+    wrongPathPatterns: patterns.wrongPaths,
+    fewShotExamples: fewShots
+  };
+}
+```
+
+### 8.3 Memory Toggle Impact
+
+The memory toggle (Spec 11) affects consolidation:
+
+- **Memory ON**: Full consolidation with few-shot generation
+- **Memory OFF**: No consolidation (baseline mode for A/B testing)
+
+---
+
+## 9. References
 
 - POC Strategy Report: `/workspaces/machine-dream/docs/poc-strategy-report.md` (Section 4.2)
 - Continuous Thinking Research: `/workspaces/machine-dream/docs/continuous-machine-thinking-research.md`
@@ -1342,6 +1434,8 @@ Status: VERIFIED
 - Type Definitions: `/workspaces/machine-dream/src/types.ts`
 - GRASP Loop Spec: `/workspaces/machine-dream/docs/specs/03-grasp-loop-spec.md`
 - Memory System Spec: `/workspaces/machine-dream/docs/specs/02-memory-system-spec.md`
+- **LLM Sudoku Player Spec**: `docs/specs/11-llm-sudoku-player.md`
+- **LLM Integration Plan**: `docs/LLM_INTEGRATION_PLAN.md`
 
 ---
 

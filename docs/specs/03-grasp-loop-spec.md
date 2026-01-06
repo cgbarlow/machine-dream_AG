@@ -69,6 +69,9 @@ The GRASP Loop (Generate-Review-Absorb-Synthesize-Persist) is the **core continu
 | Memory System | Strong | Experience storage, pattern retrieval, trajectory logging |
 | Attention Mechanism | Strong | Focus selection, priority calculation |
 | Dreaming Pipeline | Weak | Consolidation triggered after solving phase |
+| **LLM Sudoku Player (Spec 11)** | Optional | Alternative move generation source using LLM reasoning |
+
+> **Note**: See [Spec 11: LLM Sudoku Player](./11-llm-sudoku-player.md) for the pure LLM-based solving mode where the LLM itself proposes moves without deterministic strategies.
 
 ---
 
@@ -1339,11 +1342,52 @@ Then:
 
 ## 7. Future Enhancements (Post-POC)
 
-### 7.1 Multi-Path Exploration
+### 7.1 LLM-Based Move Generation (Phase 2)
+
+**See [Spec 11: LLM Sudoku Player](./11-llm-sudoku-player.md)** for complete specification.
+
+In Phase 2, the GRASP loop can use an LLM as the move generation source instead of deterministic strategies:
+
+```typescript
+interface LLMGenerateInput extends GenerateInput {
+  llmClient: LMStudioClient;
+  memoryEnabled: boolean;
+  fewShotExamples?: LLMExperience[];
+}
+
+// LLM replaces strategy-based generation
+async function generatePhaseWithLLM(input: LLMGenerateInput): Promise<GenerateOutput> {
+  // Build prompt with current puzzle state
+  const prompt = await buildLLMPrompt(input.currentState, input.fewShotExamples);
+
+  // Get LLM's proposed move
+  const response = await input.llmClient.chat([
+    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'user', content: prompt }
+  ]);
+
+  // Parse LLM response into Move
+  const move = parseMove(response);
+
+  return {
+    candidateMoves: [move],
+    strategiesApplied: ['llm-reasoning'],
+    explorationDepth: 1
+  };
+}
+```
+
+**Key Differences from Deterministic GRASP**:
+- Single move proposed per iteration (LLM's best guess)
+- No backtracking or strategy fallback
+- LLM must learn from mistakes
+- Memory toggle enables/disables learning context
+
+### 7.2 Multi-Path Exploration
 - Explore multiple candidate moves in parallel
 - Compare outcomes and select best path
 
-### 7.2 Advanced Learning
+### 7.3 Advanced Learning
 - Integration with AgentDB RL learning
 - Decision Transformer for move selection
 - Reflexion memory for error correction
@@ -1365,6 +1409,8 @@ Then:
 - **Continuous Thinking Research**: `/workspaces/machine-dream/docs/continuous-machine-thinking-research.md` (GRASP Framework)
 - **Type Definitions**: `/workspaces/machine-dream/src/types.ts` (Lines 42-65)
 - **Memory System Spec**: `/workspaces/machine-dream/docs/specs/02-memory-system-spec.md`
+- **LLM Sudoku Player Spec**: `./11-llm-sudoku-player.md` (LLM-based move generation - Phase 2)
+- **LLM Integration Plan**: `/docs/LLM_INTEGRATION_PLAN.md` (Architecture overview)
 
 ---
 

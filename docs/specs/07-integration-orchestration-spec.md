@@ -75,6 +75,9 @@ The Integration & Orchestration system serves as the **central nervous system** 
 **Soft Dependencies (Optional but recommended):**
 - Dreaming Pipeline: Consolidation for transfer learning demo
 - Benchmarking Framework: Metrics collection for stakeholder reporting
+- **LLM Sudoku Player (Spec 11)**: Pure LLM-based solving mode for true machine learning demonstration
+
+> **Phase 2 Note**: The LLM Sudoku Player (see [Spec 11](./11-llm-sudoku-player.md)) introduces a pure LLM solving mode where the LLM iteratively plays Sudoku, learns from feedback, and improves through dreaming consolidation. This is orchestrated as an alternative to the deterministic GRASP loop.
 
 **External Dependencies:**
 - Claude Flow MCP: Agent coordination and orchestration
@@ -173,6 +176,13 @@ enum EventType {
   GRASP_MOVE_VALIDATED = 'grasp.move.validated',
   GRASP_INSIGHT_DISCOVERED = 'grasp.insight.discovered',
 
+  // LLM Sudoku Player Events (Spec 11)
+  LLM_MOVE_PROPOSED = 'llm.move.proposed',
+  LLM_MOVE_VALIDATED = 'llm.move.validated',
+  LLM_EXPERIENCE_STORED = 'llm.experience.stored',
+  LLM_PARSE_FAILURE = 'llm.parse.failure',
+  LLM_SESSION_COMPLETE = 'llm.session.complete',
+
   // Memory Events
   MEMORY_EXPERIENCE_LOGGED = 'memory.experience.logged',
   MEMORY_PATTERN_EXTRACTED = 'memory.pattern.extracted',
@@ -186,6 +196,7 @@ enum EventType {
   DREAM_CYCLE_START = 'dream.cycle.start',
   DREAM_CYCLE_COMPLETE = 'dream.cycle.complete',
   DREAM_CONSOLIDATION_PROGRESS = 'dream.consolidation.progress',
+  DREAM_FEWSHOT_UPDATED = 'dream.fewshot.updated',  // LLM few-shot examples updated
 
   // System Events
   SYSTEM_ERROR = 'system.error',
