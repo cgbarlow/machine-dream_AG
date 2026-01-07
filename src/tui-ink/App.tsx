@@ -4,7 +4,7 @@
  * Integrates all screens with navigation and keyboard shortcuts
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, useInput, useApp } from 'ink';
 import { Header } from './components/Header.js';
 import { Sidebar } from './components/Sidebar.js';
@@ -18,6 +18,13 @@ import { DemoScreenInteractive } from './screens/DemoScreen.interactive.js';
 import { ConfigScreenInteractive } from './screens/ConfigScreen.interactive.js';
 import { ExportScreenInteractive } from './screens/ExportScreen.interactive.js';
 import { SystemScreen } from './screens/SystemScreen.js';
+import { LLMScreenInteractive } from './screens/LLMScreen.interactive.js';
+import { PuzzleGeneratorScreenInteractive } from './screens/PuzzleGeneratorScreen.interactive.js';
+import { ProfileManagerScreenInteractive } from './screens/ProfileManagerScreen.interactive.js';
+import { ConsoleScreen } from './screens/ConsoleScreen.js';
+import { ConsoleOverlay } from './components/overlays/ConsoleOverlay.js';
+import { HelpOverlay } from './components/overlays/HelpOverlay.js';
+import { OutputCapture } from './services/OutputCapture.js';
 
 interface MenuItem {
   id: string;
@@ -30,6 +37,9 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { id: 'home', label: 'Home', icon: '🏠', shortcut: '[H]', screen: 'Home' },
   { id: 'solve', label: 'Solve', icon: '🧩', shortcut: '[S]', screen: 'Solve' },
+  { id: 'generate', label: 'Generate', icon: '🎲', shortcut: '[G]', screen: 'Generate' },
+  { id: 'llm', label: 'LLM Play', icon: '🤖', shortcut: '[L]', screen: 'LLM' },
+  { id: 'profiles', label: 'AI Models', icon: '🔧', shortcut: '[A]', screen: 'Profiles' },
   { id: 'memory', label: 'Memory', icon: '💾', shortcut: '[M]', screen: 'Memory' },
   { id: 'dream', label: 'Dream', icon: '💭', shortcut: '[D]', screen: 'Dream' },
   { id: 'benchmark', label: 'Benchmark', icon: '⚡', shortcut: '[B]', screen: 'Benchmark' },
@@ -37,14 +47,47 @@ const menuItems: MenuItem[] = [
   { id: 'config', label: 'Config', icon: '⚙️', shortcut: '[C]', screen: 'Config' },
   { id: 'export', label: 'Export', icon: '📤', shortcut: '[X]', screen: 'Export' },
   { id: 'system', label: 'System', icon: '🖥️', shortcut: '[Y]', screen: 'System' },
+  { id: 'console', label: 'Console', icon: '>', shortcut: '[T]', screen: 'Console' },
 ];
 
 export const App: React.FC = () => {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [showConsoleOverlay, setShowConsoleOverlay] = useState(false);
+  const [showHelpOverlay, setShowHelpOverlay] = useState(false);
   const { exit } = useApp();
+
+  // Start output capture on mount
+  useEffect(() => {
+    OutputCapture.start();
+    return () => OutputCapture.stop();
+  }, []);
 
   // Keyboard navigation
   useInput((input, key) => {
+    // Backtick toggles console overlay
+    if (input === '`') {
+      setShowConsoleOverlay((prev) => !prev);
+      return;
+    }
+
+    // ? toggles help overlay
+    if (input === '?') {
+      setShowHelpOverlay((prev) => !prev);
+      return;
+    }
+
+    // Escape closes overlays
+    if (key.escape) {
+      if (showConsoleOverlay) {
+        setShowConsoleOverlay(false);
+        return;
+      }
+      if (showHelpOverlay) {
+        setShowHelpOverlay(false);
+        return;
+      }
+    }
+
     // Arrow key navigation
     if (key.upArrow) {
       setSelectedIndex((prev) => (prev > 0 ? prev - 1 : menuItems.length - 1));
@@ -56,13 +99,17 @@ export const App: React.FC = () => {
     const shortcuts: Record<string, number> = {
       h: 0, // Home
       s: 1, // Solve
-      m: 2, // Memory
-      d: 3, // Dream
-      b: 4, // Benchmark
-      e: 5, // Demo
-      c: 6, // Config
-      x: 7, // Export
-      y: 8, // System
+      g: 2, // Generate
+      l: 3, // LLM Play
+      a: 4, // AI Models
+      m: 5, // Memory
+      d: 6, // Dream
+      b: 7, // Benchmark
+      e: 8, // Demo
+      c: 9, // Config
+      x: 10, // Export
+      y: 11, // System
+      t: 12, // Console
     };
 
     if (input && shortcuts[input.toLowerCase()] !== undefined) {
@@ -86,6 +133,12 @@ export const App: React.FC = () => {
         return <HomeScreen />;
       case 'solve':
         return <SolveScreenInteractive />;
+      case 'generate':
+        return <PuzzleGeneratorScreenInteractive />;
+      case 'llm':
+        return <LLMScreenInteractive />;
+      case 'profiles':
+        return <ProfileManagerScreenInteractive />;
       case 'memory':
         return <MemoryScreenInteractive />;
       case 'dream':
@@ -100,6 +153,8 @@ export const App: React.FC = () => {
         return <ExportScreenInteractive />;
       case 'system':
         return <SystemScreen />;
+      case 'console':
+        return <ConsoleScreen />;
       default:
         return <HomeScreen />;
     }
@@ -138,6 +193,17 @@ export const App: React.FC = () => {
         memoryStatus="Ready"
         databaseStatus="Connected"
       />
+
+      {/* Overlays */}
+      {showConsoleOverlay && (
+        <ConsoleOverlay onClose={() => setShowConsoleOverlay(false)} />
+      )}
+      {showHelpOverlay && (
+        <HelpOverlay
+          screen={currentScreen}
+          onClose={() => setShowHelpOverlay(false)}
+        />
+      )}
     </Box>
   );
 };

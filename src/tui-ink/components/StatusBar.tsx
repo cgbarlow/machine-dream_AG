@@ -34,7 +34,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         <Text color="green">{databaseStatus}</Text>
       </Box>
       <Box>
-        <Text dimColor>F1: Help | Ctrl+C: Exit | Ctrl+R: Refresh</Text>
+        <Text dimColor>[?] Help | [`] Console | Ctrl+C: Exit</Text>
       </Box>
     </Box>
   );

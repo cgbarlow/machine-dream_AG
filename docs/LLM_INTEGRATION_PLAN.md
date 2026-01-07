@@ -321,24 +321,28 @@ interface LearningMetrics {
 
 ## Implementation Phases
 
-### Phase 1: Basic LLM Play (MVP)
-- [ ] LM Studio client with OpenAI-compatible API
-- [ ] Basic prompt builder for puzzle state
-- [ ] Move parser and validator
-- [ ] Simple play loop
-- [ ] Console output showing LLM reasoning
+### Phase 1: Basic LLM Play (MVP) ✅ COMPLETE
+- [x] LM Studio client with OpenAI-compatible API
+- [x] Basic prompt builder for puzzle state
+- [x] Move parser and validator
+- [x] Simple play loop
+- [x] Console output showing LLM reasoning
+- [x] CLI commands (llm play, llm stats)
 
-### Phase 2: Learning & Memory
-- [ ] Experience storage in AgentDB
-- [ ] Few-shot examples in prompts
-- [ ] Error pattern tracking
-- [ ] Basic metrics collection
+### Phase 2: Learning & Memory ✅ COMPLETE
+- [x] Experience storage in AgentDB
+- [x] Few-shot examples in prompts
+- [x] Error pattern tracking
+- [x] Basic metrics collection
+- [x] Memory toggle for A/B testing
 
-### Phase 3: Dreaming Consolidation
-- [ ] Pattern analysis from experiences
-- [ ] LLM-powered insight synthesis
-- [ ] Updated prompts based on learnings
-- [ ] Performance improvement tracking
+### Phase 3: Dreaming Consolidation ✅ COMPLETE
+- [x] Pattern analysis from experiences
+- [x] LLM-powered insight synthesis
+- [x] Updated prompts based on learnings
+- [x] Performance improvement tracking
+- [x] Benchmark command (memory ON vs OFF)
+- [x] Automated few-shot generation
 
 ### Phase 4: TUI Integration
 - [ ] Live display of LLM thinking

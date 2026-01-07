@@ -16,6 +16,7 @@ import { registerSystemCommand } from './system';
 import { registerInteractiveCommand } from './interactive';
 import { registerTUICommand } from './tui';
 import { registerLLMCommand } from './llm';
+import { registerPuzzleCommand } from './puzzle';
 
 export function registerCommands(program: Command): void {
     // Core commands
@@ -30,6 +31,9 @@ export function registerCommands(program: Command): void {
 
     // LLM Sudoku Player (Spec 11)
     registerLLMCommand(program);
+
+    // Puzzle Generation (Spec 12)
+    registerPuzzleCommand(program);
 
     // Interactive mode
     registerInteractiveCommand(program);

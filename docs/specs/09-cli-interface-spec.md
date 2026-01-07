@@ -20,6 +20,17 @@ This specification defines a comprehensive, production-ready CLI for the Machine
 5. **Machine-Readable Output**: JSON/structured formats for automation
 6. **Human-Friendly Display**: Rich terminal UI for interactive use
 
+### TUI Integration
+
+The CLI is also accessible through the Terminal User Interface (TUI) Console feature (Spec 14):
+- **Console Screen**: Full-screen console accessible via `[T]` menu item
+- **Console Overlay**: Quick toggle with backtick (`` ` ``) key from any TUI screen
+- **Direct Command Entry**: Type CLI commands directly in the TUI console
+- **Output Capture**: All CLI output displayed within the TUI, not escaping to terminal
+- **Command History**: Navigate previous commands with arrow keys
+
+See Spec 14 (Console Menu Interface) for complete TUI console integration details.
+
 ---
 
 ## 2. Architecture Overview
@@ -546,7 +557,7 @@ machine-dream export memory \
 
 ### 3.8 LLM Command
 
-LLM Sudoku Player operations (see [Spec 11: LLM Sudoku Player](./11-llm-sudoku-player.md)).
+LLM Sudoku Player operations and profile management (see [Spec 11: LLM Sudoku Player](./11-llm-sudoku-player.md) and [Spec 13: LLM Profile Management](./13-llm-profile-management.md)).
 
 ```bash
 machine-dream llm <subcommand> [options]
@@ -554,7 +565,89 @@ machine-dream llm <subcommand> [options]
 
 **Subcommands:**
 
-#### 3.8.1 `llm play` - Play Puzzle with LLM
+#### 3.8.0 `llm profile` - Manage AI Model Connection Profiles
+
+See [Spec 13: LLM Profile Management](./13-llm-profile-management.md) for complete details.
+
+```bash
+machine-dream llm profile <action> [options]
+
+Actions:
+  list                         # List all profiles
+  add                          # Create new profile (interactive)
+  show <name>                  # Show profile details
+  edit <name>                  # Edit existing profile
+  delete <name>                # Delete profile
+  set <name>                   # Set active profile
+  test [name]                  # Test profile connection
+  export <file>                # Export profiles to file
+  import <file>                # Import profiles from file
+
+Options (for 'add' action):
+  --name <name>                # Profile name (required)
+  --provider <provider>        # lmstudio|openai|anthropic|ollama|openrouter|custom
+  --base-url <url>             # API endpoint URL
+  --api-key <key>              # API key or ${ENV_VAR} reference
+  --model <model>              # Model name
+  --temperature <n>            # Temperature (0.0-2.0, default: 0.7)
+  --max-tokens <n>             # Max response tokens (default: 2048)
+  --timeout <ms>               # Request timeout (default: 60000)
+  --tags <tag1,tag2>           # Comma-separated tags
+  --color <color>              # Display color for TUI
+  --set-default                # Set as active profile after creation
+```
+
+**Examples:**
+
+```bash
+# List all profiles
+machine-dream llm profile list
+
+# Create LM Studio profile (interactive)
+machine-dream llm profile add
+
+# Create profile with all options
+machine-dream llm profile add \
+  --name lm-studio-qwen3 \
+  --provider lmstudio \
+  --base-url http://localhost:1234/v1 \
+  --model qwen3-30b \
+  --temperature 0.7 \
+  --max-tokens 2048 \
+  --tags local,default \
+  --set-default
+
+# Create OpenAI profile with environment variable
+machine-dream llm profile add \
+  --name openai-gpt4 \
+  --provider openai \
+  --api-key '${OPENAI_API_KEY}' \
+  --model gpt-4 \
+  --tags cloud,production
+
+# Switch active profile
+machine-dream llm profile set lm-studio-qwen3
+
+# Test connection
+machine-dream llm profile test lm-studio-qwen3
+
+# Show profile details
+machine-dream llm profile show lm-studio-qwen3
+
+# Edit profile (interactive)
+machine-dream llm profile edit lm-studio-qwen3
+
+# Delete profile (with confirmation)
+machine-dream llm profile delete openai-gpt4
+
+# Export profiles (without sensitive keys)
+machine-dream llm profile export profiles-backup.json
+
+# Import profiles
+machine-dream llm profile import profiles-backup.json
+```
+
+#### 3.8.1 `llm play` - Play Puzzle with AI Model
 
 ```bash
 machine-dream llm play <puzzle-file> [options]
@@ -564,27 +657,31 @@ Arguments:
 
 Options:
   --no-memory                  # Disable memory (baseline mode for A/B testing)
-  --model <model>              # LLM model name (default: qwen3-30b)
-  --endpoint <url>             # LM Studio endpoint (default: http://localhost:1234/v1)
+  --profile <name>             # Use specific profile (overrides active profile)
+  --model <model>              # Override model from profile (default: from profile)
+  --endpoint <url>             # Override endpoint from profile (default: from profile)
   --max-moves <n>              # Maximum moves before abandoning (default: 200)
-  --temperature <n>            # LLM temperature (default: 0.7)
+  --temperature <n>            # Override temperature from profile (default: from profile)
   --output <file>              # Save session results to file
   --visualize                  # Show live solving visualization
 ```
 
 **Example:**
 ```bash
-# Play with memory enabled (default)
+# Play with active profile and memory enabled (default)
 machine-dream llm play puzzles/easy-01.json --visualize
+
+# Play with specific profile
+machine-dream llm play puzzles/easy-01.json --profile lm-studio-qwen3
 
 # Play without memory (baseline for comparison)
 machine-dream llm play puzzles/easy-01.json --no-memory
 
-# Custom LM Studio configuration
+# Override profile settings
 machine-dream llm play puzzles/medium-01.json \
-  --endpoint http://localhost:1234/v1 \
-  --model qwen3-30b \
-  --temperature 0.5
+  --profile openai-gpt4 \
+  --temperature 0.5 \
+  --max-tokens 4096
 ```
 
 #### 3.8.2 `llm stats` - View Learning Statistics
@@ -687,6 +784,166 @@ Options:
   --to <system>                # Target memory system
   --validate                   # Validate after migration
   --dry-run                    # Preview migration without executing
+```
+
+---
+
+### 3.10 Puzzle Command
+
+Puzzle generation and management operations (see [Spec 12: Randomized Puzzle Generation](./12-randomized-puzzle-generation.md)).
+
+```bash
+machine-dream puzzle <subcommand> [options]
+```
+
+**Subcommands:**
+
+#### 3.10.1 `puzzle generate` - Generate Single Puzzle
+
+Generate a randomized puzzle with optional seed for reproducibility.
+
+```bash
+machine-dream puzzle generate [options]
+
+Options:
+  --seed <number>              # Random seed for reproducibility (auto-generated if not provided)
+  --size <n>                   # Grid size: 4|9|16|25 (default: 9)
+  --difficulty <level>         # easy|medium|hard|expert|diabolical (default: medium)
+  --symmetry <type>            # none|rotational|reflectional|diagonal (default: none)
+  --output <file>              # Save to file (JSON format)
+  --print-seed                 # Print seed to stdout (for reproducibility)
+  --validate                   # Validate uniqueness (default: true)
+  --format <format>            # output format: json|string|visual (default: json)
+```
+
+**Examples:**
+```bash
+# Generate with random seed (seed will be printed)
+machine-dream puzzle generate --difficulty hard --output puzzles/random-hard.json
+
+# Generate with specific seed (reproducible)
+machine-dream puzzle generate --seed 12345 --difficulty medium --output puzzles/seed-12345.json
+
+# Generate 16x16 puzzle
+machine-dream puzzle generate --size 16 --difficulty expert --output puzzles/16x16-expert.json
+
+# Generate with symmetry
+machine-dream puzzle generate --symmetry rotational --output puzzles/symmetric.json
+```
+
+#### 3.10.2 `puzzle from-seed` - Regenerate from Seed
+
+Recreate an exact puzzle from a known seed.
+
+```bash
+machine-dream puzzle from-seed <seed> [options]
+
+Arguments:
+  <seed>                       # Seed number to regenerate
+
+Options:
+  --size <n>                   # Grid size (must match original, default: 9)
+  --difficulty <level>         # Difficulty level (must match original)
+  --output <file>              # Save to file
+  --verify                     # Verify against original if provided
+  --original <file>            # Original puzzle file for verification
+```
+
+**Examples:**
+```bash
+# Recreate puzzle from seed
+machine-dream puzzle from-seed 12345 --difficulty medium --output puzzles/recreated.json
+
+# Verify recreation matches original
+machine-dream puzzle from-seed 12345 --difficulty medium --original puzzles/original.json --verify
+```
+
+#### 3.10.3 `puzzle batch` - Generate Multiple Puzzles
+
+Generate a batch of puzzles for training or testing.
+
+```bash
+machine-dream puzzle batch [options]
+
+Options:
+  --count <n>                  # Number of puzzles to generate (required)
+  --seed-start <number>        # Starting seed (auto-generated if not provided)
+  --seed-mode <mode>           # sequential|random (default: sequential)
+  --size <n>                   # Grid size for all puzzles (default: 9)
+  --difficulty <level>         # Single difficulty or comma-separated list
+  --output-dir <dir>           # Output directory (default: puzzles/batch-<timestamp>/)
+  --name-pattern <pattern>     # Filename pattern (default: puzzle-{seed}.json)
+  --progress                   # Show progress during generation
+  --summary                    # Print summary statistics
+```
+
+**Examples:**
+```bash
+# Generate 100 medium puzzles with sequential seeds
+machine-dream puzzle batch --count 100 --seed-start 1000 --difficulty medium --output-dir puzzles/training/
+
+# Generate mixed difficulty batch
+machine-dream puzzle batch --count 30 --difficulty easy,medium,hard --output-dir puzzles/mixed/
+
+# Generate with custom naming
+machine-dream puzzle batch --count 50 --seed-start 5000 --name-pattern "training-{seed}-medium.json" --output-dir puzzles/
+```
+
+#### 3.10.4 `puzzle validate` - Validate Puzzle
+
+Validate puzzle uniqueness and solvability.
+
+```bash
+machine-dream puzzle validate <puzzle-file> [options]
+
+Arguments:
+  <puzzle-file>                # Path to puzzle file
+
+Options:
+  --check-uniqueness           # Verify exactly one solution (default: true)
+  --check-solvability          # Verify puzzle is solvable
+  --check-difficulty           # Estimate and report actual difficulty
+  --max-solutions <n>          # Max solutions to find (default: 2)
+  --output <file>              # Save validation report
+```
+
+**Examples:**
+```bash
+# Full validation
+machine-dream puzzle validate puzzles/custom.json --check-uniqueness --check-solvability
+
+# Difficulty estimation
+machine-dream puzzle validate puzzles/unknown.json --check-difficulty
+
+# Find all solutions (up to limit)
+machine-dream puzzle validate puzzles/test.json --max-solutions 5
+```
+
+#### 3.10.5 `puzzle list` - List Available Puzzles
+
+List static and generated puzzles.
+
+```bash
+machine-dream puzzle list [options]
+
+Options:
+  --directory <dir>            # Directory to search (default: puzzles/)
+  --filter-difficulty <level>  # Filter by difficulty
+  --filter-size <n>            # Filter by grid size
+  --show-seeds                 # Show seed numbers for generated puzzles
+  --format <format>            # table|json|yaml (default: table)
+```
+
+**Examples:**
+```bash
+# List all puzzles
+machine-dream puzzle list
+
+# List only hard puzzles
+machine-dream puzzle list --filter-difficulty hard
+
+# List 16x16 puzzles
+machine-dream puzzle list --filter-size 16 --show-seeds
 ```
 
 ---

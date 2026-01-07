@@ -18,6 +18,7 @@
     "llm:stats": "tsx src/cli-bin.ts llm stats",
     "llm:dream": "tsx src/cli-bin.ts llm dream",
     "llm:benchmark": "tsx src/cli-bin.ts llm benchmark",
+    "cli": "tsx src/cli-bin.ts",
     "test": "vitest",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
@@ -62,6 +63,7 @@
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",
     "neo-blessed": "^0.2.0",
+    "node-fetch": "^3.3.2",
     "react": "^19.2.3",
     "string-width": "^8.1.0"
   }

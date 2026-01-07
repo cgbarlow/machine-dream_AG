@@ -365,17 +365,20 @@ Never save working files, text/mds and tests to the root folder.
 2. **Specification Documents** (in order of dependency):
    | Spec | Document | Purpose |
    |------|----------|---------|
-   | 01 | Core Types | Base type definitions |
-   | 02 | Puzzle Engine | Sudoku rules and validation |
-   | 03 | GRASP Loop | Cognitive loop framework |
-   | 04 | Strategy Engine | Move generation strategies |
-   | 05 | Dreaming Pipeline | Experience consolidation |
-   | 06 | AgentDB Types | Memory interfaces |
-   | 07 | Integration Orchestration | System events and lifecycle |
-   | 08 | AgentDB Integration | Persistence layer |
-   | 09 | CLI Interface | Command-line commands |
-   | 10 | TUI Interface | Terminal UI screens |
-   | 11 | LLM Sudoku Player | Pure LLM player (Phase 2) |
+   | 01 | [Puzzle Engine](docs/specs/01-puzzle-engine-spec.md) | Sudoku generation, validation, rules |
+   | 02 | [Memory System](docs/specs/02-memory-system-spec.md) | AgentDB integration & persistence |
+   | 03 | [GRASP Loop](docs/specs/03-grasp-loop-spec.md) | Generate, Review, Absorb, Synthesize, Persist |
+   | 04 | [Attention Mechanism](docs/specs/04-attention-mechanism-spec.md) | Focus and priority system |
+   | 05 | [Dreaming Pipeline](docs/specs/05-dreaming-pipeline-spec.md) | 5-phase consolidation |
+   | 06 | [Benchmarking Framework](docs/specs/06-benchmarking-framework-spec.md) | Performance testing |
+   | 07 | [Integration Orchestration](docs/specs/07-integration-orchestration-spec.md) | System orchestration |
+   | 08 | [AgentDB Integration](docs/specs/08-agentdb-integration-spec.md) | Native AgentDB features |
+   | 09 | [CLI Interface](docs/specs/09-cli-interface-spec.md) | Command-line interface |
+   | 10 | [Terminal UI](docs/specs/10-terminal-menu-interface-spec.md) | Interactive TUI with Ink |
+   | 11 | [LLM Integration](docs/specs/11-llm-sudoku-player.md) | AI model Sudoku player |
+   | 12 | [Puzzle Generation](docs/specs/12-randomized-puzzle-generation.md) | Seeded random puzzles |
+   | 13 | [Profile Management](docs/specs/13-llm-profile-management.md) | AI model connection profiles |
+   | 14 | [Console Menu](docs/specs/14-console-menu-interface-spec.md) | TUI console & help system |
 
 3. **When specs conflict with implementation ideas**:
    - Specs are authoritative

@@ -75,9 +75,18 @@ npx tsx src/tui/tui-bin.ts
 The system provides a comprehensive CLI for advanced users and automation.
 
 ### Basic Usage
+
+**Development Mode** (recommended for testing):
+```bash
+npm run cli -- <command> [subcommand] [options]
+```
+
+**Production Mode** (after `npm run build && npm link`):
 ```bash
 machine-dream <command> [subcommand] [options]
 ```
+
+> **Note**: Phase 4 & 5 commands (memory, system) use `npm run cli --` in examples for immediate usability. All other commands work with either format.
 
 ### Available Commands
 
@@ -100,16 +109,56 @@ machine-dream solve puzzles/demo.json \
   --pause-on-insight
 ```
 
-#### Memory Operations
+#### Memory Management (Phase 4 - 7 Commands)
 ```bash
-# Store data in memory
-machine-dream memory store "test-key" "test-value"
+# Store data in agent memory
+npm run cli -- llm memory store session-key "learning data"
+npm run cli -- llm memory store user-pref "dark-mode" --session dev
 
-# Search memory patterns
-machine-dream memory search "naked-single"
+# Retrieve stored data (placeholder - full indexing in Phase 6)
+npm run cli -- llm memory retrieve session-key
+npm run cli -- llm memory retrieve user-pref --session dev
 
-# Consolidate memory
-machine-dream memory consolidate --compression-ratio 10
+# List all memory entries and patterns
+npm run cli -- llm memory list
+npm run cli -- llm memory list --limit 50
+npm run cli -- llm memory list --session global
+
+# Search for patterns or entries
+npm run cli -- llm memory search "strategy"
+npm run cli -- llm memory search "solving" --type pattern
+npm run cli -- llm memory search "r1c1" --type move
+
+# Clear all memory data (requires --confirm for safety)
+npm run cli -- llm memory clear --confirm
+
+# Export memory to JSON backup
+npm run cli -- llm memory export memory-backup.json
+npm run cli -- llm memory export ./backups/memory-$(date +%Y%m%d).json
+
+# Import memory from JSON backup
+npm run cli -- llm memory import memory-backup.json
+npm run cli -- llm memory import backup.json --merge  # Merge with existing
+```
+
+#### System Administration (Phase 4 - 5 Commands)
+```bash
+# Show system health and status
+npm run cli -- llm system status
+npm run cli -- llm system status --verbose
+
+# Run comprehensive diagnostics
+npm run cli -- llm system diagnostics
+
+# Optimize database and cleanup patterns
+npm run cli -- llm system optimize
+
+# Export complete system state
+npm run cli -- llm system export ./backups
+npm run cli -- llm system export ./system-backup-$(date +%Y%m%d)
+
+# Reset system to default state (requires --confirm for safety)
+npm run cli -- llm system reset --confirm
 ```
 
 #### Dreaming & Consolidation
@@ -128,6 +177,88 @@ machine-dream benchmark run quick
 
 # Full benchmark suite
 machine-dream benchmark run full --parallel 4
+```
+
+#### AI Model Profile Management
+```bash
+# List all AI model profiles
+machine-dream llm profile list
+machine-dream llm profile list --provider lmstudio
+machine-dream llm profile list --sort usage
+machine-dream llm profile list --format json
+
+# Create a new profile (interactive)
+machine-dream llm profile add
+
+# Create a profile with CLI options
+machine-dream llm profile add \
+  --name lm-studio-qwen3 \
+  --provider lmstudio \
+  --base-url http://localhost:1234/v1 \
+  --model qwen3-30b \
+  --temperature 0.7 \
+  --max-tokens 2048 \
+  --tags local,default \
+  --set-default
+
+# Show profile details
+machine-dream llm profile show lm-studio-qwen3
+
+# Set active profile
+machine-dream llm profile set lm-studio-qwen3
+
+# Test profile connectivity
+machine-dream llm profile test lm-studio-qwen3
+machine-dream llm profile test  # Test active profile
+
+# Delete a profile
+machine-dream llm profile delete old-profile
+
+# Export profiles (without secrets)
+machine-dream llm profile export profiles-backup.json
+
+# Export with API keys
+machine-dream llm profile export profiles-backup.json --include-secrets
+
+# Import profiles
+machine-dream llm profile import profiles-backup.json
+machine-dream llm profile import profiles-backup.json --overwrite
+```
+
+**Profile Storage:**
+- Profiles are stored at `~/.machine-dream/llm-profiles.json`
+- Use environment variables for API keys: `apiKey: "${OPENAI_API_KEY}"`
+- Supports providers: LM Studio, OpenAI, Anthropic, Ollama, OpenRouter, Custom APIs
+
+#### LLM Sudoku Player
+```bash
+# Play with LLM using active profile
+machine-dream llm play puzzles/easy-01.json
+
+# Play with specific profile
+machine-dream llm play puzzles/easy-01.json --profile openai-gpt4
+
+# Play without memory (baseline mode for A/B testing)
+machine-dream llm play puzzles/easy-01.json --no-memory
+
+# Legacy: Custom model configuration (use profiles instead)
+machine-dream llm play puzzles/easy-01.json \
+  --model qwen3-30b \
+  --endpoint http://localhost:1234/v1 \
+  --max-moves 200
+
+# View LLM statistics
+machine-dream llm stats
+machine-dream llm stats --format json
+
+# Run dreaming consolidation (pattern synthesis)
+machine-dream llm dream
+machine-dream llm dream --dry-run
+
+# Run A/B benchmark (memory ON vs OFF)
+machine-dream llm benchmark
+machine-dream llm benchmark puzzles/easy-01.json puzzles/easy-02.json
+machine-dream llm benchmark --format json
 ```
 
 #### System Utilities
@@ -234,6 +365,8 @@ machine-dream tui --debug-output /tmp/tui-events.jsonl
 **Menu Shortcuts:**
 - `H` - Home Dashboard
 - `S` - Solve Puzzle
+- `G` - Generate Puzzle
+- `L` - LLM Play
 - `M` - Memory Browser
 - `D` - Dream Cycle
 - `B` - Benchmark
@@ -254,6 +387,84 @@ Interactive form for puzzle solving:
 - **Max Iterations** - Maximum solve iterations (default: 10)
 - **Real-Time Progress** - Live updates during solving process
 - **Results Display** - Shows solution, execution time, and success status
+
+#### 🎲 Puzzle Generator Screen
+Create randomized Sudoku puzzles with seed-based reproducibility (Spec 12):
+- **Configuration**:
+  - **Seed Mode** - Random (auto-generate) or Specific (enter seed number)
+  - **Grid Size** - 4×4, 9×9, 16×16, or 25×25
+  - **Difficulty** - Easy, Medium, Hard, Expert, or Diabolical
+  - **Symmetry** - None, Rotational, Reflectional, or Diagonal clue removal
+  - **Validation** - Optional uniqueness checking (ensures single solution)
+- **Batch Generation**:
+  - Generate multiple puzzles at once (1-1000 count)
+  - Sequential or random seed modes
+  - Configurable seed start point
+  - Custom output directory
+- **Live Preview**:
+  - Visual puzzle grid display
+  - Metadata (seed, clues, generation time, retries)
+  - Validation status (unique solution check)
+- **Quick Actions**:
+  - Save to file (auto-naming: seed-{seed}-{difficulty}-{size}x{size}.json)
+  - Use for LLM Play or GRASP solving
+  - Regenerate from same seed
+  - Copy seed number for reproduction
+
+**CLI equivalent commands:**
+```bash
+# Generate single puzzle
+machine-dream puzzle generate --size 9 --difficulty medium
+
+# Generate from specific seed
+machine-dream puzzle from-seed 12345 --size 9
+
+# Batch generation
+machine-dream puzzle batch --count 10 --seed-mode sequential --seed-start 1000
+
+# Validate existing puzzle
+machine-dream puzzle validate puzzles/my-puzzle.json
+```
+
+#### 🤖 LLM Play Screen
+Pure LLM Sudoku solving with learning capabilities:
+- **View Modes** - Play, Stats, Dream (consolidation), Benchmark (A/B testing)
+- **Configuration**:
+  - Puzzle file selection
+  - Memory toggle (ON for learning, OFF for baseline)
+  - Model selection (qwen3-30b default)
+  - Max moves limit (200 default)
+- **Live Visualization**:
+  - Real-time puzzle grid updates
+  - Move-by-move progress tracking
+  - LLM reasoning display
+  - Move validation results (✓ correct, ✗ invalid, ~ wrong)
+- **Move History Panel** - Recent moves with LLM reasoning and outcomes
+- **CLI Debug Panel** - Real-time command execution monitoring with:
+  - Timestamp and duration tracking
+  - Command parameters and arguments
+  - Success/error status indicators
+  - Output and error message display
+- **Statistics View**:
+  - Total puzzles played
+  - Solve rate and accuracy metrics
+  - Average moves to solve
+  - Improvement trends
+- **Dreaming Consolidation**:
+  - Pattern extraction from experiences
+  - Error grouping and analysis
+  - Few-shot example generation
+  - Insight synthesis
+- **Benchmark Mode**:
+  - Memory ON vs Memory OFF comparison
+  - Statistical analysis of improvement
+  - Scientific verification of learning
+
+**Requirements**:
+- LM Studio running on localhost:1234
+- Capable model loaded (Qwen3 30B recommended)
+- Pure LLM reasoning - no deterministic fallback
+- No hints - learning through struggle
 
 #### 💾 Memory Browser
 Browse and manage AgentDB memory:

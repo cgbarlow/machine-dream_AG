@@ -19,7 +19,7 @@ export function configureGlobalOptions(program: Command): void {
         .option('--log-level <level>', 'Log level: debug|info|warn|error', 'info')
         .option('--output-format <format>', 'Output format: json|table|yaml', 'table')
         .option('--quiet, -q', 'Suppress non-essential output')
-        .option('--verbose, -v', 'Show detailed output')
+        .option('--verbose, -V', 'Show detailed output')
         .option('--no-color', 'Disable colored output')
         .option('--help, -h', 'Show help for command')
         .hook('preAction', async (thisCommand) => {

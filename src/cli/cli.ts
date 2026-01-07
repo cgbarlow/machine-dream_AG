@@ -9,7 +9,7 @@
  */
 
 import { Command } from 'commander';
-import { version } from '../../package.json';
+import { version } from '../../package.json' with { type: 'json' };
 import { CLIError } from './errors';
 import { configureGlobalOptions } from './global-options';
 import { registerCommands } from './commands';

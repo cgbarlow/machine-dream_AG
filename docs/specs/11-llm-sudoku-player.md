@@ -147,6 +147,10 @@ src/llm/
 ├── ExperienceStore.ts      # Persists experiences to AgentDB
 ├── LLMSudokuPlayer.ts      # Main orchestration class
 ├── DreamingConsolidator.ts # Pattern synthesis
+├── profiles/               # Profile Management (Spec 13)
+│   ├── LLMProfileManager.ts # Profile CRUD operations
+│   ├── ProfileStorage.ts    # Profile persistence
+│   └── types.ts             # Profile type definitions
 ├── types.ts                # LLM-specific type definitions
 └── config.ts               # LM Studio configuration
 ```
@@ -157,7 +161,11 @@ src/llm/
 
 ```typescript
 interface LLMConfig {
-  // LM Studio connection
+  // Connection Profile (see Spec 13: LLM Profile Management)
+  profileName?: string;     // Load from saved profile
+  activeProfile?: LLMProfile; // Currently active profile
+
+  // LM Studio connection (overridable if not using profile)
   baseUrl: string;          // 'http://localhost:1234/v1'
   model: string;            // 'qwen3-30b' or 'local-model'
 
@@ -461,12 +469,45 @@ async consolidate(): Promise<ConsolidationReport> {
 
 ## CLI Commands
 
+### Profile Management (Spec 13)
+
+**IMPORTANT**: LLM connection profiles are managed via `llm profile` commands. See [Spec 13: LLM Profile Management](./13-llm-profile-management.md) for complete details.
+
 ```bash
-# Play a puzzle with LLM
+# Profile Management Commands
+machine-dream llm profile list                    # List all saved profiles
+machine-dream llm profile add                     # Create new profile (interactive)
+machine-dream llm profile set lm-studio-local     # Set active profile
+machine-dream llm profile show lm-studio-local    # View profile details
+machine-dream llm profile test                    # Test connection
+
+# Example: Create profile for LM Studio
+machine-dream llm profile add \
+  --name lm-studio-local \
+  --provider lmstudio \
+  --base-url http://localhost:1234/v1 \
+  --model qwen3-30b \
+  --temperature 0.7
+
+# Example: Create profile for OpenAI
+machine-dream llm profile add \
+  --name openai-gpt4 \
+  --provider openai \
+  --api-key ${OPENAI_API_KEY} \
+  --model gpt-4
+```
+
+### LLM Sudoku Player Commands
+
+```bash
+# Play a puzzle with LLM (uses active profile)
 npm run llm:play -- --puzzle easy-01
 
 # Play with memory disabled (baseline)
 npm run llm:play -- --puzzle easy-01 --no-memory
+
+# Play with specific profile
+npm run llm:play -- --puzzle easy-01 --profile lm-studio-local
 
 # View learning statistics
 npm run llm:stats
