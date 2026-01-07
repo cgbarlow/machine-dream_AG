@@ -350,3 +350,51 @@ NEVER create files unless they're absolutely necessary for achieving your goal.
 ALWAYS prefer editing an existing file to creating a new one.
 NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
 Never save working files, text/mds and tests to the root folder.
+
+## 📋 Spec-Based Development (MANDATORY)
+
+**CRITICAL RULE**: Always build to spec. No implementation changes unless outlined in specification documents.
+
+### Specification-First Workflow
+
+1. **Before implementing ANY feature**:
+   - Check if feature is defined in `/docs/specs/`
+   - If NOT defined → Update the spec first, then implement
+   - If defined → Implement exactly as specified
+
+2. **Specification Documents** (in order of dependency):
+   | Spec | Document | Purpose |
+   |------|----------|---------|
+   | 01 | [Puzzle Engine](docs/specs/01-puzzle-engine-spec.md) | Sudoku generation, validation, rules |
+   | 02 | [Memory System](docs/specs/02-memory-system-spec.md) | AgentDB integration & persistence |
+   | 03 | [GRASP Loop](docs/specs/03-grasp-loop-spec.md) | Generate, Review, Absorb, Synthesize, Persist |
+   | 04 | [Attention Mechanism](docs/specs/04-attention-mechanism-spec.md) | Focus and priority system |
+   | 05 | [Dreaming Pipeline](docs/specs/05-dreaming-pipeline-spec.md) | 5-phase consolidation |
+   | 06 | [Benchmarking Framework](docs/specs/06-benchmarking-framework-spec.md) | Performance testing |
+   | 07 | [Integration Orchestration](docs/specs/07-integration-orchestration-spec.md) | System orchestration |
+   | 08 | [AgentDB Integration](docs/specs/08-agentdb-integration-spec.md) | Native AgentDB features |
+   | 09 | [CLI Interface](docs/specs/09-cli-interface-spec.md) | Command-line interface |
+   | 10 | [Terminal UI](docs/specs/10-terminal-menu-interface-spec.md) | Interactive TUI with Ink |
+   | 11 | [LLM Integration](docs/specs/11-llm-sudoku-player.md) | AI model Sudoku player |
+   | 12 | [Puzzle Generation](docs/specs/12-randomized-puzzle-generation.md) | Seeded random puzzles |
+   | 13 | [Profile Management](docs/specs/13-llm-profile-management.md) | AI model connection profiles |
+   | 14 | [Console Menu](docs/specs/14-console-menu-interface-spec.md) | TUI console & help system |
+
+3. **When specs conflict with implementation ideas**:
+   - Specs are authoritative
+   - Propose spec updates if needed
+   - Never implement unspecified behavior
+
+4. **Verification Checklist** (before any PR):
+   - [ ] All new types defined in specs
+   - [ ] All event types registered in Spec 07
+   - [ ] All CLI commands match Spec 09
+   - [ ] All TUI screens match Spec 10
+   - [ ] Tests verify spec compliance
+
+### Why Spec-Based Development?
+
+- **Consistency**: All components follow the same contracts
+- **Traceability**: Every feature maps to a specification
+- **Reviewability**: Changes are validated against specs
+- **Maintainability**: Specs serve as living documentation

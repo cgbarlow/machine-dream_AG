@@ -27,6 +27,20 @@ export class SudokuRules {
     }
 
     /**
+     * Checks if placing a value at given coordinates is valid.
+     * Convenience method for puzzle generation.
+     *
+     * @param grid - The Sudoku grid
+     * @param row - Row index
+     * @param col - Column index
+     * @param value - Value to place
+     * @returns True if placement is valid
+     */
+    isValidPlacement(grid: Grid, row: number, col: number, value: number): boolean {
+        return SudokuRules.isValidMove(grid, { row, col }, value);
+    }
+
+    /**
      * Validates entire grid for constraint satisfaction.
      *
      * @param grid - The Sudoku grid

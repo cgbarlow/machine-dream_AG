@@ -46,12 +46,31 @@ export class LocalAgentDB {
                 confidence REAL,
                 timestamp INTEGER
             );
-            
+
             CREATE TABLE IF NOT EXISTS patterns (
                 id TEXT PRIMARY KEY,
                 description TEXT,
                 success_rate REAL,
                 usage_count INTEGER
+            );
+
+            CREATE TABLE IF NOT EXISTS reasoning_trajectories (
+                trajectory_id TEXT,
+                step_index INTEGER,
+                action TEXT,
+                reasoning TEXT,
+                outcome TEXT,
+                feedback TEXT,
+                timestamp INTEGER,
+                PRIMARY KEY (trajectory_id, step_index)
+            );
+
+            CREATE TABLE IF NOT EXISTS metadata (
+                key TEXT,
+                type TEXT,
+                data TEXT,
+                timestamp INTEGER,
+                PRIMARY KEY (key, type)
             );
         `);
     }
@@ -111,6 +130,61 @@ export class LocalAgentDB {
                     verificationStatus: 'verified',
                     timestamp: Date.now()
                 } as ConsolidatedKnowledge;
+            },
+
+            // LLM experience storage methods (Spec 11)
+            storeReasoning: async (data) => {
+                const stmt = this.db.prepare(
+                    'INSERT OR REPLACE INTO reasoning_trajectories (trajectory_id, step_index, action, reasoning, outcome, feedback, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)'
+                );
+                stmt.run(data.trajectory_id, data.step_index, data.action, data.reasoning, data.outcome, data.feedback, Date.now());
+            },
+
+            storeMetadata: async (key, type, data) => {
+                const stmt = this.db.prepare(
+                    'INSERT OR REPLACE INTO metadata (key, type, data, timestamp) VALUES (?, ?, ?, ?)'
+                );
+                stmt.run(key, type, JSON.stringify(data), Date.now());
+            },
+
+            getTrajectory: async (trajectoryId) => {
+                const stmt = this.db.prepare(
+                    'SELECT step_index FROM reasoning_trajectories WHERE trajectory_id = ? ORDER BY step_index'
+                );
+                const steps = stmt.all(trajectoryId) as Array<{ step_index: number }>;
+                if (steps.length === 0) return null;
+                return { steps };
+            },
+
+            getMetadata: async (key, type) => {
+                const stmt = this.db.prepare(
+                    'SELECT data FROM metadata WHERE key = ? AND type = ?'
+                );
+                const row = stmt.get(key, type) as { data: string } | undefined;
+                if (!row) return null;
+                return JSON.parse(row.data);
+            },
+
+            queryMetadata: async (type, filter) => {
+                const stmt = this.db.prepare(
+                    'SELECT data FROM metadata WHERE type = ?'
+                );
+                const rows = stmt.all(type) as Array<{ data: string }>;
+                const allData = rows.map(row => JSON.parse(row.data));
+
+                // Simple filter implementation
+                if (Object.keys(filter).length === 0) {
+                    return allData;
+                }
+
+                return allData.filter(item => {
+                    for (const [key, value] of Object.entries(filter)) {
+                        if ((item as any)[key] !== value) {
+                            return false;
+                        }
+                    }
+                    return true;
+                });
             }
         };
     }

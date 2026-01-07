@@ -118,19 +118,22 @@ export const HomeScreen: React.FC = () => {
         </Text>
         <Box flexDirection="column" marginLeft={2} marginTop={1}>
           <Text>
-            <Text color="gray">F1         </Text> - Show help
+            <Text color="gray">?          </Text> - Show help overlay
+          </Text>
+          <Text>
+            <Text color="gray">`          </Text> - Toggle console overlay
           </Text>
           <Text>
             <Text color="gray">Ctrl+C     </Text> - Exit application
-          </Text>
-          <Text>
-            <Text color="gray">Ctrl+R     </Text> - Refresh current view
           </Text>
           <Text>
             <Text color="gray">↑↓         </Text> - Navigate menu
           </Text>
           <Text>
             <Text color="gray">Enter      </Text> - Select item
+          </Text>
+          <Text>
+            <Text color="gray">[Letter]   </Text> - Quick access (S, M, L, T, etc.)
           </Text>
         </Box>
       </Box>

@@ -56,6 +56,9 @@ AgentDB Integration is an **optional Phase 2 enhancement** that evaluates next-g
 - **GRASP Loop** - Provides trajectories for RL training
 - **Puzzle Engine** - Generates state vectors for Decision Transformer
 - **Memory System Interface** - Shared abstraction layer
+- **LLM Sudoku Player (Spec 11)** - Provides LLM experiences for storage and consolidation
+
+> **Note**: When using LLM mode (Spec 11), AgentDB stores `LLMExperience` records including move proposals, validation outcomes, and reasoning chains. These are consolidated during dreaming to generate improved few-shot examples.
 
 **Downstream Consumers:**
 - **Benchmarking Framework** - Performance comparison metrics
@@ -1208,6 +1211,50 @@ class AgentDBRollback {
 ## Appendix A: Type Definitions (from src/types.ts)
 
 See `/workspaces/machine-dream/src/types.ts` lines 197-254 for full AgentDB integration types.
+
+## Appendix D: LLM Experience Storage (Spec 11)
+
+When operating in LLM mode, AgentDB stores LLM-specific experience types:
+
+```typescript
+interface LLMExperience {
+  id: string;
+  puzzleId: string;
+  puzzleHash: string;           // For finding similar puzzles
+  moveNumber: number;
+  gridState: number[][];
+  move: {
+    row: number;                // 1-9 (user-facing)
+    col: number;                // 1-9 (user-facing)
+    value: number;              // 1-9
+    reasoning: string;          // LLM's explanation
+    confidence?: number;        // Optional self-assessment
+  };
+  validation: {
+    isValid: boolean;           // Doesn't violate Sudoku rules
+    isCorrect: boolean;         // Matches the solution
+    outcome: 'correct' | 'invalid' | 'valid_but_wrong';
+    error?: string;             // Human-readable error
+  };
+  timestamp: Date;
+  modelUsed: string;
+  memoryWasEnabled: boolean;
+}
+
+// Storage interface for LLM experiences
+interface LLMExperienceStore {
+  save(experience: LLMExperience): Promise<void>;
+  getByPuzzle(puzzleId: string): Promise<LLMExperience[]>;
+  getUnconsolidated(): Promise<LLMExperience[]>;
+  markConsolidated(ids: string[]): Promise<void>;
+
+  // Few-shot example management
+  saveFewShots(examples: FewShotExample[]): Promise<void>;
+  getFewShots(limit?: number): Promise<FewShotExample[]>;
+}
+```
+
+**Storage Location**: LLM experiences are stored in the `llm_experiences` table with vector embeddings for similarity search.
 
 ## Appendix B: Performance Comparison Matrix
 

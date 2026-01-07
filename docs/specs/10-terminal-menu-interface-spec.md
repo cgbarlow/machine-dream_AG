@@ -124,6 +124,7 @@ This specification defines a comprehensive Terminal User Interface (TUI) for the
 │    Machine Dream    │
 ├─────────────────────┤
 │ ► 🧩 Solve Puzzle   │
+│   🤖 AI Models      │
 │   🧠 Memory         │
 │   💭 Dream          │
 │   📊 Benchmark      │
@@ -131,6 +132,7 @@ This specification defines a comprehensive Terminal User Interface (TUI) for the
 │   ⚙️ Config         │
 │   📤 Export         │
 │   🔧 System         │
+│   > Console         │
 │                     │
 │ ─────────────────── │
 │   ℹ️ Help           │
@@ -140,6 +142,7 @@ This specification defines a comprehensive Terminal User Interface (TUI) for the
 
 **Icons Legend**:
 - 🧩 Solve - Puzzle solving with GRASP loop
+- 🤖 AI Models - AI model profile management (Spec 13)
 - 🧠 Memory - AgentDB memory operations
 - 💭 Dream - Night cycle consolidation
 - 📊 Benchmark - Performance testing
@@ -147,6 +150,7 @@ This specification defines a comprehensive Terminal User Interface (TUI) for the
 - ⚙️ Config - Configuration management
 - 📤 Export - Data export utilities
 - 🔧 System - System utilities
+- \> Console - CLI console with output capture (Spec 14)
 
 ### 3.2 Submenu Structure
 
@@ -157,7 +161,17 @@ Each top-level item expands to show subcommands:
   ├── Quick Solve
   ├── Advanced Solve
   ├── Batch Solve
-  └── Solve with Visualization
+  ├── Solve with Visualization
+  ├── 🤖 AI Model Play (Spec 11)       # Pure AI model Sudoku player
+  └── 🎲 Puzzle Generator (Spec 12)    # Randomized puzzle generation
+
+🤖 AI Models (Spec 13)
+  ├── Profile Manager              # View, select, create profiles
+  ├── Add Profile                  # Create new profile (interactive)
+  ├── Edit Profile                 # Modify existing profile
+  ├── Test Connection              # Health check for profiles
+  ├── Export Profiles              # Export profiles to file
+  └── Import Profiles              # Import profiles from file
 
 🧠 Memory
   ├── Store Data
@@ -183,7 +197,8 @@ Each top-level item expands to show subcommands:
   ├── Quick Solve Demo
   ├── Transfer Learning Demo
   ├── Dreaming Visualization
-  └── Baseline Comparison
+  ├── Baseline Comparison
+  └── 🤖 AI Model Learning Demo    # AI model memory ON vs OFF comparison
 
 ⚙️ Config
   ├── View Configuration
@@ -439,6 +454,174 @@ Each top-level item expands to show subcommands:
 [D] Details  [E] Export  [C] Compare  [R] Re-run  [Q] Back
 ```
 
+### 4.6 Puzzle Generator Screen (Spec 12)
+
+**Purpose**: Generate randomized Sudoku puzzles with seed-based reproducibility and variable grid sizes.
+
+**Configuration Form**:
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│ 🎲 Puzzle Generator                                   Spec 12 Integration │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│  ┌─── Generation Configuration ─────────────────────────────────────┐   │
+│  │                                                                    │   │
+│  │  Seed Number:    [Random           ▼] or [12345          ]       │   │
+│  │                  ○ Random (auto-generate)                         │   │
+│  │                  ● Specific (enter seed below)                    │   │
+│  │                                                                    │   │
+│  │  Grid Size:      [9×9              ▼]                             │   │
+│  │                  Options: 4×4, 9×9, 16×16, 25×25                  │   │
+│  │                                                                    │   │
+│  │  Difficulty:     [Medium           ▼]                             │   │
+│  │                  Easy, Medium, Hard, Expert, Diabolical           │   │
+│  │                                                                    │   │
+│  │  Symmetry:       [None             ▼]                             │   │
+│  │                  None, Rotational, Reflectional, Diagonal         │   │
+│  │                                                                    │   │
+│  │  ☑ Validate uniqueness (ensure single solution)                  │   │
+│  │  ☑ Show preview after generation                                 │   │
+│  │                                                                    │   │
+│  └────────────────────────────────────────────────────────────────────┘   │
+│                                                                           │
+│  ┌─── Batch Generation (Optional) ──────────────────────────────────┐   │
+│  │                                                                    │   │
+│  │  ☐ Generate multiple puzzles                                      │   │
+│  │     Count:       [10   ] ← → (1-1000)                             │   │
+│  │     Seed Mode:   ○ Sequential  ● Random                           │   │
+│  │     Seed Start:  [1000 ] (if sequential)                          │   │
+│  │     Output Dir:  [puzzles/batch/                          ]       │   │
+│  │                                                                    │   │
+│  └────────────────────────────────────────────────────────────────────┘   │
+│                                                                           │
+│  [  Generate  ]  [  Load from Seed  ]  [  Validate Puzzle  ]  [  Cancel  ]│
+│                                                                           │
+└──────────────────────────────────────────────────────────────────────────┘
+[Tab] Next Field  [↑↓] Navigate  [Space] Toggle  [Enter] Generate  [Esc] Cancel
+```
+
+**Live Preview (After Generation)**:
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│ 🎲 Puzzle Generated Successfully                     Seed: 12345         │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│  ┌─── Generated Puzzle (9×9) ──────┐  ┌─── Metadata ──────────────┐     │
+│  │                                  │  │                            │     │
+│  │   5 3 · │ · 7 · │ · · ·         │  │ Seed:       12345          │     │
+│  │   6 · · │ 1 9 5 │ · · ·         │  │ Size:       9×9            │     │
+│  │   · 9 8 │ · · · │ · 6 ·         │  │ Difficulty: Medium         │     │
+│  │   ─────   ─────   ─────         │  │ Clues:      32/81 (40%)    │     │
+│  │   8 · · │ · 6 · │ · · 3         │  │ Symmetry:   None           │     │
+│  │   4 · · │ 8 · 3 │ · · 1         │  │                            │     │
+│  │   7 · · │ · 2 · │ · · 6         │  │ Validation: ✓ Unique       │     │
+│  │   ─────   ─────   ─────         │  │ Gen Time:   147ms          │     │
+│  │   · 6 · │ · · · │ 2 8 ·         │  │ Retries:    0              │     │
+│  │   · · · │ 4 1 9 │ · · 5         │  │                            │     │
+│  │   · · · │ · 8 · │ · 7 9         │  │ Solvable:   ✓ Yes          │     │
+│  │                                  │  │ Solution:   ✓ Verified     │     │
+│  │ ·Empty  #Given  *Focus          │  │                            │     │
+│  └──────────────────────────────────┘  └────────────────────────────┘     │
+│                                                                           │
+│  ┌─── Quick Actions ────────────────────────────────────────────────┐   │
+│  │                                                                    │   │
+│  │  [1] Save to File           [4] Regenerate from Seed              │   │
+│  │  [2] Use for LLM Play       [5] Generate Batch (same config)     │   │
+│  │  [3] Export Metadata        [6] Copy Seed Number                 │   │
+│  │                                                                    │   │
+│  └────────────────────────────────────────────────────────────────────┘   │
+│                                                                           │
+│  ┌─── Output Path ──────────────────────────────────────────────────┐   │
+│  │ Save As: [puzzles/seed-12345-medium-9x9.json      ] [📁 Browse]  │   │
+│  └────────────────────────────────────────────────────────────────────┘   │
+│                                                                           │
+│  [  Save  ]  [  Solve Now  ]  [  LLM Play  ]  [  New Puzzle  ]  [  Back  ]│
+│                                                                           │
+└──────────────────────────────────────────────────────────────────────────┘
+[1-6] Quick Actions  [S] Save  [L] LLM Play  [N] New  [Q] Back
+```
+
+**Batch Generation Progress**:
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│ 🎲 Batch Generation                               Progress: 7/10 (70%)   │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│  Overall Progress: ██████████████░░░░░░ 70% (7/10 complete)             │
+│  Elapsed: 00:01.2s | Estimated: 00:00.5s remaining                       │
+│                                                                           │
+│  ┌─── Generation Log ────────────────────────────────────────────────┐  │
+│  │                                                                     │  │
+│  │  ✓ Puzzle 1 | Seed: 1000 | 147ms | ✓ Valid | puzzles/batch/001.json│  │
+│  │  ✓ Puzzle 2 | Seed: 1001 | 142ms | ✓ Valid | puzzles/batch/002.json│  │
+│  │  ✓ Puzzle 3 | Seed: 1002 | 158ms | ✓ Valid | puzzles/batch/003.json│  │
+│  │  ✓ Puzzle 4 | Seed: 1003 | 139ms | ✓ Valid | puzzles/batch/004.json│  │
+│  │  ✓ Puzzle 5 | Seed: 1004 | 151ms | ✓ Valid | puzzles/batch/005.json│  │
+│  │  ✓ Puzzle 6 | Seed: 1005 | 144ms | ✓ Valid | puzzles/batch/006.json│  │
+│  │  ▶ Puzzle 7 | Seed: 1006 | Generating... (attempt 1)                 │  │
+│  │  ○ Puzzle 8 | Seed: 1007 | Pending...                                │  │
+│  │  ○ Puzzle 9 | Seed: 1008 | Pending...                                │  │
+│  │  ○ Puzzle 10| Seed: 1009 | Pending...                                │  │
+│  │                                                                     │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+│                                                                           │
+│  ┌─── Statistics ────────────────────────────────────────────────────┐  │
+│  │ Success: 6/7 (100%)  |  Failed: 0  |  Avg Time: 145ms/puzzle      │  │
+│  │ Output: puzzles/batch/ | Total Size: 47.3 KB                       │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
+│                                                                           │
+│  [  Pause  ]  [  Skip Current  ]  [  Cancel All  ]                       │
+│                                                                           │
+└──────────────────────────────────────────────────────────────────────────┘
+[Space] Pause  [K] Skip  [C] Cancel All
+```
+
+**Key Features**:
+- **Seed input field**: Random or specific seed number
+- **Grid size selector**: 4×4, 9×9, 16×16, 25×25 via dropdown
+- **Difficulty selector**: Easy through Diabolical
+- **Symmetry options**: None, Rotational, Reflectional, Diagonal
+- **Live preview**: Shows generated puzzle with metadata
+- **Validation status**: Uniqueness and solvability verification
+- **Quick actions**: Save, Use for LLM Play, Regenerate, Batch
+- **Batch generation**: Sequential or random seed modes with progress tracking
+- **CLI integration**: All operations drive CLI commands via CLIExecutor
+
+**CLI Command Mapping**:
+```typescript
+// Single puzzle generation
+CLIExecutor.executePuzzleGenerate({
+  seed: 12345,
+  size: 9,
+  difficulty: 'medium',
+  symmetry: 'none',
+  output: 'puzzles/seed-12345-medium-9x9.json'
+});
+// Executes: machine-dream puzzle generate --seed 12345 --size 9 --difficulty medium --output puzzles/seed-12345-medium-9x9.json
+
+// Batch generation
+CLIExecutor.executePuzzleBatch({
+  count: 10,
+  seedStart: 1000,
+  seedMode: 'sequential',
+  difficulty: 'medium',
+  size: 9,
+  outputDir: 'puzzles/batch/'
+});
+// Executes: machine-dream puzzle batch --count 10 --seed-start 1000 --seed-mode sequential --difficulty medium --size 9 --output-dir puzzles/batch/
+```
+
+**Navigation Flow**:
+1. Main Menu → Solve Puzzle → Puzzle Generator
+2. Fill configuration form
+3. Click "Generate" or press Enter
+4. View live preview with metadata
+5. Choose quick action: Save, LLM Play, Batch, or New
+6. Return to form or exit to main menu
+
 ---
 
 ## 5. Interactive Components
@@ -645,16 +828,15 @@ Loading... ⠸
 ### 6.1 Global Shortcuts
 
 ```
-F1          - Help (context-sensitive)
-F2          - Quick access to Config
-F3          - Search/Find
-F10         - Toggle menu
+?           - Help overlay (context-sensitive) - Spec 14
+`           - Toggle console overlay - Spec 14
 Ctrl+C      - Exit application
-Ctrl+R      - Refresh current view
-Ctrl+S      - Save current state
-Ctrl+L      - Clear screen/logs
-Ctrl+P      - Open command palette
+Esc         - Close overlay (if open)
+q           - Quit application
+↑ ↓         - Navigate menu items
 ```
+
+**Note**: F1-F12 function keys are not supported by the Ink library. Use `?` for help instead.
 
 ### 6.2 Navigation Shortcuts
 
@@ -674,16 +856,19 @@ PgUp/PgDn   - Scroll page up/down
 
 **Main Menu**:
 ```
-1-9         - Quick access to menu items
+H           - Home
 S           - Solve Puzzle
+G           - Generate Puzzle
+L           - LLM Play
+A           - AI Models (Profiles)
 M           - Memory Browser
 D           - Dream Cycle
 B           - Benchmark
-O           - Demo
+E           - Demo
 C           - Config
-E           - Export
+X           - Export
 Y           - System Utilities
-H           - Help
+T           - Console
 Q           - Quit
 ```
 
@@ -1825,6 +2010,206 @@ export class SolveScreen extends Component {
     await this.cliExecutor.execute('solve', [formData.puzzleFile], formData);
   }
 }
+```
+
+---
+
+### 4.7 AI Model Profile Manager Screen (Spec 13)
+
+**Purpose**: Manage AI model connection profiles for easy switching between providers.
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│ 🤖 AI Model Profile Manager                       Spec 13 Integration    │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│  ┌─── Available Profiles (5) ──────────────────────────────────────┐    │
+│  │                                                                   │    │
+│  │ ► lm-studio-local         (Active)                               │    │
+│  │   Provider: LM Studio  |  Model: qwen3-30b  |  Last Used: 5m ago│    │
+│  │   http://localhost:1234/v1  |  Tags: local, default             │    │
+│  │                                                                   │    │
+│  │   openai-gpt4                                                    │    │
+│  │   Provider: OpenAI  |  Model: gpt-4  |  Last Used: 2h ago       │    │
+│  │   https://api.openai.com/v1  |  Tags: cloud, production         │    │
+│  │                                                                   │    │
+│  │   anthropic-claude                                               │    │
+│  │   Provider: Anthropic  |  Model: claude-3-opus  |  Never used   │    │
+│  │   https://api.anthropic.com/v1  |  Tags: cloud, testing         │    │
+│  │                                                                   │    │
+│  │   ollama-local                                                   │    │
+│  │   Provider: Ollama  |  Model: llama3  |  Last Used: 1d ago      │    │
+│  │   http://localhost:11434/v1  |  Tags: local, experimental       │    │
+│  │                                                                   │    │
+│  │   openrouter-mixed                                               │    │
+│  │   Provider: OpenRouter  |  Model: auto  |  Never used           │    │
+│  │   https://openrouter.ai/api/v1  |  Tags: cloud, fallback        │    │
+│  │                                                                   │    │
+│  └───────────────────────────────────────────────────────────────────┘    │
+│                                                                           │
+│  ┌─── Selected Profile: lm-studio-local ───────────────────────────┐    │
+│  │                                                                   │    │
+│  │  Name:        lm-studio-local                                    │    │
+│  │  Description: Local LM Studio with Qwen3 30B                     │    │
+│  │  Provider:    LM Studio (local server)                           │    │
+│  │  Base URL:    http://localhost:1234/v1                           │    │
+│  │  Model:       qwen3-30b                                          │    │
+│  │  API Key:     (none required for local)                          │    │
+│  │                                                                   │    │
+│  │  Parameters:                                                     │    │
+│  │    Temperature:      0.7                                         │    │
+│  │    Max Tokens:       2048                                        │    │
+│  │    Timeout:          60000ms                                     │    │
+│  │    Top P:            0.9                                         │    │
+│  │                                                                   │    │
+│  │  Metadata:                                                       │    │
+│  │    Created:          2 weeks ago                                 │    │
+│  │    Last Used:        5 minutes ago                               │    │
+│  │    Usage Count:      127 times                                   │    │
+│  │    Tags:             local, default                              │    │
+│  │    Status:           ✓ Healthy (last checked: 1m ago)           │    │
+│  │                                                                   │    │
+│  └───────────────────────────────────────────────────────────────────┘    │
+│                                                                           │
+│  [Set Active] [Add New] [Edit] [Test] [Delete] [Export] [Import] [Back] │
+│                                                                           │
+└──────────────────────────────────────────────────────────────────────────┘
+[Enter] Set Active  [A] Add  [E] Edit  [T] Test  [D] Delete  [Q] Back
+```
+
+**Add Profile Form**:
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│ 🤖 Add AI Model Profile                                                  │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│  ┌─── Basic Information ─────────────────────────────────────────────┐  │
+│  │                                                                     │  │
+│  │  Profile Name:   [lm-studio-qwen3                           ]      │  │
+│  │  Description:    [Local LM Studio with Qwen3 30B            ]      │  │
+│  │                                                                     │  │
+│  │  Provider:       [LM Studio          ▼]                            │  │
+│  │                  Options: LM Studio, OpenAI, Anthropic, Ollama,   │  │
+│  │                           OpenRouter, Custom                       │  │
+│  │                                                                     │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+│                                                                           │
+│  ┌─── Connection Settings ────────────────────────────────────────────┐  │
+│  │                                                                     │  │
+│  │  Base URL:       [http://localhost:1234/v1                  ]      │  │
+│  │  Model:          [qwen3-30b                                 ]      │  │
+│  │  API Key:        [${LM_STUDIO_KEY}                          ]      │  │
+│  │                  (Use ${ENV_VAR} for environment variables)        │  │
+│  │                                                                     │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+│                                                                           │
+│  ┌─── Model Parameters ───────────────────────────────────────────────┐  │
+│  │                                                                     │  │
+│  │  Temperature:    [0.7  ] ← → (0.0-2.0)                             │  │
+│  │  Max Tokens:     [2048 ] ← → (1-32768)                             │  │
+│  │  Timeout:        [60000] ms ← → (1000-300000)                      │  │
+│  │  Top P:          [0.9  ] ← → (0.0-1.0)                             │  │
+│  │  Frequency Pen:  [0.0  ] ← → (-2.0-2.0)                            │  │
+│  │  Presence Pen:   [0.0  ] ← → (-2.0-2.0)                            │  │
+│  │                                                                     │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+│                                                                           │
+│  ┌─── Organization ───────────────────────────────────────────────────┐  │
+│  │                                                                     │  │
+│  │  Tags:           [local, default                            ]      │  │
+│  │                  (Comma-separated)                                 │  │
+│  │  Display Color:  [cyan             ▼]                              │  │
+│  │  ☑ Set as active profile after creation                            │  │
+│  │  ☑ Test connection before saving                                   │  │
+│  │                                                                     │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+│                                                                           │
+│  [  Save & Test  ]  [  Save  ]  [  Test Only  ]  [  Cancel  ]            │
+│                                                                           │
+└──────────────────────────────────────────────────────────────────────────┘
+[Tab] Next Field  [↑↓] Navigate  [Space] Toggle  [Enter] Save  [Esc] Cancel
+```
+
+**Key Features**:
+- **Profile list**: Scrollable list with active profile indicator
+- **Profile details**: Full configuration display for selected profile
+- **Quick actions**: Set active, add, edit, test, delete operations
+- **Connection testing**: Health check before saving
+- **Import/export**: Share profiles across machines
+- **Environment variables**: Secure API key storage using ${ENV_VAR} syntax
+- **Color coding**: Visual distinction for profiles in TUI
+- **Usage tracking**: Show last used time and usage count
+
+## 23.4 AI Model Solve Screen (Spec 11)
+
+**Purpose**: Visualize AI model Sudoku solving with live reasoning display.
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│ 🤖 AI Model Sudoku Player                      Move: 15 | Memory: ON     │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│  ┌─── Puzzle Grid ─────────────┐  ┌─── AI Model Reasoning ───────────┐  │
+│  │                              │  │                                   │  │
+│  │   5 3 · │ · 7 · │ · · ·     │  │ Analyzing row 2, column 2...     │  │
+│  │   6 · · │ 1 9 5 │ · · ·     │  │                                   │  │
+│  │   · 9 8 │ · · · │ · 6 ·     │  │ Row 2 has: 6, 1, 9, 5            │  │
+│  │   ─────   ─────   ─────     │  │ Column 2 has: 3, 9, 6            │  │
+│  │   8 · · │ · 6 · │ · · 3     │  │ Box 1 has: 5, 3, 6, 9, 8         │  │
+│  │   4 · · │ 8 · 3 │ · · 1     │  │                                   │  │
+│  │   7 · · │ · 2 · │ · · 6     │  │ Missing from intersection:        │  │
+│  │   ─────   ─────   ─────     │  │ {2, 4, 7}                         │  │
+│  │   · 6 · │ · · · │ 2 8 ·     │  │                                   │  │
+│  │   · · · │ 4 1 9 │ · · 5     │  │ Trying value 7 at (2,2)          │  │
+│  │   · · · │ · 8 · │ · 7 9     │  │                                   │  │
+│  │                              │  └───────────────────────────────────┘  │
+│  │ *Current  ·Empty  #Correct  │                                         │
+│  └──────────────────────────────┘                                         │
+│                                                                           │
+│  ┌─── Move History ───────────────────────────────────────────────────┐  │
+│  │ #13 | (1,3)=4 | CORRECT ✓  | "Only candidate in row 1"            │  │
+│  │ #14 | (2,2)=7 | INVALID ✗  | "7 already in column 2"              │  │
+│  │ #15 | (2,2)=4 | CORRECT ✓  | "Only remaining candidate"    ← now  │  │
+│  └────────────────────────────────────────────────────────────────────┘  │
+│                                                                           │
+│  ┌─── Statistics ─────────────────────────────────────────────────────┐  │
+│  │ Correct: 12/15 (80%)  |  Invalid: 2  |  Wrong: 1  |  Time: 01:23   │  │
+│  └────────────────────────────────────────────────────────────────────┘  │
+│                                                                           │
+│  [  Pause  ]  [  Memory Toggle  ]  [  Export Session  ]  [  Stop  ]      │
+│                                                                           │
+└──────────────────────────────────────────────────────────────────────────┘
+[Space] Pause  [M] Toggle Memory  [E] Export  [Q] Stop
+```
+
+**Key Features**:
+- **Live AI model reasoning display**: Shows the AI model's step-by-step analysis
+- **Move validation feedback**: CORRECT (green), INVALID (red), WRONG (yellow)
+- **Memory toggle button**: Switch between memory ON/OFF for A/B testing
+- **Statistics panel**: Real-time accuracy tracking
+- **Move history**: Scrollable history with reasoning excerpts
+- **Profile selection**: Choose from saved profiles (Spec 13)
+
+**Configuration Options**:
+```
+┌─── AI Model Configuration ────────────────────────────────────────────┐
+│                                                                         │
+│  Active Profile:     [lm-studio-local         ▼] [Edit Profile]        │
+│  Base URL:           [http://localhost:1234/v1              ]          │
+│  Model:              [qwen3-30b                              ]          │
+│  Temperature:        [0.7  ] ← → (0.0-1.0)                             │
+│                                                                         │
+│  ┌─── Memory Settings ────────────────────────────────────────────┐    │
+│  │ ● Memory Enabled (include past experiences in prompts)         │    │
+│  │ ○ Memory Disabled (baseline mode for A/B testing)              │    │
+│  │                                                                 │    │
+│  │   Max History Moves: [20  ] ← → (0-50)                         │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
+│                                                                         │
+│  [  Start AI Play  ]  [  Manage Profiles  ]  [  Cancel  ]              │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---

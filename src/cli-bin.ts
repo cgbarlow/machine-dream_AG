@@ -7,7 +7,7 @@
  * 'machine-dream' command. It loads the CLI and executes the requested command.
  */
 
-import { runCLI } from './cli/cli';
+import { runCLI } from './cli/cli.js';
 
 // Run the CLI
 runCLI().catch(error => {

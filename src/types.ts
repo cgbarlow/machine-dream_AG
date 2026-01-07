@@ -15,6 +15,20 @@ export interface AgentDBReasoningBank {
   querySimilar(context: PuzzleState): Promise<Experience[]>;
   distillPatterns(sessionId: string): Promise<Pattern[]>;
   consolidate(experiences: Experience[]): Promise<ConsolidatedKnowledge>;
+
+  // Additional methods for LLM experience storage (Spec 11)
+  storeReasoning(data: {
+    trajectory_id: string;
+    step_index: number;
+    action: string;
+    reasoning: string;
+    outcome: string;
+    feedback: string;
+  }): Promise<void>;
+  storeMetadata(key: string, type: string, data: unknown): Promise<void>;
+  getTrajectory(trajectoryId: string): Promise<{ steps: Array<{ step_index: number }> } | null>;
+  getMetadata(key: string, type: string): Promise<unknown>;
+  queryMetadata(type: string, filter: Record<string, unknown>): Promise<unknown[]>;
 }
 
 export interface AgentDBReflexionMemory {
@@ -47,12 +61,45 @@ export type Move = {
   timestamp: number;
 };
 
+export type DifficultyLevel = 'easy' | 'medium' | 'hard' | 'expert' | 'diabolical';
+
 export type PuzzleState = {
   grid: Grid;
   candidates: Map<string, CandidateSet>; // "row,col" -> Set<number>
   moveHistory: Move[];
-  difficulty: 'easy' | 'medium' | 'hard' | 'expert';
+  difficulty: DifficultyLevel;
 };
+
+// ============================================================================
+// Puzzle Generation Types (Spec 12)
+// ============================================================================
+
+export type GridSize = 4 | 9 | 16 | 25;
+
+export type SymmetryType = 'none' | 'rotational' | 'reflectional' | 'diagonal';
+
+export interface PuzzleGenerationConfig {
+  seed?: number;                  // Random seed (auto-generated if not provided)
+  size?: GridSize;                // Grid size (default: 9)
+  difficulty?: DifficultyLevel;   // Target difficulty (default: 'medium')
+  symmetry?: SymmetryType;        // Cell removal symmetry (default: 'none')
+  validateUniqueness?: boolean;   // Ensure single solution (default: true)
+  maxRetries?: number;            // Max retry attempts (default: 100)
+}
+
+export interface GeneratedPuzzle {
+  grid: Grid;                     // Puzzle grid with clues
+  solution: Grid;                 // Complete solution grid
+  seed: number;                   // Seed used for generation
+  size: GridSize;                 // Grid size
+  targetDifficulty: DifficultyLevel;
+  actualDifficulty: DifficultyLevel;
+  clueCount: number;              // Number of given cells
+  generationTimeMs: number;       // Time taken to generate
+  retryCount: number;             // Number of retries needed
+  isValid: boolean;               // Validation passed
+  hasUniqueSolution: boolean;     // Has exactly one solution
+}
 
 // ============================================================================
 // GRASP Loop Types

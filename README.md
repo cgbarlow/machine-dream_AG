@@ -2,8 +2,45 @@
 
 **Continuous Machine Cognition & AgentDB Integration**
 
-> [!NOTE]
-> **Functional POC**: This repository is a fully functional Proof-of-Concept. It implements the complete GRASP loop and Dreaming pipeline using a Local AgentDB (SQLite) for persistence.
+> [!IMPORTANT]
+> **Current Status: 72% Production Ready** (Assessment: Jan 7, 2026)
+>
+> ✅ **Phases 1-3 (Complete)**: TUI, CLI, GRASP loop, Dreaming pipeline, AgentDB persistence, LLM integration
+>
+> ✅ **Phase 4 (Complete)**: CLI Wiring - 12 new commands for memory & system management
+>
+> ✅ **Phase 5 (Complete)**: CLI Runtime - All commands tested and operational
+>
+> ✅ **Puzzle Generator**: Seed-based randomized generation (4×4 to 25×25 grids)
+>
+> ⚠️ **Production Readiness**: [View Assessment](docs/PRODUCTION_READINESS_SUMMARY.md) | [Action Plan](docs/PRODUCTION_ACTION_PLAN.md)
+
+## 🎯 Project Status
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Puzzle Engine | ✅ Complete | Sudoku generation, validation, rules |
+| GRASP Loop | ✅ Complete | Generate, Review, Absorb, Synthesize, Persist |
+| Dreaming Pipeline | ✅ Complete | 5-phase consolidation |
+| AgentDB (Local) | ✅ Complete | SQLite-based persistence |
+| CLI Interface | ✅ Complete | 25 commands across 4 functional areas |
+| TUI (Ink) | ✅ Complete | Interactive terminal UI |
+| LLM Integration | ✅ Complete | Pure LLM player with learning + TUI |
+| **Puzzle Generator** | ✅ **Complete** | Seeded random generation, 4×4 to 25×25 grids |
+| **AI Model Profiles** | ✅ **Complete (Phase 2)** | Multi-provider connection management |
+| **Memory Management** | ✅ **Complete (Phase 4)** | 7 CLI commands for agent memory control |
+| **System Administration** | ✅ **Complete (Phase 4)** | 5 CLI commands for diagnostics & optimization |
+
+### The Critical Gap
+
+The current system uses **deterministic rule-based solving** (naked singles, hidden singles, backtracking). While architecturally sound, **the LLM never actually plays Sudoku**.
+
+Phase 2 will implement a **true LLM Sudoku player** where:
+- The LLM receives puzzle state and proposes moves
+- Moves are validated (correct/invalid/wrong)
+- The LLM learns from feedback
+- Experiences persist for "dreaming" consolidation
+- No hints, no fallbacks - pure LLM reasoning
 
 ## 🚀 Quick Start
 
@@ -18,7 +55,212 @@ npm run dev
 
 # Run Tests
 npm test
+
+# LLM Sudoku Player with Profile Management (Phase 2)
+cp .env.example .env                    # Configure environment
+
+# Quick CLI access (all commands)
+npm run cli -- llm --help              # Show all LLM commands
+
+# Manage AI model connection profiles
+npm run cli -- llm profile add          # Add new profile (interactive)
+npm run cli -- llm profile list         # List all profiles
+npm run cli -- llm profile set <name>   # Set active profile
+npm run cli -- llm profile test         # Test connection
+
+# Play with LLM
+npm run cli -- llm play puzzles/easy-01.json   # Play with active profile
+npm run cli -- llm stats                       # View statistics
+npm run cli -- llm dream                       # Run consolidation
+npm run cli -- llm benchmark                   # Test learning (ON vs OFF)
+
+# Memory Management (Phase 4 - NEW!)
+npm run cli -- llm memory store key "value"    # Store data in memory
+npm run cli -- llm memory list                 # List all memory entries
+npm run cli -- llm memory search "pattern"     # Search memory
+npm run cli -- llm memory export backup.json   # Export memory
+npm run cli -- llm memory import backup.json   # Import memory
+
+# System Administration (Phase 4 - NEW!)
+npm run cli -- llm system status               # Show system health
+npm run cli -- llm system diagnostics          # Run diagnostics
+npm run cli -- llm system optimize             # Optimize performance
+
+# TUI: Interactive interface with live debugging
+npm run build
+machine-dream tui  # Press 'L' for LLM Play, 'M' for Memory, 'G' for Generator
 ```
+
+## 🎲 Puzzle Generation (Phase 5)
+
+Generate randomized Sudoku puzzles with seed-based reproducibility:
+
+```bash
+# CLI: Generate single puzzle
+machine-dream puzzle generate --size 9 --difficulty medium
+
+# CLI: Generate from specific seed (reproducible)
+machine-dream puzzle from-seed 12345 --size 9 --difficulty hard
+
+# CLI: Batch generation for training data
+machine-dream puzzle batch --count 100 --seed-mode sequential
+
+# TUI: Interactive puzzle generator
+machine-dream tui  # Press 'G' for Generator screen
+```
+
+### Features
+- **Seed-based reproducibility** - Same seed = identical puzzle
+- **Variable grid sizes** - 4×4, 9×9, 16×16, 25×25 Sudoku variants
+- **Difficulty scaling** - Easy to Diabolical with size-specific clue counts
+- **Symmetry patterns** - None, Rotational, Reflectional, Diagonal
+- **Uniqueness validation** - Ensures exactly one solution
+- **Batch generation** - Create training datasets with sequential/random seeds
+
+See [Spec 12](docs/specs/12-randomized-puzzle-generation.md) for implementation details.
+```
+
+## 🤖 LLM Integration (Phase 2)
+
+### AI Model Profile Management (Spec 13)
+
+Easily switch between different LLM providers and models with saved connection profiles:
+
+```bash
+# Create profiles for multiple providers
+machine-dream llm profile add \
+  --name lm-studio-local \
+  --provider lmstudio \
+  --base-url http://localhost:1234/v1 \
+  --model qwen3-30b \
+  --set-default
+
+machine-dream llm profile add \
+  --name openai-gpt4 \
+  --provider openai \
+  --base-url https://api.openai.com/v1 \
+  --api-key "${OPENAI_API_KEY}" \
+  --model gpt-4
+
+# Switch between profiles
+machine-dream llm profile set openai-gpt4
+machine-dream llm play puzzles/easy-01.json
+```
+
+**Supported Providers:**
+- **LM Studio** - Local models (privacy, no costs, offline)
+- **OpenAI** - GPT-3.5, GPT-4 (cloud, API costs)
+- **Anthropic** - Claude 3 models (cloud, API costs)
+- **Ollama** - Local models via Ollama server
+- **OpenRouter** - Multi-provider gateway
+- **Custom** - Any OpenAI-compatible API endpoint
+
+**Security:**
+- Profiles stored at `~/.machine-dream/llm-profiles.json`
+- Use environment variables for API keys: `apiKey: "${OPENAI_API_KEY}"`
+- Export/import profiles across machines (with/without secrets)
+
+See [Spec 13](docs/specs/13-llm-profile-management.md) for full documentation.
+
+### Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| LLM Provider | **Profile-based** | Support multiple providers easily |
+| Default Provider | **LM Studio (local)** | Privacy, no API costs, offline |
+| Target Model | **Qwen3 30B** | Capable reasoning, runs locally |
+| Deterministic Fallback | **None** | Pure LLM - must learn on its own |
+| Hints | **None** | LLM must struggle and learn |
+| Memory Persistence | **Yes** | Experiences persist across sessions |
+| Memory Toggle | **Yes** | Enable/disable to verify learning |
+
+### LM Studio Setup
+
+1. Download [LM Studio](https://lmstudio.ai/)
+2. Load **Qwen3 30B** (or similar capable model)
+3. Start local server (default: `localhost:1234`)
+4. Create profile: `machine-dream llm profile add`
+5. The system connects via OpenAI-compatible API
+
+### How It Works
+
+```
+┌─────────────────────────────────────────────────────┐
+│                LLM Sudoku Player                    │
+├─────────────────────────────────────────────────────┤
+│  1. Show puzzle state to LLM                        │
+│  2. LLM proposes a move (row, col, value)           │
+│  3. System validates move                           │
+│  4. Feedback: "CORRECT" / "INVALID: reason"         │
+│  5. Store experience in AgentDB                     │
+│  6. Repeat until solved                             │
+│  7. Consolidate patterns during "dreaming"          │
+└─────────────────────────────────────────────────────┘
+```
+
+### Memory Toggle
+
+To verify learning is working:
+- `--no-memory`: Fresh start, no history (baseline)
+- `--memory`: Include past experiences (should improve over time)
+
+### Documentation
+
+- [LLM Integration Plan](docs/LLM_INTEGRATION_PLAN.md) - Architecture overview
+- [Spec 11: LLM Sudoku Player](docs/specs/11-llm-sudoku-player.md) - Formal specification
+
+## 💾 Memory & System Management (Phase 4)
+
+Complete CLI interface for managing agent memory and system health with 12 new commands:
+
+### Memory Management (7 Commands)
+
+Control agent learning data and patterns:
+
+```bash
+# Store and retrieve data
+npm run cli -- llm memory store session-key "learning data"
+npm run cli -- llm memory retrieve session-key  # Coming in Phase 6
+
+# List and search
+npm run cli -- llm memory list --limit 50
+npm run cli -- llm memory search "strategy" --type pattern
+
+# Backup and restore
+npm run cli -- llm memory export ./backups/memory-$(date +%Y%m%d).json
+npm run cli -- llm memory import ./backups/memory-20260106.json --merge
+
+# Clear memory (requires --confirm for safety)
+npm run cli -- llm memory clear --confirm
+```
+
+### System Administration (5 Commands)
+
+Monitor and optimize system performance:
+
+```bash
+# Health monitoring
+npm run cli -- llm system status              # Overall system health
+npm run cli -- llm system diagnostics         # Comprehensive diagnostics
+
+# Performance optimization
+npm run cli -- llm system optimize            # Vacuum database, cleanup patterns
+
+# State management
+npm run cli -- llm system export ./backups    # Complete system backup
+npm run cli -- llm system reset --confirm     # Reset to default state
+```
+
+**Features:**
+- ✅ Real-time system status and health metrics
+- ✅ Pattern learning insights and statistics
+- ✅ Database optimization and cleanup
+- ✅ Complete state export/import
+- ✅ Safety confirmations for destructive operations
+
+**Documentation:**
+- [CLI Testing Guide](docs/cli-testing-guide.md) - Comprehensive command examples
+- [Phase 4 Summary](docs/phase4-cli-wiring-summary.md) - Implementation details
 
 ## 📖 Overview
 
@@ -73,6 +315,9 @@ machine-dream/
 | Document | Description |
 | :--- | :--- |
 | [**User Guide**](docs/USER_GUIDE.md) | **Start Here!** Instructions for installation, usage, and configuration. |
+| [**Production Readiness Assessment**](docs/PRODUCTION_READINESS_SUMMARY.md) | **NEW!** Current production status (72%), critical gaps, and timeline. |
+| [**Production Action Plan**](docs/PRODUCTION_ACTION_PLAN.md) | **NEW!** 11-week roadmap to production readiness with detailed tasks. |
+| [**Immediate Actions**](docs/IMMEDIATE_ACTION_CHECKLIST.md) | **NEW!** Week 1 checklist for fixing critical test failures. |
 | [**Continuous Machine Thinking Research**](docs/continuous-machine-thinking-research.md) | The foundational research report detailing the theory, findings, and performance metrics. |
 | [**POC Strategy Report**](docs/poc-strategy-report.md) | Detailed strategic analysis and implementation roadmap. |
 | [**Source Types**](src/types.ts) | TypeScript definitions that serve as the "Code-as-Spec" for the architecture, utilizing native `agentdb` types. |

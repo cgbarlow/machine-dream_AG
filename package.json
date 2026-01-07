@@ -14,6 +14,11 @@
     "dev": "tsx watch src/index.ts",
     "tui": "tsx src/tui-ink/tui.tsx",
     "tui:poc": "tsx src/tui-ink/poc.tsx",
+    "llm:play": "tsx src/cli-bin.ts llm play",
+    "llm:stats": "tsx src/cli-bin.ts llm stats",
+    "llm:dream": "tsx src/cli-bin.ts llm dream",
+    "llm:benchmark": "tsx src/cli-bin.ts llm benchmark",
+    "cli": "tsx src/cli-bin.ts",
     "test": "vitest",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
@@ -41,7 +46,9 @@
     "@types/react": "^19.2.7",
     "@typescript-eslint/eslint-plugin": "^6.13.0",
     "@typescript-eslint/parser": "^6.13.0",
+    "@vitest/coverage-v8": "^1.6.1",
     "eslint": "^8.54.0",
+    "ink-testing-library": "^4.0.0",
     "tsx": "^4.7.0",
     "typescript": "^5.3.0",
     "vitest": "^1.0.0"
@@ -58,6 +65,7 @@
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",
     "neo-blessed": "^0.2.0",
+    "node-fetch": "^3.3.2",
     "react": "^19.2.3",
     "string-width": "^8.1.0"
   }

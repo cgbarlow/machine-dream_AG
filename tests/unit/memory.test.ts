@@ -17,7 +17,7 @@ describe('LocalAgentDB (Spec 02 & 08)', () => {
 
     afterEach(() => {
         if (fs.existsSync(TEST_DB_PATH)) {
-            try { fs.unlinkSync(TEST_DB_PATH); } catch (e) { }
+            try { fs.unlinkSync(TEST_DB_PATH); } catch (e) { /* Ignore cleanup errors */ }
         }
     });
 
