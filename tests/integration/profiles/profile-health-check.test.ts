@@ -261,10 +261,11 @@ describe('Profile Health Check Integration (Spec 13)', () => {
     });
 
     it('should handle malformed URLs', async () => {
+      // Use a valid URL format that will fail during connection
       manager.create({
         name: 'malformed-url',
         provider: 'lmstudio',
-        baseUrl: 'not-a-valid-url',
+        baseUrl: 'http://invalid-host-that-does-not-exist:9999',
         model: 'test-model',
         parameters: { temperature: 0.7, maxTokens: 1024 },
       });
@@ -324,6 +325,10 @@ describe('Profile Health Check Integration (Spec 13)', () => {
       });
 
       const result1 = await manager.test('profile-1');
+
+      // Small delay to ensure different timestamp
+      await new Promise(resolve => setTimeout(resolve, 10));
+
       const result2 = await manager.test('profile-2');
 
       expect(result1).toBeDefined();

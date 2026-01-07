@@ -54,7 +54,7 @@ describe('LLMProfileManager (Spec 13)', () => {
 
   describe('Profile Creation', () => {
     it('should create a new profile successfully', () => {
-      const options = createTestOptions();
+      const options = createTestOptions('test-profile');
       const { profile, validation } = manager.create(options);
 
       expect(profile.name).toBe('test-profile');
@@ -100,7 +100,7 @@ describe('LLMProfileManager (Spec 13)', () => {
     });
 
     it('should set as active when setDefault is true', () => {
-      const options = createTestOptions();
+      const options = createTestOptions('test-profile');
       options.setDefault = true;
 
       manager.create(options);
@@ -349,8 +349,10 @@ describe('LLMProfileManager (Spec 13)', () => {
       expect(sorted[2].usageCount).toBe(0);
     });
 
-    it('should sort by last used', () => {
-      // Wait a bit and use another profile
+    it('should sort by last used', async () => {
+      // Wait a bit to ensure different timestamp
+      await new Promise(resolve => setTimeout(resolve, 10));
+
       manager.recordUsage('openai-1');
 
       const sorted = manager.sortByLastUsed();

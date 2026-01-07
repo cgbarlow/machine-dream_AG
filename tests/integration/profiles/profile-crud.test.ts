@@ -182,8 +182,39 @@ describe('Profile CRUD Integration (Spec 13)', () => {
   });
 
   describe('Config Integration', () => {
+    let productionManager: LLMProfileManager;
+    let originalProfiles: string;
+
+    beforeEach(() => {
+      // For config integration tests, we need to use the default storage path
+      // since getLLMConfig() creates its own manager with the default path
+      productionManager = new LLMProfileManager(); // Uses default path
+
+      // Backup existing profiles
+      try {
+        originalProfiles = productionManager.export({ includeSecrets: true });
+      } catch (error) {
+        originalProfiles = '';
+      }
+
+      // Clear all existing profiles for clean test
+      const storage = (productionManager as any).storage;
+      storage.clearAll();
+    });
+
+    afterEach(() => {
+      // Restore original profiles
+      if (originalProfiles) {
+        try {
+          productionManager.import(originalProfiles, true);
+        } catch (error) {
+          // Ignore errors during restore
+        }
+      }
+    });
+
     it('should integrate with getLLMConfig for active profile', () => {
-      // Create profile with specific config
+      // Create profile with specific config using production manager
       const options = createProfileOptions('config-test');
       options.parameters = {
         temperature: 0.8,
@@ -192,7 +223,7 @@ describe('Profile CRUD Integration (Spec 13)', () => {
       options.timeout = 90000;
       options.setDefault = true;
 
-      manager.create(options);
+      productionManager.create(options);
 
       // Get config through config system
       const config = getLLMConfig();
@@ -205,14 +236,14 @@ describe('Profile CRUD Integration (Spec 13)', () => {
     });
 
     it('should integrate with getLLMConfig for specific profile', () => {
-      manager.create(createProfileOptions('profile-1'));
-      manager.create({
+      productionManager.create(createProfileOptions('profile-1'));
+      productionManager.create({
         ...createProfileOptions('profile-2'),
         parameters: { temperature: 0.5, maxTokens: 1024 },
       });
 
       // Set profile-1 as active
-      manager.setActive('profile-1');
+      productionManager.setActive('profile-1');
 
       // Get config for specific profile (not active)
       const config = getLLMConfig('profile-2');

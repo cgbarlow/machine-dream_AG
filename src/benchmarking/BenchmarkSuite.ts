@@ -67,7 +67,7 @@ export class BenchmarkSuite {
         // Other types would require different logic/mocks
         let success = false;
         let iterations = 0;
-        let strategies: string[] = [];
+        const strategies: string[] = [];
 
         try {
             const res = await this.orchestrator.solvePuzzle(grid);

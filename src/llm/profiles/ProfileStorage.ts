@@ -53,7 +53,12 @@ export class ProfileStorageManager {
   load(): ProfileStorage {
     try {
       if (!fs.existsSync(this.storagePath)) {
-        return { ...DEFAULT_STORAGE };
+        // Return a fresh copy - avoid shared object references!
+        return {
+          version: STORAGE_VERSION,
+          profiles: {},  // New empty object each time
+          activeProfile: undefined,
+        };
       }
 
       const data = fs.readFileSync(this.storagePath, 'utf-8');

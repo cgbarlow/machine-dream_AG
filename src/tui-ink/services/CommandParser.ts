@@ -313,10 +313,11 @@ export class CommandParserStatic {
         await CLIExecutor.executeLLMDream(onProgress);
         break;
 
-      case 'stats':
+      case 'stats': {
         const stats = await CLIExecutor.getLLMStats();
         console.log(JSON.stringify(stats, null, 2));
         break;
+      }
 
       default:
         throw new Error(`Unknown LLM subcommand: ${subcommand}`);
@@ -337,14 +338,15 @@ export class CommandParserStatic {
     }
 
     switch (subcommand) {
-      case 'list':
+      case 'list': {
         const namespace = args[0] || 'default';
         const entries = await CLIExecutor.memoryList(namespace);
         console.log(`Found ${entries.length} entries in namespace "${namespace}":`);
         entries.forEach((entry: string) => console.log(`- ${entry}`));
         break;
+      }
 
-      case 'search':
+      case 'search': {
         if (args.length === 0) {
           throw new Error('Missing search query. Usage: memory search <query>');
         }
@@ -357,11 +359,13 @@ export class CommandParserStatic {
         console.log(`Found ${results.length} matches:`);
         results.forEach((result: any) => console.log(`- ${result.key} (${result.similarity.toFixed(2)}): ${result.value}`));
         break;
+      }
 
-      case 'stats':
+      case 'stats': {
         const stats = await CLIExecutor.getMemoryStats();
         console.log(JSON.stringify(stats, null, 2));
         break;
+      }
 
       default:
         throw new Error(`Unknown memory subcommand: ${subcommand}`);

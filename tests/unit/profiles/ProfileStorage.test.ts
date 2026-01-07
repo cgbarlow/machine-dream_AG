@@ -17,18 +17,21 @@ let testCounter = 0;
 describe('ProfileStorageManager (Spec 13)', () => {
   let storage: ProfileStorageManager;
   let testStoragePath: string;
+  let testDir: string;
 
   beforeEach(() => {
-    // Create unique temp file for each test using counter
+    // Create unique isolated directory for each test
     testCounter++;
-    testStoragePath = path.join(os.tmpdir(), `.test-storage-${process.pid}-${testCounter}-${Date.now()}.json`);
+    testDir = path.join(os.tmpdir(), `test-storage-${process.pid}-${testCounter}-${Date.now()}`);
+    fs.mkdirSync(testDir, { recursive: true });
+    testStoragePath = path.join(testDir, 'profiles.json');
     storage = new ProfileStorageManager(testStoragePath);
   });
 
   afterEach(() => {
-    // Clean up test file
-    if (fs.existsSync(testStoragePath)) {
-      fs.unlinkSync(testStoragePath);
+    // Clean up entire test directory
+    if (fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true, force: true });
     }
   });
 
@@ -264,7 +267,10 @@ describe('ProfileStorageManager (Spec 13)', () => {
     });
 
     it('should import profiles successfully', () => {
-      const newStoragePath = path.join(os.tmpdir(), `.test-import-${Date.now()}-${Math.random()}.json`);
+      // Create isolated directory for import test
+      const importTestDir = path.join(os.tmpdir(), `test-import-${Date.now()}-${Math.random()}`);
+      fs.mkdirSync(importTestDir, { recursive: true });
+      const newStoragePath = path.join(importTestDir, 'profiles.json');
       const newStorage = new ProfileStorageManager(newStoragePath);
 
       const exported = storage.exportProfiles(undefined, true);
@@ -275,8 +281,8 @@ describe('ProfileStorageManager (Spec 13)', () => {
       expect(newStorage.getProfileCount()).toBe(2);
 
       // Clean up
-      if (fs.existsSync(newStoragePath)) {
-        fs.unlinkSync(newStoragePath);
+      if (fs.existsSync(importTestDir)) {
+        fs.rmSync(importTestDir, { recursive: true, force: true });
       }
     });
 
