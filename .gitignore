@@ -30,3 +30,7 @@ claude-flow
 .claude/*
 # Removed Windows wrapper files per user request
 hive-mind-prompt-*.txt
+
+# Test coverage and results
+coverage/
+test-results*.txt
