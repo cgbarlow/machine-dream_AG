@@ -1,0 +1,58 @@
+{
+  "memorySystem": "agentdb",
+  "enableRL": true,
+  "enableReflexion": true,
+  "enableSkillLibrary": true,
+  "solving": {
+    "maxIterations": 50,
+    "maxSolveTime": 300000,
+    "reflectionInterval": 5,
+    "attentionWindowSize": 10,
+    "backtrackEnabled": false,
+    "guessThreshold": 0.3,
+    "strategies": [
+      "naked-single",
+      "hidden-single",
+      "pointing-pairs",
+      "box-line-reduction",
+      "naked-pairs",
+      "x-wing"
+    ]
+  },
+  "dreaming": {
+    "schedule": "after-session",
+    "compressionRatio": 10,
+    "abstractionLevels": 4,
+    "minSuccessRate": 0.7
+  },
+  "agentdb": {
+    "dbPath": ".agentdb",
+    "preset": "medium",
+    "quantization": "scalar",
+    "indexing": "hnsw"
+  },
+  "benchmarking": {
+    "enabled": true,
+    "outputDir": "./benchmarks",
+    "parallel": 1
+  },
+  "logging": {
+    "level": "info",
+    "outputDir": "./logs",
+    "format": "json"
+  },
+  "demo": {
+    "mode": false,
+    "speed": "realtime",
+    "pauseOnInsight": false
+  },
+  "hooks": {
+    "preTask": null,
+    "postTask": null,
+    "preEdit": null,
+    "postEdit": null,
+    "sessionEnd": null,
+    "sessionRestore": null
+  },
+  "key": "value"
+}

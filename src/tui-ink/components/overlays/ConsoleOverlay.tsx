@@ -8,9 +8,9 @@
  */
 
 import React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import { ConsolePanel } from '../console/ConsolePanel.js';
-import { CommandParser, ParsedCommand } from '../../services/CommandParser.js';
+import { CommandParserStatic, ParsedCommand } from '../../services/CommandParser.js';
 import type { ProgressEvent } from '../../services/CLIExecutor.js';
 
 interface ConsoleOverlayProps {
@@ -18,10 +18,16 @@ interface ConsoleOverlayProps {
 }
 
 export const ConsoleOverlay: React.FC<ConsoleOverlayProps> = ({ onClose }) => {
+  // Handle keyboard input for closing overlay
+  useInput((input, key) => {
+    if (input === '`' || key.escape) {
+      onClose();
+    }
+  });
   const handleCommand = async (command: string) => {
     try {
-      const parsed: ParsedCommand = CommandParser.parse(command);
-      await CommandParser.execute(parsed, (event: ProgressEvent) => {
+      const parsed: ParsedCommand = CommandParserStatic.parse(command);
+      await CommandParserStatic.execute(parsed, (_event: ProgressEvent) => {
         // Progress events captured by OutputCapture
       });
     } catch (error: any) {
@@ -31,10 +37,6 @@ export const ConsoleOverlay: React.FC<ConsoleOverlayProps> = ({ onClose }) => {
 
   return (
     <Box
-      position="absolute"
-      bottom={0}
-      left={0}
-      right={0}
       height="50%"
       flexDirection="column"
       borderStyle="double"
@@ -44,9 +46,9 @@ export const ConsoleOverlay: React.FC<ConsoleOverlayProps> = ({ onClose }) => {
       {/* Header */}
       <Box paddingX={1} borderBottom>
         <Text bold color="cyan">
-          Console (`) - Quick Access
+          Console Overlay
         </Text>
-        <Text dimColor> | ` or Esc to close</Text>
+        <Text dimColor> - Press ` to close</Text>
       </Box>
 
       {/* Console Panel */}

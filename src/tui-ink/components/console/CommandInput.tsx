@@ -23,8 +23,8 @@ export const CommandInput: React.FC<CommandInputProps> = ({
   placeholder = 'Enter command...',
 }) => {
   const [input, setInput] = useState('');
-  const [historyIndex, setHistoryIndex] = useState(-1);
-  const [commandHistory] = useState<string[]>([]); // TODO: Load from file in future
+  const [_historyIndex, setHistoryIndex] = useState(-1);
+  const [_commandHistory] = useState<string[]>([]); // TODO: Load from file in future
 
   const handleSubmit = (value: string) => {
     if (value.trim()) {

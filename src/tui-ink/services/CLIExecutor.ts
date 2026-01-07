@@ -105,6 +105,7 @@ export class CLIExecutor {
         indexing: 'none',
         cacheEnabled: true,
         maxIterations: params.maxIterations,
+        reflectionInterval: 10,
         dreamingSchedule: 'manual' as const,
         logLevel: 'info' as const,
         demoMode: false,
@@ -350,6 +351,7 @@ export class CLIExecutor {
         indexing: 'hnsw' as const,
         cacheEnabled: true,
         maxIterations: 100,
+        reflectionInterval: 10,
         dreamingSchedule: 'manual' as const,
         logLevel: 'info' as const,
         demoMode: false,
@@ -446,6 +448,7 @@ export class CLIExecutor {
         indexing: 'hnsw' as const,
         cacheEnabled: true,
         maxIterations: 50,
+        reflectionInterval: 10,
         dreamingSchedule: 'manual' as const,
         logLevel: 'info' as const,
         demoMode: false,
@@ -681,9 +684,6 @@ export class CLIExecutor {
         quantization: 'scalar' as const,
         indexing: 'hnsw' as const,
         cacheEnabled: true,
-        dreamingSchedule: 'manual' as const,
-        logLevel: 'info' as const,
-        demoMode: false,
         reflexion: { enabled: true, maxEntries: 1000, similarityThreshold: 0.8 },
         skillLibrary: { enabled: false, minSuccessRate: 0.8, maxSkills: 100, autoConsolidate: false }
       };
@@ -794,9 +794,6 @@ export class CLIExecutor {
         quantization: 'scalar' as const,
         indexing: 'hnsw' as const,
         cacheEnabled: true,
-        dreamingSchedule: 'manual' as const,
-        logLevel: 'info' as const,
-        demoMode: false,
         reflexion: { enabled: true, maxEntries: 1000, similarityThreshold: 0.8 },
         skillLibrary: { enabled: false, minSuccessRate: 0.8, maxSkills: 100, autoConsolidate: false }
       };
@@ -890,9 +887,6 @@ export class CLIExecutor {
         quantization: 'scalar' as const,
         indexing: 'hnsw' as const,
         cacheEnabled: true,
-        dreamingSchedule: 'manual' as const,
-        logLevel: 'info' as const,
-        demoMode: false,
         reflexion: { enabled: true, maxEntries: 1000, similarityThreshold: 0.8 },
         skillLibrary: { enabled: false, minSuccessRate: 0.8, maxSkills: 100, autoConsolidate: false }
       };
@@ -962,9 +956,6 @@ export class CLIExecutor {
         quantization: 'scalar' as const,
         indexing: 'hnsw' as const,
         cacheEnabled: true,
-        dreamingSchedule: 'manual' as const,
-        logLevel: 'info' as const,
-        demoMode: false,
         reflexion: { enabled: true, maxEntries: 1000, similarityThreshold: 0.8 },
         skillLibrary: { enabled: false, minSuccessRate: 0.8, maxSkills: 100, autoConsolidate: false }
       };

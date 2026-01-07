@@ -17,9 +17,114 @@ export interface ParsedCommand {
   options: Record<string, string | boolean>;
 }
 
+/**
+ * Instance-based CommandParser for TUI integration tests
+ */
 export class CommandParser {
+  constructor(private executor: CLIExecutor) {}
+
   /**
-   * Parse command string into structured format
+   * Parse command string (instance method for tests)
+   */
+  private parseCommand(input: string): { command: string; args: string[] } {
+    const trimmed = input.trim();
+    if (!trimmed) {
+      return { command: '', args: [] };
+    }
+
+    // Parse with quote support
+    const parts: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < trimmed.length; i++) {
+      const char = trimmed[i];
+
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ' ' && !inQuotes) {
+        if (current) {
+          parts.push(current);
+          current = '';
+        }
+      } else {
+        current += char;
+      }
+    }
+
+    if (current) {
+      parts.push(current);
+    }
+
+    // Normalize command to lowercase
+    const command = parts[0]?.toLowerCase() || '';
+    const args = parts.slice(1);
+
+    return { command, args };
+  }
+
+  /**
+   * Execute command (instance method for tests)
+   */
+  async execute(commandString: string): Promise<string> {
+    const { command, args } = this.parseCommand(commandString);
+
+    if (!command) {
+      return '';
+    }
+
+    try {
+      // Route to executor instance methods
+      switch (command) {
+        case 'solve':
+          await this.executor.executeSolve(args);
+          return 'Solve completed successfully';
+
+        case 'llm':
+          await this.executor.executeLLM(args);
+          return 'LLM play completed';
+
+        case 'memory':
+          await this.executor.executeMemory(args);
+          return 'Memory operation completed';
+
+        case 'dream':
+          await this.executor.executeDream(args);
+          return 'Dream completed';
+
+        case 'benchmark':
+          await this.executor.executeBenchmark(args);
+          return 'Benchmark completed';
+
+        case 'config':
+          await this.executor.executeConfig(args);
+          return 'Config updated';
+
+        case 'help':
+        case '?':
+        case 'h':
+          await this.executor.executeHelp(args);
+          return 'Help displayed';
+
+        case 'clear':
+          await this.executor.executeClear(args);
+          return 'Console cleared';
+
+        default:
+          return `Unknown command: ${command}. Type 'help' for available commands.`;
+      }
+    } catch (error: any) {
+      return `Error: ${error.message}`;
+    }
+  }
+}
+
+/**
+ * Static CommandParser for CLI usage
+ */
+export class CommandParserStatic {
+  /**
+   * Parse command string into structured format (static)
    */
   static parse(input: string): ParsedCommand {
     const trimmed = input.trim();
@@ -158,9 +263,13 @@ export class CommandParser {
     }
 
     const puzzleFile = args[0];
+    const memorySystemStr = (options['memory-system'] as string) || 'agentdb';
+    const memorySystem: 'agentdb' | 'reasoningbank' =
+      memorySystemStr === 'reasoningbank' ? 'reasoningbank' : 'agentdb';
+
     const params = {
       puzzleFile,
-      memorySystem: (options['memory-system'] as string) || 'agentdb',
+      memorySystem,
       enableRL: Boolean(options.rl),
       enableReflexion: Boolean(options.reflexion),
       maxIterations: parseInt((options['max-iterations'] as string) || '100', 10),
@@ -201,7 +310,7 @@ export class CommandParser {
         break;
 
       case 'dream':
-        await CLIExecutor.executeLLMDream({}, onProgress);
+        await CLIExecutor.executeLLMDream(onProgress);
         break;
 
       case 'stats':
@@ -221,7 +330,7 @@ export class CommandParser {
     subcommand: string | undefined,
     args: string[],
     options: Record<string, string | boolean>,
-    onProgress: ProgressCallback
+    _onProgress: ProgressCallback
   ): Promise<void> {
     if (!subcommand) {
       throw new Error('Memory subcommand required. Use: memory list|search|stats');
@@ -229,19 +338,24 @@ export class CommandParser {
 
     switch (subcommand) {
       case 'list':
-        const pattern = args[0] || '*';
-        const entries = await CLIExecutor.memoryList({ pattern });
-        console.log(`Found ${entries.length} entries:`);
-        entries.forEach((entry: any) => console.log(`- ${entry.key}: ${entry.value}`));
+        const namespace = args[0] || 'default';
+        const entries = await CLIExecutor.memoryList(namespace);
+        console.log(`Found ${entries.length} entries in namespace "${namespace}":`);
+        entries.forEach((entry: string) => console.log(`- ${entry}`));
         break;
 
       case 'search':
         if (args.length === 0) {
           throw new Error('Missing search query. Usage: memory search <query>');
         }
-        const results = await CLIExecutor.memorySearch({ query: args[0] });
+        const pattern = args[0];
+        const searchOptions = {
+          namespace: (options.namespace as string) || 'default',
+          limit: parseInt((options.limit as string) || '10', 10),
+        };
+        const results = await CLIExecutor.memorySearch(pattern, searchOptions);
         console.log(`Found ${results.length} matches:`);
-        results.forEach((result: any) => console.log(`- ${result.key}: ${result.value}`));
+        results.forEach((result: any) => console.log(`- ${result.key} (${result.similarity.toFixed(2)}): ${result.value}`));
         break;
 
       case 'stats':
@@ -259,14 +373,20 @@ export class CommandParser {
    */
   private static async executePuzzle(
     subcommand: string | undefined,
-    args: string[],
+    _args: string[],
     options: Record<string, string | boolean>,
     onProgress: ProgressCallback
   ): Promise<void> {
     if (subcommand === 'generate' || !subcommand) {
+      const difficultyStr = (options.difficulty as string) || 'medium';
+      const validDifficulties = ['easy', 'medium', 'hard', 'expert', 'diabolical'];
+      const difficulty = validDifficulties.includes(difficultyStr)
+        ? (difficultyStr as 'easy' | 'medium' | 'hard' | 'expert' | 'diabolical')
+        : 'medium';
+
       await CLIExecutor.executePuzzleGenerate(
         {
-          difficulty: (options.difficulty as string) || 'medium',
+          difficulty,
           seed: options.seed ? parseInt(options.seed as string, 10) : undefined,
         },
         onProgress
@@ -284,8 +404,11 @@ export class CommandParser {
     options: Record<string, string | boolean>,
     onProgress: ProgressCallback
   ): Promise<void> {
-    const suite = args[0] || 'all';
-    await CLIExecutor.executeBenchmark({ suite }, onProgress);
+    const suiteName = args[0] || 'Standard';
+    const type = (options.type as string) || 'grasp-baseline';
+    const count = parseInt((options.count as string) || '50', 10);
+
+    await CLIExecutor.executeBenchmark(suiteName, type, count, onProgress);
   }
 
   /**
@@ -294,8 +417,8 @@ export class CommandParser {
   private static async executeConfig(
     subcommand: string | undefined,
     args: string[],
-    options: Record<string, string | boolean>,
-    onProgress: ProgressCallback
+    _options: Record<string, string | boolean>,
+    _onProgress: ProgressCallback
   ): Promise<void> {
     if (!subcommand || subcommand === 'show') {
       const config = await CLIExecutor.getConfig();
@@ -304,7 +427,7 @@ export class CommandParser {
       if (args.length < 2) {
         throw new Error('Usage: config set <key> <value>');
       }
-      await CLIExecutor.setConfig({ key: args[0], value: args[1] });
+      await CLIExecutor.setConfig(args[0], args[1]);
       console.log(`Set ${args[0]} = ${args[1]}`);
     } else {
       throw new Error(`Unknown config subcommand: ${subcommand}`);

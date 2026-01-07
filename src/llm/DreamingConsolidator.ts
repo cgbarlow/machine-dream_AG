@@ -34,9 +34,9 @@ export class DreamingConsolidator {
 
   constructor(
     private experienceStore: ExperienceStore,
-    private config: LLMConfig
+    _config: LLMConfig
   ) {
-    this.llmClient = new LMStudioClient(config);
+    this.llmClient = new LMStudioClient(_config);
   }
 
   /**

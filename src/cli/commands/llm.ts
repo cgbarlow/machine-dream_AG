@@ -14,7 +14,7 @@ import { AgentMemory } from '../../memory/AgentMemory.js';
 import type { AgentDBConfig } from '../../types.js';
 import { LLMProfileManager, ProfileValidator } from '../../llm/profiles/index.js';
 import type { CreateProfileOptions, LLMProvider } from '../../llm/profiles/index.js';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 import { resolve, join } from 'path';
 import * as readline from 'readline/promises';
 import { homedir } from 'os';
@@ -39,9 +39,6 @@ function createDefaultMemoryConfig(): AgentDBConfig {
     quantization: 'scalar' as const,
     indexing: 'hnsw' as const,
     cacheEnabled: true,
-    dreamingSchedule: 'manual' as const,
-    logLevel: 'info' as const,
-    demoMode: false,
     reflexion: { enabled: true, maxEntries: 1000, similarityThreshold: 0.8 },
     skillLibrary: { enabled: false, minSuccessRate: 0.8, maxSkills: 100, autoConsolidate: false }
   };
@@ -119,9 +116,7 @@ export function registerLLMCommand(program: Command): void {
           }
         }
       } catch (error) {
-        throw new CLIError('Failed to list profiles', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to list profiles', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -197,9 +192,7 @@ export function registerLLMCommand(program: Command): void {
 
         logger.info(`\n💾 Saved to: ${manager.getStoragePath()}`);
       } catch (error) {
-        throw new CLIError('Failed to create profile', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to create profile', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -241,9 +234,7 @@ export function registerLLMCommand(program: Command): void {
         logger.info(`Usage Count:    ${p.usageCount}`);
         logger.info(`Active:         ${p.isDefault ? '✓ Yes' : '✗ No'}`);
       } catch (error) {
-        throw new CLIError('Failed to show profile', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to show profile', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -280,9 +271,7 @@ export function registerLLMCommand(program: Command): void {
         manager.delete(name);
         logger.info(`\n✅ Profile deleted: ${name}`);
       } catch (error) {
-        throw new CLIError('Failed to delete profile', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to delete profile', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -302,9 +291,7 @@ export function registerLLMCommand(program: Command): void {
         manager.setActive(name);
         logger.info(`\n▶ Active profile set to: ${name}`);
       } catch (error) {
-        throw new CLIError('Failed to set active profile', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to set active profile', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -337,9 +324,7 @@ export function registerLLMCommand(program: Command): void {
           }
         }
       } catch (error) {
-        throw new CLIError('Failed to test profile', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to test profile', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -367,9 +352,7 @@ export function registerLLMCommand(program: Command): void {
           logger.warn('⚠️  API keys were not exported (use --include-secrets to export them)');
         }
       } catch (error) {
-        throw new CLIError('Failed to export profiles', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to export profiles', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -397,9 +380,7 @@ export function registerLLMCommand(program: Command): void {
           result.errors.forEach(e => logger.warn(`   ${e.profile}: ${e.error}`));
         }
       } catch (error) {
-        throw new CLIError('Failed to import profiles', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to import profiles', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -450,9 +431,7 @@ export function registerLLMCommand(program: Command): void {
         const puzzleData = JSON.parse(readFileSync(puzzlePath, 'utf-8'));
 
         if (!puzzleData.initial || !puzzleData.solution) {
-          throw new CLIError('Invalid puzzle file format', 1, {
-            details: 'Puzzle file must contain "initial" and "solution" grids',
-          });
+          throw new CLIError('Invalid puzzle file format', 1, 'Puzzle file must contain "initial" and "solution" grids');
         }
 
         // Initialize player
@@ -464,14 +443,11 @@ export function registerLLMCommand(program: Command): void {
         const isHealthy = await player.healthCheck();
 
         if (!isHealthy) {
-          throw new CLIError('LM Studio is not running', 1, {
-            details: `Cannot connect to ${config.baseUrl}`,
-            suggestions: [
-              'Start LM Studio and load a model',
-              'Verify the endpoint URL',
-              `Check that the server is running on ${config.baseUrl}`,
-            ],
-          });
+          throw new CLIError('LM Studio is not running', 1, `Cannot connect to ${config.baseUrl}`, [
+            'Start LM Studio and load a model',
+            'Verify the endpoint URL',
+            `Check that the server is running on ${config.baseUrl}`,
+          ]);
         }
 
         const modelInfo = await player.getModelInfo();
@@ -509,9 +485,7 @@ export function registerLLMCommand(program: Command): void {
         if (error instanceof CLIError) {
           throw error;
         }
-        throw new CLIError('Failed to play puzzle', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to play puzzle', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -545,9 +519,7 @@ export function registerLLMCommand(program: Command): void {
           }
         }
       } catch (error) {
-        throw new CLIError('Failed to get statistics', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to get statistics', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -598,9 +570,7 @@ export function registerLLMCommand(program: Command): void {
           logger.info('\n(Dry run mode - no changes were saved)');
         }
       } catch (error) {
-        throw new CLIError('Failed to run dreaming', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to run dreaming', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -632,9 +602,7 @@ export function registerLLMCommand(program: Command): void {
         }
 
         if (filesToLoad.length === 0) {
-          throw new CLIError('No puzzle files found', 1, {
-            details: 'Provide puzzle files or ensure puzzles/easy-*.json exist',
-          });
+          throw new CLIError('No puzzle files found', 1, 'Provide puzzle files or ensure puzzles/easy-*.json exist');
         }
 
         logger.info(`Loading ${filesToLoad.length} puzzle(s)...`);
@@ -652,10 +620,7 @@ export function registerLLMCommand(program: Command): void {
         const isHealthy = await player.healthCheck();
 
         if (!isHealthy) {
-          throw new CLIError('LM Studio is not running', 1, {
-            details: `Cannot connect to ${DEFAULT_LLM_CONFIG.baseUrl}`,
-            suggestions: ['Start LM Studio and load a model'],
-          });
+          throw new CLIError('LM Studio is not running', 1, `Cannot connect to ${DEFAULT_LLM_CONFIG.baseUrl}`, ['Start LM Studio and load a model']);
         }
 
         logger.info('✓ LM Studio connected\n');
@@ -711,9 +676,7 @@ export function registerLLMCommand(program: Command): void {
           }
         }
       } catch (error) {
-        throw new CLIError('Failed to run benchmark', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to run benchmark', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -746,9 +709,7 @@ export function registerLLMCommand(program: Command): void {
 
         logger.info(`✓ Stored "${key}" in session "${sessionId}"`);
       } catch (error) {
-        throw new CLIError('Failed to store data', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to store data', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -766,9 +727,7 @@ export function registerLLMCommand(program: Command): void {
         logger.info(`Looking for key "${key}" in session "${sessionId}"...`);
         logger.warn('Note: Full key-value retrieval requires enhanced indexing (Phase 5)');
       } catch (error) {
-        throw new CLIError('Failed to retrieve data', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to retrieve data', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -801,9 +760,7 @@ export function registerLLMCommand(program: Command): void {
           );
         });
       } catch (error) {
-        throw new CLIError('Failed to list memory', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to list memory', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -840,9 +797,7 @@ export function registerLLMCommand(program: Command): void {
           logger.info(`\nFound ${experiences.length} move(s) in history`);
         }
       } catch (error) {
-        throw new CLIError('Failed to search memory', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to search memory', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -871,9 +826,7 @@ export function registerLLMCommand(program: Command): void {
           logger.info('No memory database found');
         }
       } catch (error) {
-        throw new CLIError('Failed to clear memory', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to clear memory', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -913,9 +866,7 @@ export function registerLLMCommand(program: Command): void {
           logger.info(`✓ Exported memory to ${outputFile}`);
         }
       } catch (error) {
-        throw new CLIError('Failed to export memory', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to export memory', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -950,9 +901,7 @@ export function registerLLMCommand(program: Command): void {
           logger.warn('Note: JSON import requires reconstruction (Phase 5)');
         }
       } catch (error) {
-        throw new CLIError('Failed to import memory', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to import memory', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -1010,9 +959,7 @@ export function registerLLMCommand(program: Command): void {
           logger.info(`  Reflexion: ${config.reflexion.enabled ? 'enabled' : 'disabled'}`);
         }
       } catch (error) {
-        throw new CLIError('Failed to get system status', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to get system status', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -1039,9 +986,7 @@ export function registerLLMCommand(program: Command): void {
 
         logger.info('✓ System reset complete');
       } catch (error) {
-        throw new CLIError('Failed to reset system', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to reset system', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -1074,9 +1019,7 @@ export function registerLLMCommand(program: Command): void {
 
         logger.info(`✓ System state exported to ${outputDir}`);
       } catch (error) {
-        throw new CLIError('Failed to export system', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to export system', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -1164,9 +1107,7 @@ export function registerLLMCommand(program: Command): void {
           logger.info('✅ All systems operational');
         }
       } catch (error) {
-        throw new CLIError('Failed to run diagnostics', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to run diagnostics', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -1192,9 +1133,7 @@ export function registerLLMCommand(program: Command): void {
 
         logger.info('\n✅ Optimization complete');
       } catch (error) {
-        throw new CLIError('Failed to optimize system', 1, {
-          details: error instanceof Error ? error.message : String(error),
-        });
+        throw new CLIError('Failed to optimize system', 1, error instanceof Error ? error.message : String(error));
       }
     });
 }

@@ -10,7 +10,7 @@
 import React, { useState } from 'react';
 import { Box, Text } from 'ink';
 import { ConsolePanel } from '../components/console/ConsolePanel.js';
-import { CommandParser, ParsedCommand } from '../services/CommandParser.js';
+import { CommandParserStatic, ParsedCommand } from '../services/CommandParser.js';
 import type { ProgressEvent } from '../services/CLIExecutor.js';
 
 export const ConsoleScreen: React.FC = () => {
@@ -23,11 +23,11 @@ export const ConsoleScreen: React.FC = () => {
 
     try {
       // Parse command
-      const parsed: ParsedCommand = CommandParser.parse(command);
+      const parsed: ParsedCommand = CommandParserStatic.parse(command);
       console.log(`Executing: ${parsed.command} ${parsed.subcommand || ''}`);
 
       // Execute command
-      await CommandParser.execute(parsed, (event: ProgressEvent) => {
+      await CommandParserStatic.execute(parsed, (event: ProgressEvent) => {
         // Progress events are automatically captured by OutputCapture
         if (event.type === 'complete' || event.type === 'error') {
           setIsExecuting(false);
@@ -47,7 +47,7 @@ export const ConsoleScreen: React.FC = () => {
       {/* Header */}
       <Box marginBottom={1}>
         <Text bold color="cyan">
-          \> Console
+          {'>'} Console
         </Text>
       </Box>
 

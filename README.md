@@ -3,7 +3,7 @@
 **Continuous Machine Cognition & AgentDB Integration**
 
 > [!IMPORTANT]
-> **Current Status: Production Ready (95%)**
+> **Current Status: 72% Production Ready** (Assessment: Jan 7, 2026)
 >
 > ✅ **Phases 1-3 (Complete)**: TUI, CLI, GRASP loop, Dreaming pipeline, AgentDB persistence, LLM integration
 >
@@ -12,6 +12,8 @@
 > ✅ **Phase 5 (Complete)**: CLI Runtime - All commands tested and operational
 >
 > ✅ **Puzzle Generator**: Seed-based randomized generation (4×4 to 25×25 grids)
+>
+> ⚠️ **Production Readiness**: [View Assessment](docs/PRODUCTION_READINESS_SUMMARY.md) | [Action Plan](docs/PRODUCTION_ACTION_PLAN.md)
 
 ## 🎯 Project Status
 
@@ -313,6 +315,9 @@ machine-dream/
 | Document | Description |
 | :--- | :--- |
 | [**User Guide**](docs/USER_GUIDE.md) | **Start Here!** Instructions for installation, usage, and configuration. |
+| [**Production Readiness Assessment**](docs/PRODUCTION_READINESS_SUMMARY.md) | **NEW!** Current production status (72%), critical gaps, and timeline. |
+| [**Production Action Plan**](docs/PRODUCTION_ACTION_PLAN.md) | **NEW!** 11-week roadmap to production readiness with detailed tasks. |
+| [**Immediate Actions**](docs/IMMEDIATE_ACTION_CHECKLIST.md) | **NEW!** Week 1 checklist for fixing critical test failures. |
 | [**Continuous Machine Thinking Research**](docs/continuous-machine-thinking-research.md) | The foundational research report detailing the theory, findings, and performance metrics. |
 | [**POC Strategy Report**](docs/poc-strategy-report.md) | Detailed strategic analysis and implementation roadmap. |
 | [**Source Types**](src/types.ts) | TypeScript definitions that serve as the "Code-as-Spec" for the architecture, utilizing native `agentdb` types. |

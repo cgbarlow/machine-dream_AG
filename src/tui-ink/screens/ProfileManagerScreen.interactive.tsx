@@ -29,7 +29,7 @@ interface Profile {
 }
 
 export const ProfileManagerScreenInteractive: React.FC = () => {
-  const [view, setView] = useState<View>('list');
+  const [view, _setView] = useState<View>('list');
   const [focusField, setFocusField] = useState<FocusField>('list');
 
   // Profile state

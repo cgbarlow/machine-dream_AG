@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 
 interface HelpOverlayProps {
   screen: string;
@@ -117,11 +117,15 @@ const helpContent: Record<string, HelpSection> = {
 export const HelpOverlay: React.FC<HelpOverlayProps> = ({ screen, onClose }) => {
   const help = helpContent[screen] || helpContent.Home;
 
+  // Handle keyboard input for closing overlay
+  useInput((input, key) => {
+    if (input === '?' || key.escape) {
+      onClose();
+    }
+  });
+
   return (
     <Box
-      position="absolute"
-      top={2}
-      left={10}
       width={60}
       flexDirection="column"
       borderStyle="double"

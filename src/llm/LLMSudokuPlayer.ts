@@ -37,14 +37,14 @@ export class LLMSudokuPlayer extends EventEmitter {
 
   constructor(
     private config: LLMConfig,
-    private agentMemory: AgentMemory
+    _agentMemory: AgentMemory
   ) {
     super();
     this.client = new LMStudioClient(config);
     this.promptBuilder = new PromptBuilder();
     this.responseParser = new ResponseParser();
     this.validator = new MoveValidator();
-    this.experienceStore = new ExperienceStore(agentMemory, config);
+    this.experienceStore = new ExperienceStore(_agentMemory, config);
   }
 
   /**

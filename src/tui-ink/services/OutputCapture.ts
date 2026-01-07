@@ -9,23 +9,37 @@
 
 export class OutputCapture {
   private static originalWrite: typeof process.stdout.write | null = null;
+  private static originalLog: typeof console.log | null = null;
   private static buffer: string[] = [];
   private static listeners: Set<(line: string) => void> = new Set();
   private static maxLines: number = 1000;
-  private static isCapturing: boolean = false;
+  private static isActive: boolean = false;
 
   /**
    * Start capturing stdout
    */
-  static start(): void {
-    if (this.isCapturing) {
+  static start(maxLines?: number): void {
+    if (maxLines !== undefined) {
+      this.maxLines = maxLines;
+    }
+
+    if (this.isActive) {
       return; // Already capturing
     }
 
-    // Save original write function
+    // Save original functions
     this.originalWrite = process.stdout.write.bind(process.stdout);
+    this.originalLog = console.log.bind(console);
 
-    // Patch process.stdout.write
+    // Patch console.log (more reliable in test environments)
+    console.log = (...args: any[]) => {
+      const text = args.map(arg => String(arg)).join(' ');
+      this.addLine(text);
+      // Also call original to maintain normal output
+      this.originalLog!(...args);
+    };
+
+    // Also patch process.stdout.write for direct writes
     process.stdout.write = ((chunk: any, ...args: any[]): boolean => {
       const text = typeof chunk === 'string' ? chunk : chunk.toString('utf8');
 
@@ -45,21 +59,29 @@ export class OutputCapture {
       return this.originalWrite!(chunk, ...args);
     }) as typeof process.stdout.write;
 
-    this.isCapturing = true;
+    this.isActive = true;
   }
 
   /**
    * Stop capturing and restore original stdout
    */
   static stop(): void {
-    if (!this.isCapturing || !this.originalWrite) {
+    if (!this.isActive) {
       return;
     }
 
-    // Restore original write function
-    process.stdout.write = this.originalWrite;
-    this.originalWrite = null;
-    this.isCapturing = false;
+    // Restore original functions
+    if (this.originalWrite) {
+      process.stdout.write = this.originalWrite;
+      this.originalWrite = null;
+    }
+
+    if (this.originalLog) {
+      console.log = this.originalLog;
+      this.originalLog = null;
+    }
+
+    this.isActive = false;
   }
 
   /**
@@ -76,8 +98,16 @@ export class OutputCapture {
       this.buffer.shift();
     }
 
-    // Notify all subscribers
-    this.listeners.forEach(callback => callback(timestampedLine));
+    // Notify all subscribers with raw line (not timestamped)
+    // Listeners can add their own timestamps if needed
+    this.listeners.forEach(callback => {
+      try {
+        callback(line);
+      } catch (error) {
+        // Silently ignore listener errors to prevent disrupting capture
+        console.error('[OutputCapture] Listener error:', error);
+      }
+    });
   }
 
   /**
@@ -115,7 +145,7 @@ export class OutputCapture {
     return {
       lines: this.buffer.length,
       maxLines: this.maxLines,
-      isCapturing: this.isCapturing,
+      isCapturing: this.isActive,
     };
   }
 }

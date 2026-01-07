@@ -68,7 +68,7 @@ export class LMStudioClient {
         );
       }
 
-      const data: ChatCompletionResponse = await response.json();
+      const data = await response.json() as ChatCompletionResponse;
 
       if (!data.choices || data.choices.length === 0) {
         throw new Error('No response from LM Studio');
@@ -116,7 +116,7 @@ export class LMStudioClient {
         return null;
       }
 
-      const data = await response.json();
+      const data = await response.json() as { data?: Array<{ id: string; object: string }> };
       if (data.data && data.data.length > 0) {
         return data.data[0];
       }

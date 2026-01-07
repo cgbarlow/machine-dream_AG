@@ -32,7 +32,7 @@ export const ConsolePanel: React.FC<ConsolePanelProps> = ({
   const [focusField, setFocusField] = useState<FocusField>('input');
 
   // Keyboard navigation
-  useInput((input, key) => {
+  useInput((_input, key) => {
     // Tab switches focus
     if (key.tab) {
       setFocusField((prev) => (prev === 'output' ? 'input' : 'output'));
