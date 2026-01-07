@@ -9,6 +9,9 @@ import { getCommandConfig } from '../global-options';
 import { logger } from '../logger';
 import { ConfigurationError } from '../errors';
 import { saveConfiguration } from '../config';
+import { ProfileValidator } from '../../llm/profiles/ProfileValidator.js';
+import type { LLMProfile } from '../../llm/profiles/types.js';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 
 export function registerConfigCommand(program: Command): void {
     const configCommand = new Command('config');
@@ -150,27 +153,99 @@ export function registerConfigCommand(program: Command): void {
                 const fileToValidate = configFile || '.machine-dream.json';
                 logger.info(`🔍 Validating configuration: ${fileToValidate}`);
 
-                // TODO: Implement actual validation
+                // Check if file exists
+                if (!existsSync(fileToValidate)) {
+                    throw new ConfigurationError(
+                        `Configuration file not found: ${fileToValidate}`,
+                        undefined,
+                        ['Check file path', 'Create configuration file first']
+                    );
+                }
+
+                // Read and parse configuration file
+                const configContent = readFileSync(fileToValidate, 'utf-8');
+                let parsedConfig: any;
+
+                try {
+                    parsedConfig = JSON.parse(configContent);
+                } catch (parseError) {
+                    throw new ConfigurationError(
+                        `Invalid JSON in configuration file: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+                        undefined,
+                        ['Check JSON syntax', 'Use a JSON validator']
+                    );
+                }
+
+                // Validate configuration structure
+                const errors: string[] = [];
+                const warnings: string[] = [];
+
+                // Check if it's an LLM profile configuration
+                if (parsedConfig.name && parsedConfig.provider) {
+                    // Validate as LLM profile
+                    const result = ProfileValidator.validate(parsedConfig as Partial<LLMProfile>);
+                    errors.push(...result.errors);
+                    warnings.push(...result.warnings);
+                } else {
+                    // Validate as system configuration
+                    if (!parsedConfig.memorySystem && !parsedConfig.agentdb) {
+                        errors.push('Configuration must contain either memorySystem or agentdb section');
+                    }
+
+                    if (parsedConfig.agentdb && !parsedConfig.agentdb.dbPath) {
+                        errors.push('agentdb.dbPath is required');
+                    }
+
+                    if (parsedConfig.solving && typeof parsedConfig.solving.maxIterations !== 'number') {
+                        errors.push('solving.maxIterations must be a number');
+                    }
+                }
+
+                const isValid = errors.length === 0;
+                const totalIssues = errors.length + warnings.length;
+
                 if (outputFormat === 'json') {
                     logger.json({
-                        status: 'success',
+                        status: isValid ? 'success' : 'error',
                         action: 'config-validate',
                         configFile: fileToValidate,
-                        valid: true,
-                        issuesFound: 0
+                        valid: isValid,
+                        errors,
+                        warnings,
+                        issuesFound: totalIssues
                     });
                 } else {
-                    console.log('✅ Configuration Valid');
+                    if (isValid) {
+                        console.log('✅ Configuration Valid');
+                    } else {
+                        console.log('❌ Configuration Invalid');
+                    }
                     console.log('─'.repeat(40));
                     console.log('File:', fileToValidate);
-                    console.log('Status:', 'Valid');
-                    console.log('Issues Found:', 0);
+                    console.log('Status:', isValid ? 'Valid' : 'Invalid');
+                    console.log('Errors:', errors.length);
+                    console.log('Warnings:', warnings.length);
+
+                    if (errors.length > 0) {
+                        console.log('\n❌ Errors:');
+                        errors.forEach((err, i) => console.log(`  ${i + 1}. ${err}`));
+                    }
+
+                    if (warnings.length > 0) {
+                        console.log('\n⚠️  Warnings:');
+                        warnings.forEach((warn, i) => console.log(`  ${i + 1}. ${warn}`));
+                    }
+                }
+
+                // Exit with error if validation failed
+                if (!isValid) {
+                    process.exitCode = 1;
                 }
             } catch (error) {
                 throw new ConfigurationError(
                     `Failed to validate configuration: ${error instanceof Error ? error.message : String(error)}`,
                     undefined,
-                    ['Check file syntax', 'Use --fix to auto-correct']
+                    ['Check file syntax', 'Verify file path', 'Use --fix to auto-correct']
                 );
             }
         });
@@ -183,19 +258,48 @@ export function registerConfigCommand(program: Command): void {
         .option('--format <format>', 'json|yaml', 'json')
         .option('--include-defaults', 'Include default values')
         .action(async (outputFile, options) => {
-            const { outputFormat } = getCommandConfig(exportCommand);
+            const { config, outputFormat } = getCommandConfig(exportCommand);
 
             try {
                 logger.info(`💾 Exporting configuration to: ${outputFile}`);
 
-                // TODO: Implement actual export
+                // Prepare configuration for export
+                let exportConfig = { ...config };
+
+                // Remove sensitive information if not including defaults
+                if (!options.includeDefaults) {
+                    // Remove default values and only export non-default settings
+                    // For now, export everything (full implementation would filter defaults)
+                }
+
+                // Format based on requested format
+                let content: string;
+                if (options.format === 'yaml') {
+                    // YAML export not implemented (would require yaml library)
+                    throw new ConfigurationError(
+                        'YAML export not yet implemented. Use JSON format instead.',
+                        undefined,
+                        ['Use --format json', 'Install yaml library for YAML support']
+                    );
+                } else {
+                    // JSON format
+                    content = JSON.stringify(exportConfig, null, 2);
+                }
+
+                // Write to file
+                writeFileSync(outputFile, content, 'utf-8');
+
+                // Count exported keys
+                const keyCount = Object.keys(exportConfig).length;
+
                 if (outputFormat === 'json') {
                     logger.json({
                         status: 'success',
                         action: 'config-export',
                         outputFile,
                         format: options.format,
-                        includeDefaults: !!options.includeDefaults
+                        includeDefaults: !!options.includeDefaults,
+                        keysExported: keyCount
                     });
                 } else {
                     console.log('💾 Configuration Exported');
@@ -203,12 +307,14 @@ export function registerConfigCommand(program: Command): void {
                     console.log('Output File:', outputFile);
                     console.log('Format:', options.format);
                     console.log('Include Defaults:', options.includeDefaults ? 'Yes' : 'No');
+                    console.log('Keys Exported:', keyCount);
+                    console.log('\n✅ Configuration saved successfully');
                 }
             } catch (error) {
                 throw new ConfigurationError(
                     `Failed to export configuration: ${error instanceof Error ? error.message : String(error)}`,
                     undefined,
-                    ['Check file permissions', 'Verify output path']
+                    ['Check file permissions', 'Verify output path', 'Use absolute path if needed']
                 );
             }
         });

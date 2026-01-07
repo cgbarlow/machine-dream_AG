@@ -9,6 +9,8 @@ import { getCommandConfig } from '../global-options';
 import { SolveOptions } from '../types';
 import { logger } from '../logger';
 import { SystemOrchestrator } from '../../orchestration/SystemOrchestrator';
+import { DreamingController } from '../../consolidation/DreamingController';
+import { AgentMemory } from '../../memory/AgentMemory';
 import { SolveError } from '../errors';
 import { OrchestratorConfig } from '../../types';
 import fs from 'fs/promises';
@@ -160,8 +162,33 @@ export function registerSolveCommand(program: Command): void {
 
                 // Trigger dreaming if requested
                 if (options.dreamAfter) {
-                    logger.info('🌙 Triggering dream cycle after solving...');
-                    // TODO: Implement dream cycle integration
+                    logger.info('🌙 Running dream cycle consolidation...');
+
+                    // Initialize memory and dreaming controller
+                    const memory = new AgentMemory(orchestratorConfig);
+                    const dreamingController = new DreamingController(memory, orchestratorConfig);
+
+                    // Run dream cycle with the session ID (fallback to generated ID)
+                    const sessionIdForDream = solveOptions.sessionId || `solve-${Date.now()}`;
+                    const knowledge = await dreamingController.runDreamCycle(sessionIdForDream);
+
+                    // Display consolidation results
+                    if (outputFormat === 'json') {
+                        logger.json({
+                            dreamCycle: {
+                                sessionId: sessionIdForDream,
+                                patternsConsolidated: knowledge.patterns.length,
+                                compressionRatio: knowledge.compressionRatio,
+                                verificationStatus: knowledge.verificationStatus
+                            }
+                        });
+                    } else {
+                        console.log('\n🌙 Dream Cycle Complete');
+                        console.log('─'.repeat(50));
+                        console.log(`✨ Consolidated: ${knowledge.patterns.length} patterns`);
+                        console.log(`📉 Compression: ${knowledge.compressionRatio.toFixed(2)}x`);
+                        console.log(`🔍 Status: ${knowledge.verificationStatus}`);
+                    }
                 }
 
             } catch (error) {

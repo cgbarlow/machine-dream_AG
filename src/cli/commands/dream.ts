@@ -8,6 +8,36 @@ import { Command } from 'commander';
 import { getCommandConfig } from '../global-options';
 import { logger } from '../logger';
 import { ConfigurationError } from '../errors';
+import { AgentMemory } from '../../memory/AgentMemory.js';
+import { DreamingController } from '../../consolidation/DreamingController.js';
+import type { AgentDBConfig } from '../../types.js';
+import { join } from 'path';
+import { homedir } from 'os';
+
+// Helper to create default AgentDB config for dream operations
+function createDefaultDreamConfig(): AgentDBConfig {
+  return {
+    dbPath: join(homedir(), '.machine-dream/agentdb'),
+    preset: 'large' as const,
+    rlPlugin: {
+      type: 'decision-transformer' as const,
+      name: 'sudoku-solver' as const,
+      stateDim: 81,
+      actionDim: 9,
+      sequenceLength: 20
+    },
+    agentDbPath: join(homedir(), '.machine-dream/agentdb'),
+    embeddingModel: 'Xenova/all-MiniLM-L6-v2',
+    enableReasoningBank: true,
+    enableReflexion: true,
+    enableSkillLibrary: false,
+    quantization: 'scalar' as const,
+    indexing: 'hnsw' as const,
+    cacheEnabled: true,
+    reflexion: { enabled: true, maxEntries: 1000, similarityThreshold: 0.8 },
+    skillLibrary: { enabled: false, minSuccessRate: 0.8, maxSkills: 100, autoConsolidate: false }
+  };
+}
 
 export function registerDreamCommand(program: Command): void {
     const dreamCommand = new Command('dream');
@@ -31,27 +61,61 @@ export function registerDreamCommand(program: Command): void {
             try {
                 logger.info('🌙 Starting dream cycle...');
 
-                // TODO: Implement actual dream cycle
+                // Initialize memory and dreaming controller with real backends
+                const memoryConfig = createDefaultDreamConfig();
+                const memory = new AgentMemory(memoryConfig);
+                const dreamingController = new DreamingController(memory, memoryConfig);
+
+                // Parse session IDs from options
+                const sessionIds = options.sessions?.split(',') || ['default-session'];
+
+                let totalPatterns = 0;
+                let totalCompressionRatio = 0;
+                const results = [];
+
+                // Run dream cycle for each session
+                for (const sessionId of sessionIds) {
+                    const knowledge = await dreamingController.runDreamCycle(sessionId);
+                    totalPatterns += knowledge.patterns.length;
+                    totalCompressionRatio += knowledge.compressionRatio;
+
+                    results.push({
+                        sessionId,
+                        patterns: knowledge.patterns.length,
+                        compressionRatio: knowledge.compressionRatio,
+                        verificationStatus: knowledge.verificationStatus
+                    });
+                }
+
+                const avgCompressionRatio = totalCompressionRatio / sessionIds.length;
+
                 if (outputFormat === 'json') {
                     logger.json({
                         status: 'success',
                         action: 'dream-run',
-                        sessions: options.sessions || 'all recent',
+                        sessions: sessionIds,
                         phases: options.phases || 'all',
-                        knowledgeConsolidated: 8
+                        knowledgeConsolidated: totalPatterns,
+                        avgCompressionRatio: avgCompressionRatio.toFixed(2),
+                        results
                     });
                 } else {
                     console.log('🌙 Dream Cycle Complete');
                     console.log('─'.repeat(40));
-                    console.log('Sessions:', options.sessions || 'all recent');
+                    console.log('Sessions:', sessionIds.join(', '));
                     console.log('Phases:', options.phases || 'all');
-                    console.log('Knowledge Consolidated:', 8, 'patterns');
+                    console.log('Knowledge Consolidated:', totalPatterns, 'patterns');
+                    console.log('Avg Compression Ratio:', avgCompressionRatio.toFixed(2) + 'x');
+                    console.log('\nSession Details:');
+                    results.forEach(r => {
+                        console.log(`  ${r.sessionId}: ${r.patterns} patterns (${r.compressionRatio.toFixed(2)}x compression)`);
+                    });
                 }
             } catch (error) {
                 throw new ConfigurationError(
                     `Failed to run dream cycle: ${error instanceof Error ? error.message : String(error)}`,
                     undefined,
-                    ['Check session IDs', 'Try fewer phases']
+                    ['Check session IDs', 'Try fewer phases', 'Verify database path']
                 );
             }
         });
@@ -106,32 +170,60 @@ export function registerDreamCommand(program: Command): void {
             try {
                 logger.info('📊 Checking dream status...');
 
-                // TODO: Implement actual status check
-                const mockCycles = [
-                    { id: 'dream-001', timestamp: '2026-01-05T10:00:00Z', knowledgeGained: 5 },
-                    { id: 'dream-002', timestamp: '2026-01-05T12:00:00Z', knowledgeGained: 8 }
-                ];
+                // Initialize memory to query dream cycle history
+                const memoryConfig = createDefaultDreamConfig();
+                const memory = new AgentMemory(memoryConfig);
+
+                // Query recent dream cycles from metadata
+                const allCycles = await memory.reasoningBank.queryMetadata('dream-cycle', {});
+
+                // Sort by timestamp (most recent first)
+                const sortedCycles = allCycles
+                    .map((cycle: any) => ({
+                        id: cycle.sessionId || 'unknown',
+                        timestamp: cycle.timestamp || Date.now(),
+                        knowledgeGained: cycle.patterns || 0,
+                        compressionRatio: cycle.compressionRatio || 0,
+                        verificationStatus: cycle.verificationStatus || 'unknown'
+                    }))
+                    .sort((a, b) => b.timestamp - a.timestamp)
+                    .slice(0, options.last || 5);
+
+                const cycleCount = sortedCycles.length;
+                const totalKnowledge = sortedCycles.reduce((sum, c) => sum + c.knowledgeGained, 0);
 
                 if (outputFormat === 'json') {
                     logger.json({
                         status: 'success',
                         action: 'dream-status',
-                        lastCycles: mockCycles.slice(0, options.last || 5)
+                        totalCycles: cycleCount,
+                        totalKnowledge,
+                        lastCycles: sortedCycles
                     });
                 } else {
                     console.log('📊 Dream Status');
                     console.log('─'.repeat(40));
-                    mockCycles.slice(0, options.last || 5).forEach(cycle => {
-                        console.log(`Cycle: ${cycle.id}`);
-                        console.log(`  Time: ${new Date(cycle.timestamp).toLocaleString()}`);
-                        console.log(`  Knowledge: ${cycle.knowledgeGained} patterns`);
-                    });
+                    console.log(`Total Dream Cycles: ${cycleCount}`);
+                    console.log(`Total Knowledge Consolidated: ${totalKnowledge} patterns`);
+
+                    if (sortedCycles.length > 0) {
+                        console.log('\nRecent Cycles:');
+                        sortedCycles.forEach(cycle => {
+                            console.log(`\nCycle: ${cycle.id}`);
+                            console.log(`  Time: ${new Date(cycle.timestamp).toLocaleString()}`);
+                            console.log(`  Knowledge: ${cycle.knowledgeGained} patterns`);
+                            console.log(`  Compression: ${cycle.compressionRatio.toFixed(2)}x`);
+                            console.log(`  Status: ${cycle.verificationStatus}`);
+                        });
+                    } else {
+                        console.log('\nNo dream cycles found. Run "machine-dream dream run" to start consolidation.');
+                    }
                 }
             } catch (error) {
                 throw new ConfigurationError(
                     `Failed to get dream status: ${error instanceof Error ? error.message : String(error)}`,
                     undefined,
-                    ['Check system status', 'Try again later']
+                    ['Check database path', 'Verify system initialization', 'Try again later']
                 );
             }
         });
