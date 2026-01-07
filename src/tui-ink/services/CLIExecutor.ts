@@ -15,6 +15,7 @@ export interface SolveParams {
   memorySystem: 'agentdb' | 'reasoningbank';
   enableRL: boolean;
   enableReflexion: boolean;
+  dreamAfter?: boolean;
   maxIterations: number;
   sessionId?: string;
 }
@@ -37,7 +38,7 @@ export interface ProgressEventData {
 }
 
 export interface ProgressEvent {
-  type: 'start' | 'progress' | 'iteration' | 'complete' | 'error';
+  type: 'start' | 'progress' | 'iteration' | 'complete' | 'error' | 'dream-start' | 'dream-complete';
   message: string;
   percentage?: number;
   data?: ProgressEventData | any;  // Allow any type of data
@@ -147,6 +148,47 @@ export class CLIExecutor {
         currentGrid: finalGrid,
         currentStrategy: 'Complete',
       });
+
+      // Auto-trigger dream cycle if requested and solve was successful
+      if (params.dreamAfter && result.success) {
+        try {
+          const { DreamingController } = await import('../../consolidation/DreamingController.js');
+          const { AgentMemory } = await import('../../memory/AgentMemory.js');
+
+          onProgress({
+            type: 'dream-start',
+            message: 'Starting dream cycle consolidation...',
+            percentage: 92,
+          });
+
+          // Initialize memory and dreaming controller
+          const memory = new AgentMemory(orchestratorConfig);
+          const dreamingController = new DreamingController(memory, orchestratorConfig);
+
+          // Run dream cycle with session ID
+          const sessionId = params.sessionId || `solve-${Date.now()}`;
+          const knowledge = await dreamingController.runDreamCycle(sessionId);
+
+          onProgress({
+            type: 'dream-complete',
+            message: `Dream cycle complete: ${knowledge.patterns.length} patterns consolidated`,
+            percentage: 98,
+            data: {
+              sessionId,
+              patternsConsolidated: knowledge.patterns.length,
+              compressionRatio: knowledge.compressionRatio,
+              verificationStatus: knowledge.verificationStatus,
+            },
+          });
+        } catch (dreamError) {
+          // Don't fail the whole solve if dream cycle fails
+          onProgress({
+            type: 'progress',
+            message: `Dream cycle error: ${dreamError instanceof Error ? dreamError.message : 'Unknown error'}`,
+            percentage: 95,
+          });
+        }
+      }
 
       onProgress({
         type: 'complete',

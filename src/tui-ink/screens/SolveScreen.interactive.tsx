@@ -11,7 +11,7 @@ import { CLIExecutor, SolveParams, ProgressEvent } from '../services/CLIExecutor
 import { PuzzleGrid } from '../components/PuzzleGrid.js';
 import { SolveProgress } from '../components/SolveProgress.js';
 
-type FocusField = 'puzzleFile' | 'memorySystem' | 'enableRL' | 'enableReflexion' | 'maxIterations' | 'execute';
+type FocusField = 'puzzleFile' | 'memorySystem' | 'enableRL' | 'enableReflexion' | 'dreamAfter' | 'maxIterations' | 'execute';
 
 export const SolveScreenInteractive: React.FC = () => {
   const [focusField, setFocusField] = useState<FocusField>('puzzleFile');
@@ -19,12 +19,14 @@ export const SolveScreenInteractive: React.FC = () => {
   const [memorySystem] = useState<'agentdb' | 'reasoningbank'>('agentdb');
   const [enableRL, setEnableRL] = useState(true);
   const [enableReflexion, setEnableReflexion] = useState(true);
+  const [dreamAfter, setDreamAfter] = useState(false);
   const [maxIterations, setMaxIterations] = useState('100');
   const [isExecuting, setIsExecuting] = useState(false);
   const [progress, setProgress] = useState<ProgressEvent | null>(null);
   const [availablePuzzles, setAvailablePuzzles] = useState<string[]>([]);
   const [startTime, setStartTime] = useState<number>(0);
   const [elapsedTime, setElapsedTime] = useState<number>(0);
+  const [dreamResult, setDreamResult] = useState<any>(null);
 
   // Update elapsed time when executing
   useEffect(() => {
@@ -53,11 +55,18 @@ export const SolveScreenInteractive: React.FC = () => {
       memorySystem,
       enableRL,
       enableReflexion,
+      dreamAfter,
       maxIterations: parseInt(maxIterations) || 100,
     };
 
     await CLIExecutor.executeSolve(params, (event) => {
       setProgress(event);
+
+      // Store dream cycle results if available
+      if (event.type === 'dream-complete' && event.data) {
+        setDreamResult(event.data);
+      }
+
       if (event.type === 'complete' || event.type === 'error') {
         setIsExecuting(false);
       }
@@ -70,7 +79,7 @@ export const SolveScreenInteractive: React.FC = () => {
 
     // Tab navigation (forward and backward with Shift)
     if (key.tab) {
-      const fields: FocusField[] = ['puzzleFile', 'memorySystem', 'enableRL', 'enableReflexion', 'maxIterations', 'execute'];
+      const fields: FocusField[] = ['puzzleFile', 'memorySystem', 'enableRL', 'enableReflexion', 'dreamAfter', 'maxIterations', 'execute'];
       const currentIndex = fields.indexOf(focusField);
 
       if (key.shift) {
@@ -91,6 +100,7 @@ export const SolveScreenInteractive: React.FC = () => {
     if (input === ' ') {
       if (focusField === 'enableRL') setEnableRL(!enableRL);
       if (focusField === 'enableReflexion') setEnableReflexion(!enableReflexion);
+      if (focusField === 'dreamAfter') setDreamAfter(!dreamAfter);
     }
   });
 
@@ -156,6 +166,15 @@ export const SolveScreenInteractive: React.FC = () => {
             </Text>
           </Box>
 
+          {/* Dream After Solve (Week 2 Day 5 Bonus) */}
+          <Box marginBottom={1}>
+            <Text color={focusField === 'dreamAfter' ? 'green' : 'gray'}>
+              {focusField === 'dreamAfter' ? '▶ ' : '  '}
+              Run Dream After Solve: {dreamAfter ? <Text color="green">✓</Text> : <Text color="red">✗</Text>}
+              {dreamAfter && <Text color="yellow"> ✨ NEW</Text>}
+            </Text>
+          </Box>
+
           {/* Max Iterations */}
           <Box marginBottom={1}>
             <Text color={focusField === 'maxIterations' ? 'green' : 'gray'}>
@@ -209,7 +228,7 @@ export const SolveScreenInteractive: React.FC = () => {
       )}
 
       {/* Simple Progress (before visualization) */}
-      {progress && progress.type !== 'iteration' && progress.type !== 'complete' && (
+      {progress && progress.type !== 'iteration' && progress.type !== 'complete' && progress.type !== 'dream-complete' && (
         <Box
           flexDirection="column"
           borderStyle="single"
@@ -224,6 +243,30 @@ export const SolveScreenInteractive: React.FC = () => {
               Progress: {progress.percentage}%
             </Text>
           )}
+        </Box>
+      )}
+
+      {/* Dream Cycle Results */}
+      {dreamResult && (
+        <Box
+          flexDirection="column"
+          borderStyle="double"
+          borderColor="magenta"
+          padding={1}
+          marginTop={1}
+        >
+          <Text bold color="magenta">
+            🌙 Dream Cycle Complete
+          </Text>
+          <Text color="cyan">
+            ✨ Consolidated: <Text color="green">{dreamResult.patternsConsolidated || 0}</Text> patterns
+          </Text>
+          <Text color="cyan">
+            📉 Compression: <Text color="green">{dreamResult.compressionRatio?.toFixed(2) || '0.00'}x</Text>
+          </Text>
+          <Text color="cyan">
+            🔍 Status: <Text color={dreamResult.verificationStatus === 'verified' ? 'green' : 'yellow'}>{dreamResult.verificationStatus || 'unknown'}</Text>
+          </Text>
         </Box>
       )}
 
