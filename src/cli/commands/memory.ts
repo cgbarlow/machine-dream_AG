@@ -5,9 +5,9 @@
  */
 
 import { Command } from 'commander';
-import { getCommandConfig } from '../global-options';
-import { logger } from '../logger';
-import { ConfigurationError } from '../errors';
+import { getCommandConfig } from '../global-options.js';
+import { logger } from '../logger.js';
+import { ConfigurationError } from '../errors.js';
 import { AgentMemory } from '../../memory/AgentMemory.js';
 import { DreamingController } from '../../consolidation/DreamingController.js';
 import type { AgentDBConfig } from '../../types.js';

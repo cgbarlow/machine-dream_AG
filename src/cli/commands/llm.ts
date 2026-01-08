@@ -9,6 +9,7 @@ import { logger } from '../logger.js';
 import { CLIError } from '../errors.js';
 import { LLMSudokuPlayer } from '../../llm/index.js';
 import { DEFAULT_LLM_CONFIG, validateConfig, getLLMConfig } from '../../llm/config.js';
+import { BoardFormatter } from '../../llm/BoardFormatter.js';
 import type { LLMConfig } from '../../llm/types.js';
 import { AgentMemory } from '../../memory/AgentMemory.js';
 import type { AgentDBConfig } from '../../types.js';
@@ -393,8 +394,12 @@ export function registerLLMCommand(program: Command): void {
     .option('--no-memory', 'Disable memory (baseline mode)')
     .option('--model <model>', 'Override model name')
     .option('--endpoint <url>', 'Override LLM endpoint')
+    .option('--timeout <ms>', 'Request timeout in milliseconds', '120000')
     .option('--max-moves <n>', 'Maximum moves before abandoning', '200')
     .option('--visualize', 'Show live solving visualization')
+    .option('--debug', 'Show detailed debug output including prompts')
+    .option('--include-reasoning', 'Include reasoning snippets in move history (default: off)')
+    .option('--history-limit <n>', 'Limit move history to last N moves (default: 20, 0=unlimited)', '20')
     .action(async (puzzleFile, options) => {
       try {
         logger.info('🤖 Starting LLM Sudoku Player...');
@@ -420,11 +425,42 @@ export function registerLLMCommand(program: Command): void {
           config.baseUrl = options.endpoint;
           logger.info(`Endpoint override: ${options.endpoint}`);
         }
+        if (options.timeout) {
+          config.timeout = parseInt(options.timeout, 10);
+          logger.info(`Timeout override: ${config.timeout}ms`);
+        }
 
         // Memory setting
         config.memoryEnabled = options.memory !== false;
 
+        // Reasoning in move history setting
+        config.includeReasoning = options.includeReasoning === true;
+
+        // History limit setting
+        config.maxHistoryMoves = parseInt(options.historyLimit, 10);
+
         validateConfig(config);
+
+        /**
+         * Display sudoku board with highlighting (DRY - uses BoardFormatter)
+         */
+        const displayBoard = (grid: number[][], lastMove?: { row: number; col: number; value: number }) => {
+          logger.info('\n  📋 Current Board:');
+          const boardStr = BoardFormatter.formatForCLI(grid, lastMove);
+          boardStr.split('\n').forEach((line: string) => logger.info(`  ${line}`));
+        };
+
+        /**
+         * Display quick stats
+         */
+        const displayStats = (session: any, currentGrid: number[][]) => {
+          const emptyCells = BoardFormatter.countEmptyCells(currentGrid);
+          const accuracy = session.totalMoves > 0
+            ? ((session.correctMoves / session.totalMoves) * 100).toFixed(1)
+            : '0.0';
+
+          logger.info(`   📊 Moves: ${session.totalMoves} | ✓ Correct: ${session.correctMoves} | ✗ Invalid: ${session.invalidMoves} | ~ Wrong: ${session.validButWrongMoves} | Accuracy: ${accuracy}% | Empty: ${emptyCells}`);
+        };
 
         // Load puzzle
         const puzzlePath = resolve(puzzleFile);
@@ -437,6 +473,11 @@ export function registerLLMCommand(program: Command): void {
         // Initialize player
         const memory = new AgentMemory(createDefaultMemoryConfig());
         const player = new LLMSudokuPlayer(config, memory);
+
+        // Enable streaming if debug or visualize enabled
+        if (options.debug || options.visualize) {
+          player.enableStreaming(true);
+        }
 
         // Health check
         logger.info(`Checking LM Studio connection at ${config.baseUrl}...`);
@@ -458,30 +499,233 @@ export function registerLLMCommand(program: Command): void {
           `Memory: ${config.memoryEnabled ? '✓ ENABLED' : '✗ DISABLED (baseline)'}`
         );
 
-        // Play puzzle
-        logger.info('\n🎮 Starting puzzle solve...\n');
+        // Set up event listeners for debugging
+        let moveCounter = 0;
 
-        const session = await player.playPuzzle(
-          puzzleData.id || 'puzzle-1',
-          puzzleData.initial,
-          puzzleData.solution,
-          parseInt(options.maxMoves, 10)
-        );
+        player.on('llm:request', ({ prompt }: { prompt: string; messages: any[] }) => {
+          if (options.debug) {
+            logger.info(`\n📤 Sending request to LLM...`);
+            logger.info(`Prompt length: ${prompt.length} characters`);
+            logger.info(`\n--- FULL PROMPT ---\n${prompt}\n--- END PROMPT ---\n`);
+          }
+          if (options.visualize || options.debug) {
+            // Show move history section if it exists
+            const historyMatch = prompt.match(/YOUR PREVIOUS ATTEMPTS ON THIS PUZZLE:\n([\s\S]*?)\n\n(?:FORBIDDEN|Empty)/);
+            if (historyMatch && historyMatch[1]) {
+              logger.info(`\n📜 Move History:`);
+              historyMatch[1].split('\n').forEach((line: string) => {
+                logger.info(`   ${line}`);
+              });
+            }
 
-        // Display results
-        logger.info('\n📊 Session Results:');
-        logger.info(`  Solved: ${session.solved ? '✓ YES' : '✗ NO'}`);
-        logger.info(`  Total moves: ${session.totalMoves}`);
-        logger.info(`  Correct moves: ${session.correctMoves}`);
-        logger.info(`  Invalid moves: ${session.invalidMoves}`);
-        logger.info(`  Valid but wrong: ${session.validButWrongMoves}`);
+            // Show forbidden moves section if it exists
+            const forbiddenMatch = prompt.match(/FORBIDDEN MOVES \(do not attempt again\):\n([\s\S]*?)\n\nEmpty cells/);
+            if (forbiddenMatch && forbiddenMatch[1]) {
+              logger.info(`\n🚫 Forbidden Moves:`);
+              forbiddenMatch[1].split('\n').forEach((line: string) => {
+                if (line.trim()) logger.info(`   ${line}`);
+              });
+            }
 
-        const accuracy =
-          session.totalMoves > 0
-            ? ((session.correctMoves / session.totalMoves) * 100).toFixed(1)
-            : '0.0';
-        logger.info(`  Accuracy: ${accuracy}%`);
+            logger.info(`\n💭 LLM thinking...`);
+            process.stdout.write('   ');
+          }
+        });
+
+        player.on('llm:stream', ({ token }: { token: string }) => {
+          if (options.visualize || options.debug) {
+            process.stdout.write(token);
+          }
+        });
+
+        player.on('llm:error', ({ error }: { error: any }) => {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          logger.error(`\n❌ LLM Error: ${errorMsg}`);
+
+          if (error instanceof Error && error.stack && options.debug) {
+            logger.info(error.stack);
+          }
+        });
+
+        player.on('session:abandoned', ({ session, reason }: { session: any; reason: string }) => {
+          logger.warn(`\n⚠️  Session abandoned: ${reason}`);
+          logger.warn(`   Total moves attempted: ${session.totalMoves}`);
+        });
+
+        player.on('llm:response', () => {
+          if (options.visualize || options.debug) {
+            // Add newline after streaming
+            process.stdout.write('\n');
+          }
+        });
+
+        player.on('llm:parse_failure', ({ error, rawResponse }: { error: string; rawResponse: string }) => {
+          logger.warn(`\n⚠️  Parse failure (move ${moveCounter + 1}): ${error}`);
+          if (options.debug) {
+            logger.info('Raw response:');
+            logger.info(rawResponse.substring(0, 500));
+          }
+        });
+
+        player.on('llm:move_proposed', ({ move }: { move: any }) => {
+          moveCounter++;
+          if (options.visualize) {
+            logger.info(`\n🎯 Move ${moveCounter}: (${move.row},${move.col})=${move.value}`);
+            if (move.reasoning && options.debug) {
+              logger.info(`   Reasoning: ${move.reasoning.substring(0, 150)}...`);
+            }
+          } else {
+            // Show progress dots
+            process.stdout.write('.');
+          }
+        });
+
+        player.on('llm:move_validated', ({ experience }: { experience: any }) => {
+          if (options.visualize) {
+            const emoji = experience.validation.isCorrect ? '✓' : experience.validation.isValid ? '~' : '✗';
+            logger.info(`   ${emoji} ${experience.validation.outcome.toUpperCase()}`);
+            if (experience.validation.error) {
+              logger.info(`   Error: ${experience.validation.error}`);
+            }
+
+            // Update cumulative stats
+            cumulativeStats.totalMoves++;
+            if (experience.validation.isCorrect) {
+              cumulativeStats.correctMoves++;
+            } else if (experience.validation.isValid) {
+              cumulativeStats.validButWrongMoves++;
+            } else {
+              cumulativeStats.invalidMoves++;
+            }
+
+            // Update grid and display ONLY if move was CORRECT
+            if (experience.validation.isCorrect && experience.move.row > 0) {
+              currentGrid[experience.move.row - 1][experience.move.col - 1] = experience.move.value;
+              displayBoard(currentGrid, experience.move);
+            }
+
+            // Always display updated stats
+            displayStats(cumulativeStats, currentGrid);
+          }
+        });
+
+        // Display initial board
+        logger.info('\n🎮 Starting puzzle solve...');
+        if (options.visualize) {
+          displayBoard(puzzleData.initial);
+          displayStats({ totalMoves: 0, correctMoves: 0, invalidMoves: 0, validButWrongMoves: 0 }, puzzleData.initial);
+        } else {
+          logger.info('Progress: ');
+        }
+
+        // Track current grid state for visualization
+        let currentGrid = puzzleData.initial.map((row: number[]) => [...row]);
+
+        // Track cumulative stats for display
+        let cumulativeStats = {
+          totalMoves: 0,
+          correctMoves: 0,
+          invalidMoves: 0,
+          validButWrongMoves: 0
+        };
+
+        let session;
+        let exitReason = 'COMPLETED';
+        let exitCode = 0;
+
+        try {
+          session = await player.playPuzzle(
+            puzzleData.id || 'puzzle-1',
+            puzzleData.initial,
+            puzzleData.solution,
+            parseInt(options.maxMoves, 10)
+          );
+
+          if (!options.visualize) {
+            process.stdout.write('\n');
+          }
+
+          // Display results
+          logger.info('\n📊 Session Results:');
+          logger.info(`  Solved: ${session.solved ? '✓ YES' : '✗ NO'}`);
+          logger.info(`  Total moves: ${session.totalMoves}`);
+          logger.info(`  Correct moves: ${session.correctMoves}`);
+          logger.info(`  Invalid moves: ${session.invalidMoves}`);
+          logger.info(`  Valid but wrong: ${session.validButWrongMoves}`);
+
+          const accuracy =
+            session.totalMoves > 0
+              ? ((session.correctMoves / session.totalMoves) * 100).toFixed(1)
+              : '0.0';
+          logger.info(`  Accuracy: ${accuracy}%`);
+
+          // Set exit reason
+          if (session.solved) {
+            exitReason = 'SOLVED';
+          } else if (session.abandoned) {
+            exitReason = 'ABANDONED';
+            exitCode = 1;
+          }
+        } catch (error) {
+          // Determine exit reason from error
+          const errorMsg = error instanceof Error ? error.message : String(error);
+
+          if (errorMsg.includes('timeout')) {
+            exitReason = 'TIMEOUT';
+            exitCode = 124; // Standard timeout exit code
+          } else if (errorMsg.includes('connection') || errorMsg.includes('not running')) {
+            exitReason = 'CONNECTION_FAILED';
+            exitCode = 2;
+          } else if (errorMsg.includes('parse')) {
+            exitReason = 'PARSE_ERROR';
+            exitCode = 3;
+          } else {
+            exitReason = 'ERROR';
+            exitCode = 1;
+          }
+
+          // Display session summary if we got any moves
+          if (moveCounter > 0) {
+            logger.info('\n📊 Session Results (Incomplete):');
+            logger.info(`  Total moves attempted: ${moveCounter}`);
+            logger.info(`  Correct moves: ${cumulativeStats.correctMoves}`);
+            logger.info(`  Invalid moves: ${cumulativeStats.invalidMoves}`);
+            logger.info(`  Valid but wrong: ${cumulativeStats.validButWrongMoves}`);
+
+            const accuracy = moveCounter > 0
+              ? ((cumulativeStats.correctMoves / moveCounter) * 100).toFixed(1)
+              : '0.0';
+            logger.info(`  Accuracy: ${accuracy}%`);
+          }
+
+          // Show exit summary
+          logger.info('\n' + '─'.repeat(50));
+          logger.info(`Session ended: ${exitReason}`);
+          if (errorMsg.includes('timeout')) {
+            logger.info(`Reason: LLM response exceeded ${config.timeout}ms (circular reasoning detected)`);
+          } else {
+            logger.info(`Reason: ${errorMsg}`);
+          }
+          logger.info(`Exit code: ${exitCode}`);
+          logger.info('─'.repeat(50));
+
+          // Re-throw for CLI error handler
+          if (error instanceof CLIError) {
+            throw error;
+          }
+          throw new CLIError('Session terminated', exitCode, errorMsg);
+        }
+
+        // Show exit summary for successful completion
+        logger.info('\n' + '─'.repeat(50));
+        logger.info(`Session ended: ${exitReason}`);
+        if (session) {
+          logger.info(`Reason: ${session.solved ? 'Puzzle solved successfully' : session.abandoned ? 'Max moves reached' : 'Completed'}`);
+        }
+        logger.info(`Exit code: ${exitCode}`);
+        logger.info('─'.repeat(50));
       } catch (error) {
+        // Final catch for any unhandled errors
         if (error instanceof CLIError) {
           throw error;
         }

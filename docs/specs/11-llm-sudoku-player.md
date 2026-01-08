@@ -147,6 +147,7 @@ src/llm/
 ├── ExperienceStore.ts      # Persists experiences to AgentDB
 ├── LLMSudokuPlayer.ts      # Main orchestration class
 ├── DreamingConsolidator.ts # Pattern synthesis
+├── BoardFormatter.ts       # Shared grid display utility (DRY)
 ├── profiles/               # Profile Management (Spec 13)
 │   ├── LLMProfileManager.ts # Profile CRUD operations
 │   ├── ProfileStorage.ts    # Profile persistence
@@ -154,6 +155,23 @@ src/llm/
 ├── types.ts                # LLM-specific type definitions
 └── config.ts               # LM Studio configuration
 ```
+
+### BoardFormatter Utility
+
+**Purpose**: Shared utility for formatting Sudoku grids across all components (DRY principle).
+
+**Used By**:
+- `PromptBuilder` - Plain text grids for LLM prompts
+- CLI commands - Color-highlighted grids for terminal display
+- TUI components - Can use for text fallback rendering
+
+**Methods**:
+- `format(grid, options)` - Core formatting with highlighting support
+- `formatForPrompt(grid)` - Plain text for LLM (no ANSI colors)
+- `formatForCLI(grid, lastMove?)` - Terminal display with green highlighting
+- `countEmptyCells(grid)` - Utility to count empty cells
+
+**Design Pattern**: Static utility class to avoid code duplication
 
 ## Interfaces
 
@@ -170,13 +188,14 @@ interface LLMConfig {
   model: string;            // 'qwen3-30b' or 'local-model'
 
   // Generation parameters
-  temperature: number;      // 0.7 default
-  maxTokens: number;        // 1024 for reasoning
+  temperature: number;      // 0.3 default (reduced 2026-01-08 for deterministic reasoning)
+  maxTokens: number;        // 2048 default (increased 2026-01-08 evening to allow complete reasoning)
   timeout: number;          // 60000ms for large models
 
   // Learning settings
   memoryEnabled: boolean;   // Toggle for A/B testing
-  maxHistoryMoves: number;  // How many past moves to include
+  maxHistoryMoves: number;  // Limit move history to last N moves (20 default, 0=unlimited)
+  includeReasoning: boolean; // Include LLM's reasoning in move history (default: off)
 
   // No hints, no fallback - these are NOT configurable
 }
@@ -240,57 +259,85 @@ interface PlaySession {
 
 ## Prompt Engineering
 
-### System Prompt
+### System Prompt (Updated 2026-01-08 - Simplified)
 
 ```
-You are learning to solve Sudoku puzzles through practice and feedback.
+You are solving Sudoku puzzles through trial and error.
 
 RULES:
-- A 9x9 grid divided into nine 3x3 boxes
-- Each row must contain digits 1-9 exactly once
-- Each column must contain digits 1-9 exactly once
-- Each 3x3 box must contain digits 1-9 exactly once
+- 9x9 grid, nine 3x3 boxes
+- Each row contains 1-9 exactly once
+- Each column contains 1-9 exactly once
+- Each box contains 1-9 exactly once
 
-GRID NOTATION:
+NOTATION:
 - Numbers 1-9 are filled cells (cannot be changed)
-- The dot (.) represents an empty cell you can fill
-- Rows are numbered 1-9 from top to bottom
-- Columns are numbered 1-9 from left to right
+- Underscore (_) is empty cell you can fill
+- Rows/columns numbered 1-9
 
-YOUR TASK:
-Analyze the current puzzle state and propose ONE move.
-Think step-by-step about which cell to fill and why.
+FEEDBACK:
+- CORRECT: Move accepted
+- INVALID: Violates rules
+- VALID_BUT_WRONG: Legal but incorrect
 
-RESPONSE FORMAT (you must follow this exactly):
-ROW: <number 1-9>
-COL: <number 1-9>
-VALUE: <number 1-9>
-REASONING: <your step-by-step analysis>
+CRITICAL CONSTRAINT:
+- NEVER attempt any move listed in FORBIDDEN MOVES
+- If a move appears in FORBIDDEN MOVES, it has been proven wrong
+- You MUST choose a different cell or value
+
+OUTPUT FORMAT:
+ROW: <1-9>
+COL: <1-9>
+VALUE: <1-9>
+REASONING: <brief analysis>
 ```
+
+**Changes from original (2026-01-08 morning)**:
+- Removed "CRITICAL INSTRUCTIONS FOR REASONING" meta-instructions
+- Removed hints like "try a different cell or value"
+- Changed notation from `.` to `_` for better visibility
+- Simplified language throughout
+- Removed all "how to think" guidance - let LLM learn naturally from feedback
+
+**Additional changes (2026-01-08 evening)**:
+- Added "CRITICAL CONSTRAINT" section explicitly forbidding moves in FORBIDDEN MOVES list
+- This prevents LLM from ignoring the forbidden moves section in the prompt
 
 ### Puzzle State Prompt (with history)
 
+**Updated 2026-01-08 Evening**: Simplified grid format, added constraint and forbidden move tracking
+
 ```
 CURRENT PUZZLE STATE:
-    1 2 3   4 5 6   7 8 9
-  ┌───────┬───────┬───────┐
-1 │ 5 3 . │ . 7 . │ . . . │
-2 │ 6 . . │ 1 9 5 │ . . . │
-3 │ . 9 8 │ . . . │ . 6 . │
-  ├───────┼───────┼───────┤
-4 │ 8 . . │ . 6 . │ . . 3 │
-5 │ 4 . . │ 8 . 3 │ . . 1 │
-6 │ 7 . . │ . 2 . │ . . 6 │
-  ├───────┼───────┼───────┤
-7 │ . 6 . │ . . . │ 2 8 . │
-8 │ . . . │ 4 1 9 │ . . 5 │
-9 │ . . . │ . 8 . │ . 7 9 │
-  └───────┴───────┴───────┘
+R1: 5,3,_,_,7,_,_,_,_
+R2: 6,_,_,1,9,5,_,_,_
+R3: _,9,8,_,_,_,_,6,_
+R4: 8,_,_,_,6,_,_,_,3
+R5: 4,_,_,8,_,3,_,_,1
+R6: 7,_,_,_,2,_,_,_,6
+R7: _,6,_,_,_,_,2,8,_
+R8: _,_,_,4,1,9,_,_,5
+R9: _,_,_,_,8,_,_,7,9
+
+FILLED CELLS (cannot be changed):
+(1,1)=5, (1,2)=3, (1,5)=7, (2,1)=6, (2,4)=1, (2,5)=9, (2,6)=5, (3,2)=9, (3,3)=8, (3,8)=6
+(4,1)=8, (4,5)=6, (4,9)=3, (5,1)=4, (5,4)=8, (5,6)=3, (5,9)=1, (6,1)=7, (6,5)=2, (6,9)=6
+(7,2)=6, (7,7)=2, (7,8)=8, (8,4)=4, (8,5)=1, (8,6)=9, (8,9)=5, (9,5)=8, (9,8)=7, (9,9)=9
 
 YOUR PREVIOUS ATTEMPTS ON THIS PUZZLE:
-Move 1: (2,2)=7 → INVALID: Value 7 already exists in column 2
-Move 2: (2,2)=4 → CORRECT: Good move!
-Move 3: (1,3)=2 → INVALID: Value 2 already exists in box 1
+Move 1: (2,2)=7 → INVALID (Value 7 already exists in column 2)
+Move 2: (3,4)=5 → INVALID (Value 5 already exists in box 2)
+Move 3: (2,2)=4 → CORRECT
+Move 4: (1,3)=2 → VALID_BUT_WRONG
+
+FORBIDDEN MOVES (do not attempt again):
+(2,2)=7, (3,4)=5
+
+(Optional: If --include-reasoning flag is set, each move shows reasoning snippet)
+Move 1: (2,2)=7 → INVALID (Value 7 already exists in column 2)
+  Your reasoning: "Looking at row 2, I need to find where the digit 7 can go. The digits alr..."
+Move 2: (2,2)=4 → CORRECT
+  Your reasoning: "After analyzing all constraints for cell (2,2): Row 2 needs digits 1,2,4,6..."
 
 Empty cells remaining: 48
 
@@ -349,16 +396,16 @@ async playPuzzle(puzzle: Puzzle): Promise<PlaySession> {
     const experience = this.recordExperience(state, move, validation);
     session.experiences.push(experience);
 
-    // 6. Update state if valid
-    if (validation.isValid) {
+    // 6. Update state ONLY if correct
+    // IMPORTANT: Only apply correct moves to avoid corrupting the grid state
+    if (validation.isCorrect) {
       state = state.applyMove(move);
-      if (validation.isCorrect) {
-        session.correctMoves++;
-      } else {
-        session.validButWrongMoves++;
-        // Note: We apply valid-but-wrong moves and let LLM discover the error later
-      }
+      session.correctMoves++;
+    } else if (validation.isValid) {
+      // Valid but wrong - don't apply! Tell LLM it's wrong and let it retry
+      session.validButWrongMoves++;
     } else {
+      // Invalid - rule violation, don't apply
       session.invalidMoves++;
     }
 
@@ -518,6 +565,45 @@ npm run llm:dream
 # Compare memory ON vs OFF performance
 npm run llm:benchmark
 ```
+
+## Current Implementation Notes (2026-01-08)
+
+### Enhancement History
+
+**Previous Issues (Before 2026-01-08 Evening)**:
+- Parser extracted first occurrence of ROW/COL/VALUE, risking mid-thought values
+- Prompt included both visual grid AND row format (~25 lines wasted)
+- No constraint information provided before LLM call
+- No forbidden move tracking (LLM repeated same invalid moves)
+- Token limit at 768 caused response cutoffs
+
+**Implemented Enhancements (2026-01-08 Evening)**:
+
+1. **Parser Improvements** ✅
+   - Now finds LAST complete set of ROW/COL/VALUE appearing together (within 200 chars)
+   - Prevents extracting mid-thought values from LLM's reasoning process
+   - Falls back to first occurrence if no complete set found
+
+2. **Grid Simplification** ✅
+   - Removed visual grid (box drawing characters)
+   - Use only compact row format: `R1: 5,3,_,_,7,_,_,_,_`
+   - Saves ~25 lines in prompt, reduces token usage
+
+3. **Constraint Pre-Information** ✅
+   - Prompt now includes "FILLED CELLS (cannot be changed)" section
+   - Lists all filled cells to prevent LLM proposing moves for them
+   - Format: `(1,1)=5, (1,2)=3, (1,3)=4, ...`
+
+4. **Forbidden Move Tracking** ✅
+   - Extracts INVALID and VALID_BUT_WRONG (cell,value) pairs from experience history
+   - Displays "FORBIDDEN MOVES (do not attempt again)" in prompt
+   - Prevents LLM from repeatedly attempting same wrong moves
+   - Added "CRITICAL CONSTRAINT" in system prompt explicitly forbidding these moves
+
+5. **Token Limit Increase** ✅
+   - Raised from 768 to 2048 tokens
+   - Allows complete reasoning without mid-analysis cutoff
+   - Reduces circular reasoning caused by premature truncation
 
 ## Error Handling
 

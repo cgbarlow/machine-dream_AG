@@ -5,9 +5,9 @@
  */
 
 import { Command } from 'commander';
-import { getCommandConfig } from '../global-options';
-import { logger } from '../logger';
-import { ConfigurationError } from '../errors';
+import { getCommandConfig } from '../global-options.js';
+import { logger } from '../logger.js';
+import { ConfigurationError } from '../errors.js';
 
 export function registerBenchmarkCommand(program: Command): void {
     const benchmarkCommand = new Command('benchmark');

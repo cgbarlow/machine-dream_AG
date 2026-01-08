@@ -8,8 +8,8 @@
     "machine-dream": "dist/cli-bin.js"
   },
   "scripts": {
-    "build": "tsc",
-    "build:cli": "tsc && cp src/cli-bin.js dist/cli-bin.js",
+    "build": "tsc && node scripts/fix-imports.js",
+    "build:cli": "npm run build && cp src/cli-bin.js dist/cli-bin.js",
     "build:all": "npm run build:cli",
     "dev": "tsx watch src/index.ts",
     "tui": "tsx src/tui-ink/tui.tsx",
@@ -49,6 +49,7 @@
     "@vitest/coverage-v8": "^1.6.1",
     "eslint": "^8.54.0",
     "ink-testing-library": "^4.0.0",
+    "tsc-alias": "^1.8.16",
     "tsx": "^4.7.0",
     "typescript": "^5.3.0",
     "vitest": "^1.0.0"

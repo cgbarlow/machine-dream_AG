@@ -4,6 +4,7 @@
  */
 
 import type { LLMExperience, FewShotExample } from './types.js';
+import { BoardFormatter } from './BoardFormatter.js';
 
 /**
  * Prompt Builder
@@ -14,6 +15,8 @@ import type { LLMExperience, FewShotExample } from './types.js';
  * - Few-shot examples (when memory enabled)
  */
 export class PromptBuilder {
+  constructor(private includeReasoning: boolean = false) {}
+
   /**
    * Build complete prompt for LLM
    *
@@ -26,9 +29,19 @@ export class PromptBuilder {
     experiences: LLMExperience[] = [],
     fewShots: FewShotExample[] = []
   ): string {
+    // Simplified prompt: use only row format (no visual grid)
     let prompt = 'CURRENT PUZZLE STATE:\n';
-    prompt += this.formatGrid(gridState);
-    prompt += '\n\n';
+    for (let row = 0; row < 9; row++) {
+      const rowStr = gridState[row]
+        .map(cell => cell === 0 ? '_' : cell.toString())
+        .join(',');
+      prompt += `R${row + 1}: ${rowStr}\n`;
+    }
+    prompt += '\n';
+
+    // Add constraint information to prevent invalid moves
+    prompt += this.buildConstraintInfo(gridState);
+    prompt += '\n';
 
     // Add few-shot examples if memory enabled
     if (fewShots.length > 0) {
@@ -41,10 +54,22 @@ export class PromptBuilder {
       prompt += 'YOUR PREVIOUS ATTEMPTS ON THIS PUZZLE:\n';
       prompt += this.formatMoveHistory(experiences);
       prompt += '\n\n';
+
+      // Add forbidden moves to prevent repetition
+      const forbiddenMoves = this.extractForbiddenMoves(experiences);
+      if (forbiddenMoves.length > 0) {
+        prompt += 'FORBIDDEN MOVES (do not attempt again):\n';
+        // Group in sets of 8 for readability
+        for (let i = 0; i < forbiddenMoves.length; i += 8) {
+          const group = forbiddenMoves.slice(i, i + 8).join(', ');
+          prompt += `${group}\n`;
+        }
+        prompt += '\n';
+      }
     }
 
     // Add empty cell count
-    const emptyCells = this.countEmptyCells(gridState);
+    const emptyCells = BoardFormatter.countEmptyCells(gridState);
     prompt += `Empty cells remaining: ${emptyCells}\n\n`;
     prompt += 'What is your next move?';
 
@@ -52,64 +77,91 @@ export class PromptBuilder {
   }
 
   /**
-   * Format 9x9 grid with box separators (Spec 11 format)
+   * Extract forbidden moves from experience history
+   * Returns list of (cell,value) pairs that have been proven wrong
    */
-  private formatGrid(grid: number[][]): string {
-    let result = '    1 2 3   4 5 6   7 8 9\n';
-    result += '  ┌───────┬───────┬───────┐\n';
+  private extractForbiddenMoves(experiences: LLMExperience[]): string[] {
+    const forbidden = new Set<string>();
 
-    for (let row = 0; row < 9; row++) {
-      result += `${row + 1} │`;
-
-      for (let col = 0; col < 9; col++) {
-        const value = grid[row][col];
-        result += value === 0 ? ' .' : ` ${value}`;
-
-        // Box separators
-        if (col === 2 || col === 5) {
-          result += ' │';
-        } else if (col === 8) {
-          result += ' │\n';
-        }
-      }
-
-      // Row separators
-      if (row === 2 || row === 5) {
-        result += '  ├───────┼───────┼───────┤\n';
+    for (const exp of experiences) {
+      // Track INVALID (rule violations) and VALID_BUT_WRONG (incorrect guesses) as forbidden
+      // This prevents the LLM from repeatedly trying the same wrong move
+      if (exp.validation.outcome === 'invalid' || exp.validation.outcome === 'valid_but_wrong') {
+        const { row, col, value } = exp.move;
+        forbidden.add(`(${row},${col})=${value}`);
       }
     }
 
-    result += '  └───────┴───────┴───────┘';
-    return result;
+    return Array.from(forbidden).sort();
   }
 
   /**
-   * Format move history with outcomes
+   * Build constraint information about filled cells
+   * This helps the LLM avoid proposing moves for already-filled cells
+   */
+  private buildConstraintInfo(gridState: number[][]): string {
+    const filledCells: string[] = [];
+
+    for (let row = 0; row < 9; row++) {
+      for (let col = 0; col < 9; col++) {
+        const value = gridState[row][col];
+        if (value !== 0) {
+          // Cell is filled - add to list (1-indexed for user-facing)
+          filledCells.push(`(${row + 1},${col + 1})=${value}`);
+        }
+      }
+    }
+
+    let info = 'FILLED CELLS (cannot be changed):\n';
+    // Group in sets of 10 for readability
+    for (let i = 0; i < filledCells.length; i += 10) {
+      const group = filledCells.slice(i, i + 10).join(', ');
+      info += `${group}\n`;
+    }
+
+    return info;
+  }
+
+  /**
+   * Format move history with outcomes - facts only
+   * Note: Caller is responsible for limiting experiences array if needed
    */
   private formatMoveHistory(experiences: LLMExperience[]): string {
     return experiences
       .map((exp, idx) => {
         const { row, col, value } = exp.move;
         const outcome = this.formatOutcome(exp.validation);
-        return `Move ${idx + 1}: (${row},${col})=${value} → ${outcome}`;
+
+        // Include reasoning snippet as factual record (if enabled)
+        let reasoning = '';
+        if (this.includeReasoning && exp.move.reasoning) {
+          const snippet = exp.move.reasoning
+            .replace(/\n/g, ' ')
+            .substring(0, 80)
+            .trim();
+          reasoning = `\n  Your reasoning: "${snippet}${exp.move.reasoning.length > 80 ? '...' : ''}"`;
+        }
+
+        return `Move ${idx + 1}: (${row},${col})=${value} → ${outcome}${reasoning}`;
       })
       .join('\n');
   }
 
   /**
-   * Format validation outcome
+   * Format validation outcome - factual only, no hints
    */
   private formatOutcome(validation: {
     outcome: 'correct' | 'invalid' | 'valid_but_wrong';
     error?: string;
   }): string {
     if (validation.outcome === 'correct') {
-      return 'CORRECT: Good move!';
+      return 'CORRECT';
     }
     if (validation.outcome === 'invalid') {
-      return `INVALID: ${validation.error || 'Rule violation'}`;
+      // Include specific error for learning
+      return `INVALID (${validation.error || 'Rule violation'})`;
     }
-    return `VALID_BUT_WRONG: Move was legal but doesn't match solution`;
+    return 'VALID_BUT_WRONG';
   }
 
   /**
@@ -127,10 +179,4 @@ export class PromptBuilder {
     return result.trim();
   }
 
-  /**
-   * Count empty cells in grid
-   */
-  private countEmptyCells(grid: number[][]): number {
-    return grid.flat().filter((cell) => cell === 0).length;
-  }
 }

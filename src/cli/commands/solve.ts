@@ -5,14 +5,14 @@
  */
 
 import { Command } from 'commander';
-import { getCommandConfig } from '../global-options';
-import { SolveOptions } from '../types';
-import { logger } from '../logger';
-import { SystemOrchestrator } from '../../orchestration/SystemOrchestrator';
-import { DreamingController } from '../../consolidation/DreamingController';
-import { AgentMemory } from '../../memory/AgentMemory';
-import { SolveError } from '../errors';
-import { OrchestratorConfig } from '../../types';
+import { getCommandConfig } from '../global-options.js';
+import { SolveOptions } from '../types.js';
+import { logger } from '../logger.js';
+import { SystemOrchestrator } from '../../orchestration/SystemOrchestrator.js';
+import { DreamingController } from '../../consolidation/DreamingController.js';
+import { AgentMemory } from '../../memory/AgentMemory.js';
+import { SolveError } from '../errors.js';
+import { OrchestratorConfig } from '../../types.js';
 import fs from 'fs/promises';
 import path from 'path';
 

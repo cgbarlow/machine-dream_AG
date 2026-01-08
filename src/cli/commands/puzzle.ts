@@ -10,11 +10,11 @@
  */
 
 import { Command } from 'commander';
-import { getCommandConfig } from '../global-options';
-import { logger } from '../logger';
-import { PuzzleGenerator } from '../../engine/PuzzleGenerator';
-import { PuzzleValidator } from '../../engine/PuzzleValidator';
-import type { PuzzleGenerationConfig, GeneratedPuzzle, GridSize, DifficultyLevel } from '../../types';
+import { getCommandConfig } from '../global-options.js';
+import { logger } from '../logger.js';
+import { PuzzleGenerator } from '../../engine/PuzzleGenerator.js';
+import { PuzzleValidator } from '../../engine/PuzzleValidator.js';
+import type { PuzzleGenerationConfig, GeneratedPuzzle, GridSize, DifficultyLevel } from '../../types.js';
 import fs from 'fs/promises';
 import path from 'path';
 

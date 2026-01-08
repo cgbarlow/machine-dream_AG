@@ -19,6 +19,7 @@ export interface LLMConfig {
   // Learning settings
   memoryEnabled: boolean;   // Toggle for A/B testing
   maxHistoryMoves: number;  // How many past moves to include
+  includeReasoning: boolean; // Include reasoning snippets in move history
 
   // No hints, no fallback - these are NOT configurable
 }

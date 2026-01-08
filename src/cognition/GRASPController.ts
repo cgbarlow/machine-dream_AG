@@ -3,11 +3,11 @@ import {
     PuzzleState,
     Move,
     ValidationResult
-} from '../types';
-import { AgentMemory } from '../memory/AgentMemory';
-import { PuzzleBoard } from '../engine/PuzzleBoard';
-import { AttentionManager } from './AttentionManager';
-import { StrategyEngine } from './StrategyEngine';
+} from '../types.js';
+import { AgentMemory } from '../memory/AgentMemory.js';
+import { PuzzleBoard } from '../engine/PuzzleBoard.js';
+import { AttentionManager } from './AttentionManager.js';
+import { StrategyEngine } from './StrategyEngine.js';
 
 export class GRASPController {
     private memory: AgentMemory;

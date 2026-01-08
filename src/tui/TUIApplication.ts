@@ -130,6 +130,11 @@ export class TUIApplication {
    * Navigate to a specific screen
    */
   private async navigateTo(screenName: ScreenName): Promise<void> {
+    // Prevent re-navigating to the same screen
+    if (this.currentScreen === screenName) {
+      return;
+    }
+
     this.outputManager.emit({
       eventType: 'navigation',
       component: 'TUIApplication',

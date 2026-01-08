@@ -7,15 +7,15 @@
  * Spec: 12-randomized-puzzle-generation.md
  */
 
-import { SeededRandom } from './SeededRandom';
-import { PuzzleValidator } from './PuzzleValidator';
-import { SudokuRules } from './SudokuRules';
+import { SeededRandom } from './SeededRandom.js';
+import { PuzzleValidator } from './PuzzleValidator.js';
+import { SudokuRules } from './SudokuRules.js';
 import type {
   PuzzleGenerationConfig,
   GeneratedPuzzle,
   GridSize,
   DifficultyLevel
-} from '../types';
+} from '../types.js';
 
 /**
  * Difficulty-to-clue-count mapping for different grid sizes

@@ -66,21 +66,55 @@ export class ResponseParser {
 
   /**
    * Extract move components from response text
+   *
+   * Strategy: Find the LAST complete set of ROW/COL/VALUE that appear together
+   * This prevents extracting mid-thought values during LLM's reasoning process
    */
   private extractMove(text: string): LLMMove | null {
-    const rowMatch = text.match(/ROW:\s*(\d+)/i);
-    const colMatch = text.match(/COL(?:UMN)?:\s*(\d+)/i);
-    const valueMatch = text.match(/VALUE:\s*(\d+)/i);
-    const reasoningMatch = text.match(/REASONING:\s*(.+?)(?=\n\n|$)/is);
+    // Find all matches for each field
+    const rowMatches = Array.from(text.matchAll(/ROW:\s*(\d+)/gi));
+    const colMatches = Array.from(text.matchAll(/COL(?:UMN)?:\s*(\d+)/gi));
+    const valueMatches = Array.from(text.matchAll(/VALUE:\s*(\d+)/gi));
 
-    if (!rowMatch || !colMatch || !valueMatch) {
+    if (rowMatches.length === 0 || colMatches.length === 0 || valueMatches.length === 0) {
       return null;
     }
 
+    // Find the last complete set where all three appear within 200 characters of each other
+    // Start from the end and work backwards to prefer final decision over mid-thought
+    for (let i = rowMatches.length - 1; i >= 0; i--) {
+      const rowMatch = rowMatches[i];
+      const rowPos = rowMatch.index!;
+
+      // Find COL and VALUE that are near this ROW (within 200 chars after)
+      const nearbyCol = colMatches.find(m =>
+        m.index! >= rowPos && m.index! <= rowPos + 200
+      );
+      const nearbyValue = valueMatches.find(m =>
+        m.index! >= rowPos && m.index! <= rowPos + 200
+      );
+
+      if (nearbyCol && nearbyValue) {
+        // Found a complete set - extract reasoning if present
+        const reasoningMatch = text.slice(rowPos).match(/REASONING:\s*(.+?)(?=\n\n|$)/is);
+
+        return {
+          row: parseInt(rowMatch[1], 10),
+          col: parseInt(nearbyCol[1], 10),
+          value: parseInt(nearbyValue[1], 10),
+          reasoning: reasoningMatch ? reasoningMatch[1].trim() : 'No reasoning provided',
+        };
+      }
+    }
+
+    // Fallback: if no complete set found within proximity, use first occurrence of each
+    // (This handles edge cases where format is non-standard but still parseable)
+    const reasoningMatch = text.match(/REASONING:\s*(.+?)(?=\n\n|$)/is);
+
     return {
-      row: parseInt(rowMatch[1], 10),
-      col: parseInt(colMatch[1], 10),
-      value: parseInt(valueMatch[1], 10),
+      row: parseInt(rowMatches[0][1], 10),
+      col: parseInt(colMatches[0][1], 10),
+      value: parseInt(valueMatches[0][1], 10),
       reasoning: reasoningMatch ? reasoningMatch[1].trim() : 'No reasoning provided',
     };
   }

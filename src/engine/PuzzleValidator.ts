@@ -6,7 +6,7 @@
  * Spec: 12-randomized-puzzle-generation.md
  */
 
-import { SudokuRules } from './SudokuRules';
+import { SudokuRules } from './SudokuRules.js';
 
 export interface ValidationResult {
   isValid: boolean;

@@ -5,18 +5,18 @@
  */
 
 import { Command } from 'commander';
-import { registerSolveCommand } from './solve';
-import { registerMemoryCommand } from './memory';
-import { registerDreamCommand } from './dream';
-import { registerBenchmarkCommand } from './benchmark';
-import { registerDemoCommand } from './demo';
-import { registerConfigCommand } from './config';
-import { registerExportCommand } from './export';
-import { registerSystemCommand } from './system';
-import { registerInteractiveCommand } from './interactive';
-import { registerTUICommand } from './tui';
-import { registerLLMCommand } from './llm';
-import { registerPuzzleCommand } from './puzzle';
+import { registerSolveCommand } from './solve.js';
+import { registerMemoryCommand } from './memory.js';
+import { registerDreamCommand } from './dream.js';
+import { registerBenchmarkCommand } from './benchmark.js';
+import { registerDemoCommand } from './demo.js';
+import { registerConfigCommand } from './config.js';
+import { registerExportCommand } from './export.js';
+import { registerSystemCommand } from './system.js';
+import { registerInteractiveCommand } from './interactive.js';
+import { registerTUICommand } from './tui.js';
+import { registerLLMCommand } from './llm.js';
+import { registerPuzzleCommand } from './puzzle.js';
 
 export function registerCommands(program: Command): void {
     // Core commands

@@ -1,0 +1,64 @@
+lm_studio log
+
+2026-01-08 13:34:30 [DEBUG]
+ Received request: POST to /v1/chat/completions with body  {
+  "model": "qwen3-coder",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are learning to solve Sudoku puzzles through p... <Truncated in logs> ...umber 1-9>\nREASONING: <your step-by-step analysis>"
+    },
+    {
+      "role": "user",
+      "content": "CURRENT PUZZLE STATE:\n    1 2 3   4 5 6   7 8 9\n  ... <Truncated in logs> ...Empty cells remaining: 49\n\nWhat is your next move?"
+    }
+  ],
+  "temperature": 0.7,
+  "max_tokens": 2048,
+  "stream": true
+}
+2026-01-08 13:34:30  [INFO]
+ [qwen3-coder-30b-a3b-instruct] Running chat completion on conversation with 2 messages.
+2026-01-08 13:34:30  [INFO]
+ [qwen3-coder-30b-a3b-instruct] Streaming response...
+2026-01-08 13:34:30 [DEBUG]
+ Sampling params:	repeat_last_n = 64, repeat_penalty = 1.100, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = -1
+	top_k = 40, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.700
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000
+Sampling: 
+logits -> penalties -> dry -> top-n-sigma -> top-k -> typical -> top-p -> min-p -> xtc -> temp-ext -> dist 
+Generate: n_ctx = 4096, n_batch = 512, n_predict = 2048, n_keep = 689
+2026-01-08 13:34:30  [INFO]
+ [qwen3-coder-30b-a3b-instruct] Prompt processing progress: 0.0%
+2026-01-08 13:34:30 [DEBUG]
+ Looking for non-prefix contiguous prompt sequences of size >= 256 to reuse from cache
+Cache reuse summary: 370/689 of prompt (53.701%), 370 prefix, 0 non-prefix
+Total prompt tokens: 689
+Prompt tokens to decode: 319
+BeginProcessingPrompt
+2026-01-08 13:34:31 [DEBUG]
+ PromptProcessing: 44.5141
+2026-01-08 13:34:31  [INFO]
+ [qwen3-coder-30b-a3b-instruct] Prompt processing progress: 44.5%
+2026-01-08 13:34:32 [DEBUG]
+ FinishedProcessingPrompt. Progress: 100
+2026-01-08 13:34:32  [INFO]
+ [qwen3-coder-30b-a3b-instruct] Prompt processing progress: 100.0%
+2026-01-08 13:36:30  [INFO]
+ [LM STUDIO SERVER] Client disconnected. Stopping generation... (If the model is busy processing the prompt, it will finish first.)
+2026-01-08 13:36:30 [DEBUG]
+ Target model llama_perf stats:
+common_perf_print:    sampling time =    1131.59 ms
+common_perf_print:    samplers time =     968.12 ms /  2419 tokens
+common_perf_print:        load time =   34833.55 ms
+common_perf_print: prompt eval time =    1229.04 ms /   319 tokens (    3.85 ms per token,   259.55 tokens per second)
+common_perf_print:        eval time =  117540.50 ms /  1729 runs   (   67.98 ms per token,    14.71 tokens per second)
+common_perf_print:       total time =  119982.63 ms /  2048 tokens
+common_perf_print: unaccounted time =      81.50 ms /   0.1 %      (total - sampling - prompt eval - eval) / (total)
+common_perf_print:    graphs reused =       1721
+llama_memory_breakdown_print: | memory breakdown [MiB]                | total    free     self   model   context   compute    unaccounted |
+llama_memory_breakdown_print: |   - ROCm0 (Radeon(TM) 8060S Graphics) | 69545 = 34575 + (34408 = 33723 +     384 +     300) +         561 |
+llama_memory_breakdown_print: |   - Host                              |                    607 =   593 +       0 +      14                |
+2026-01-08 13:36:30  [INFO]
+ [qwen3-coder-30b-a3b-instruct] Finished streaming response

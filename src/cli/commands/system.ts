@@ -5,9 +5,9 @@
  */
 
 import { Command } from 'commander';
-import { getCommandConfig } from '../global-options';
-import { logger } from '../logger';
-import { ConfigurationError, InitializationError } from '../errors';
+import { getCommandConfig } from '../global-options.js';
+import { logger } from '../logger.js';
+import { ConfigurationError, InitializationError } from '../errors.js';
 import { SystemOrchestrator } from '../../orchestration/SystemOrchestrator.js';
 import { AgentMemory } from '../../memory/AgentMemory.js';
 import type { OrchestratorConfig } from '../../types.js';

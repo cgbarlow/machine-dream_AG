@@ -23,41 +23,48 @@ export const DEFAULT_LLM_CONFIG: LLMConfig = {
   model: process.env.LLM_MODEL || 'qwen3-30b',
 
   // Generation parameters
-  temperature: parseFloat(process.env.LLM_TEMPERATURE || '0.7'),
-  maxTokens: parseInt(process.env.LLM_MAX_TOKENS || '1024', 10),
+  temperature: parseFloat(process.env.LLM_TEMPERATURE || '0.3'), // Lower temp for more deterministic reasoning
+  maxTokens: parseInt(process.env.LLM_MAX_TOKENS || '2048', 10), // Increased to allow complete reasoning without cutoff
   timeout: parseInt(process.env.LLM_TIMEOUT || '60000', 10),
 
   // Learning settings
   memoryEnabled: process.env.LLM_MEMORY_ENABLED !== 'false',
   maxHistoryMoves: parseInt(process.env.LLM_MAX_HISTORY_MOVES || '20', 10),
+  includeReasoning: process.env.LLM_INCLUDE_REASONING === 'true', // Default: OFF
 };
 
 /**
  * System Prompt (Spec 11 - Prompt Engineering)
+ * Simplified: removed meta-instructions, let LLM learn naturally from feedback
  */
-export const SYSTEM_PROMPT = `You are learning to solve Sudoku puzzles through practice and feedback.
+export const SYSTEM_PROMPT = `You are solving Sudoku puzzles through trial and error.
 
 RULES:
-- A 9x9 grid divided into nine 3x3 boxes
-- Each row must contain digits 1-9 exactly once
-- Each column must contain digits 1-9 exactly once
-- Each 3x3 box must contain digits 1-9 exactly once
+- 9x9 grid, nine 3x3 boxes
+- Each row contains 1-9 exactly once
+- Each column contains 1-9 exactly once
+- Each box contains 1-9 exactly once
 
-GRID NOTATION:
+NOTATION:
 - Numbers 1-9 are filled cells (cannot be changed)
-- The dot (.) represents an empty cell you can fill
-- Rows are numbered 1-9 from top to bottom
-- Columns are numbered 1-9 from left to right
+- Underscore (_) is empty cell you can fill
+- Rows/columns numbered 1-9
 
-YOUR TASK:
-Analyze the current puzzle state and propose ONE move.
-Think step-by-step about which cell to fill and why.
+FEEDBACK:
+- CORRECT: Move accepted
+- INVALID: Violates rules
+- VALID_BUT_WRONG: Legal but incorrect
 
-RESPONSE FORMAT (you must follow this exactly):
-ROW: <number 1-9>
-COL: <number 1-9>
-VALUE: <number 1-9>
-REASONING: <your step-by-step analysis>`;
+CRITICAL CONSTRAINT:
+- NEVER attempt any move listed in FORBIDDEN MOVES
+- If a move appears in FORBIDDEN MOVES, it has been proven wrong
+- You MUST choose a different cell or value
+
+OUTPUT FORMAT:
+ROW: <1-9>
+COL: <1-9>
+VALUE: <1-9>
+REASONING: <brief analysis>`;
 
 /**
  * Validate LLM configuration
@@ -93,14 +100,26 @@ export function validateConfig(config: LLMConfig): void {
  * Spec 13: Profile to Config conversion
  */
 export function profileToConfig(profile: LLMProfile): LLMConfig {
+  // Normalize baseUrl: ensure /v1 suffix for OpenAI-compatible APIs
+  let baseUrl = profile.baseUrl;
+  if (profile.provider === 'lmstudio' || profile.provider === 'openai') {
+    // Remove trailing slash
+    baseUrl = baseUrl.replace(/\/$/, '');
+    // Add /v1 if not present
+    if (!baseUrl.endsWith('/v1')) {
+      baseUrl = `${baseUrl}/v1`;
+    }
+  }
+
   return {
-    baseUrl: profile.baseUrl,
+    baseUrl,
     model: profile.model,
     temperature: profile.parameters.temperature,
     maxTokens: profile.parameters.maxTokens,
     timeout: profile.timeout,
     memoryEnabled: true, // Default to enabled, can be overridden
     maxHistoryMoves: 20, // Default value
+    includeReasoning: false, // Default: OFF
   };
 }
 

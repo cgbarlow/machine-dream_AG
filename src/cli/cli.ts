@@ -9,11 +9,13 @@
  */
 
 import { Command } from 'commander';
-import { version } from '../../package.json' with { type: 'json' };
-import { CLIError } from './errors';
-import { configureGlobalOptions } from './global-options';
-import { registerCommands } from './commands';
-import { logger } from './logger';
+import pkg from '../../package.json' with { type: 'json' };
+import { CLIError } from './errors.js';
+
+const { version } = pkg;
+import { configureGlobalOptions } from './global-options.js';
+import { registerCommands } from './commands/index.js';
+import { logger } from './logger.js';
 
 // CLI Entry Point
 export async function runCLI() {

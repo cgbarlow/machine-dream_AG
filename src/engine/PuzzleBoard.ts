@@ -1,6 +1,6 @@
 
-import { Grid, Cell, PuzzleState, ValidationResult } from '../types';
-import { SudokuRules } from './SudokuRules';
+import { Grid, Cell, PuzzleState, ValidationResult } from '../types.js';
+import { SudokuRules } from './SudokuRules.js';
 
 export class PuzzleBoard {
     private _grid: Grid;

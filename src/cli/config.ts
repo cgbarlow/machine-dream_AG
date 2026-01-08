@@ -8,8 +8,8 @@
  * - CLI arguments
  */
 
-import { ConfigurationError } from './errors';
-import { Configuration } from './types';
+import { ConfigurationError } from './errors.js';
+import { Configuration } from './types.js';
 import fs from 'fs/promises';
 
 // Default configuration

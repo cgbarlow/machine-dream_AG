@@ -1900,7 +1900,29 @@ When running in CI/Docker/non-TTY environments:
 
 ## 23. Component-Based Architecture
 
-### 23.1 Directory Structure
+### 23.1 Grid Display Components
+
+**PuzzleGrid Component** (`src/tui-ink/components/PuzzleGrid.tsx`):
+- React/Ink component for interactive visual grid display in TUI
+- Uses Box and Text components for colored, interactive rendering
+- Supports highlighting cells with colors (yellow for active, green for filled)
+- **Use Case**: TUI screens requiring interactive board visualization
+
+**BoardFormatter Utility** (`src/llm/BoardFormatter.ts`):
+- Shared utility for text-based grid formatting (DRY principle)
+- Static class with no dependencies on React/Ink
+- **Use Cases**:
+  - CLI commands requiring terminal output
+  - LLM prompts requiring plain text grids
+  - Text-based board exports
+- **Methods**:
+  - `formatForPrompt()` - Plain text for LLM (no colors)
+  - `formatForCLI()` - ANSI-colored for terminal with highlighting
+  - `countEmptyCells()` - Utility method
+
+**Design Decision**: Keep separate implementations for TUI (React-based) and CLI/prompt (text-based) to maintain appropriate separation of concerns.
+
+### 23.2 Directory Structure
 
 ```
 src/tui/

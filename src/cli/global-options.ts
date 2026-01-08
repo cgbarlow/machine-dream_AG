@@ -6,9 +6,9 @@
  */
 
 import { Command } from 'commander';
-import { configureLogger } from './logger';
-import { loadConfiguration } from './config';
-import { Configuration } from './types';
+import { configureLogger } from './logger.js';
+import { loadConfiguration } from './config.js';
+import { Configuration } from './types.js';
 
 // Global configuration storage
 let globalConfig: Configuration | null = null;

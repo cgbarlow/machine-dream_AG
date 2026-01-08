@@ -41,8 +41,13 @@ export class LMStudioClient {
    * Send chat completion request to LM Studio
    *
    * Spec 11: Uses OpenAI-compatible /v1/chat/completions endpoint
+   * @param messages - Chat messages to send
+   * @param onStream - Optional callback for streaming tokens
    */
-  async chat(messages: ChatMessage[]): Promise<string> {
+  async chat(
+    messages: ChatMessage[],
+    onStream?: (token: string) => void
+  ): Promise<string> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
@@ -57,6 +62,7 @@ export class LMStudioClient {
           messages,
           temperature: this.config.temperature,
           max_tokens: this.config.maxTokens,
+          stream: !!onStream, // Enable streaming if callback provided
         }),
         signal: controller.signal,
       });
@@ -68,6 +74,12 @@ export class LMStudioClient {
         );
       }
 
+      // Handle streaming response
+      if (onStream && response.body) {
+        return await this.handleStreamingResponse(response, onStream);
+      }
+
+      // Handle non-streaming response
       const data = await response.json() as ChatCompletionResponse;
 
       if (!data.choices || data.choices.length === 0) {
@@ -85,6 +97,50 @@ export class LMStudioClient {
     } finally {
       clearTimeout(timeoutId);
     }
+  }
+
+  /**
+   * Handle streaming response from LM Studio
+   */
+  private async handleStreamingResponse(
+    response: Response,
+    onStream: (token: string) => void
+  ): Promise<string> {
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let fullContent = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n').filter(line => line.trim() !== '');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              const token = parsed.choices?.[0]?.delta?.content;
+              if (token) {
+                fullContent += token;
+                onStream(token);
+              }
+            } catch {
+              // Skip malformed JSON
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    return fullContent;
   }
 
   /**

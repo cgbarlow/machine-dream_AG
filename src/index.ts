@@ -1,6 +1,6 @@
 
-import { SystemOrchestrator } from './orchestration/SystemOrchestrator';
-import { OrchestratorConfig } from './types';
+import { SystemOrchestrator } from './orchestration/SystemOrchestrator.js';
+import { OrchestratorConfig } from './types.js';
 
 async function main() {
     console.log('🧠 Machine Dream POC: Starting...');

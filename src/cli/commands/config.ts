@@ -5,10 +5,10 @@
  */
 
 import { Command } from 'commander';
-import { getCommandConfig } from '../global-options';
-import { logger } from '../logger';
-import { ConfigurationError } from '../errors';
-import { saveConfiguration } from '../config';
+import { getCommandConfig } from '../global-options.js';
+import { logger } from '../logger.js';
+import { ConfigurationError } from '../errors.js';
+import { saveConfiguration } from '../config.js';
 import { ProfileValidator } from '../../llm/profiles/ProfileValidator.js';
 import type { LLMProfile } from '../../llm/profiles/types.js';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
