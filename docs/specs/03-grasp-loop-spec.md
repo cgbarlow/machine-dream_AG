@@ -432,6 +432,14 @@ function calculateImportance(move: Move, result: ValidationResult): number {
 }
 ```
 
+> **LLM Sudoku Player Integration**: For LLM-based solving (Spec 11), importance
+> calculation uses the same formula with LLM-specific adaptations:
+> - "Advanced strategies" maps to long reasoning chains (>500 chars)
+> - "Breakthrough" maps to first correct move after 3+ errors
+> - Parse failures treated as error (learning opportunity)
+>
+> See Spec 11 for complete LLM importance calculation details.
+
 #### 2.1.4 SYNTHESIZE Phase
 
 **Purpose:** Connect patterns and generate insights

@@ -53,6 +53,20 @@ export interface LLMExperience {
   timestamp: Date;
   modelUsed: string;
   memoryWasEnabled: boolean;
+
+  // Importance scoring (Spec 03 FR-A3, Spec 11)
+  importance: number;       // 0.0 - 1.0, calculated at creation
+  context: LLMExperienceContext;
+}
+
+/**
+ * Experience Context (Spec 11 - Importance Scoring)
+ * Metrics for calculating experience importance
+ */
+export interface LLMExperienceContext {
+  emptyCellsAtMove: number;   // Grid complexity indicator
+  reasoningLength: number;    // Token proxy (character count)
+  constraintDensity: number;  // Avg candidates per empty cell
 }
 
 /**

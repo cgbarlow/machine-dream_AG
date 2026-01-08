@@ -10,6 +10,8 @@ import type {
   PlaySession,
   LLMExperience,
   ChatMessage,
+  LLMMove,
+  MoveValidation,
 } from './types.js';
 import { LMStudioClient } from './LMStudioClient.js';
 import { PromptBuilder } from './PromptBuilder.js';
@@ -18,6 +20,7 @@ import { MoveValidator } from './MoveValidator.js';
 import { ExperienceStore } from './ExperienceStore.js';
 import { SYSTEM_PROMPT } from './config.js';
 import type { AgentMemory } from '../memory/AgentMemory.js';
+import { calculateImportance, calculateContext } from './ImportanceCalculator.js';
 
 /**
  * LLM Sudoku Player
@@ -74,6 +77,9 @@ export class LLMSudokuPlayer extends EventEmitter {
     const fewShots = this.config.memoryEnabled
       ? await this.experienceStore.getFewShots()
       : [];
+
+    // Track consecutive errors for breakthrough detection
+    let recentErrorCount = 0;
 
     while (!this.validator.isSolved(gridState) && !session.abandoned) {
       // Check max moves limit
@@ -136,12 +142,14 @@ export class LLMSudokuPlayer extends EventEmitter {
           session.totalMoves + 1,
           gridState,
           rawResponse,
-          parsed.parseError || 'Unknown parse error'
+          parsed.parseError || 'Unknown parse error',
+          recentErrorCount
         );
 
         session.experiences.push(failureExperience);
         session.totalMoves++;
         session.invalidMoves++;
+        recentErrorCount++; // Count parse failure as error
 
         // Persist experience if memory enabled
         if (this.config.memoryEnabled) {
@@ -167,7 +175,8 @@ export class LLMSudokuPlayer extends EventEmitter {
         session.totalMoves + 1,
         gridState,
         parsed.move,
-        validation
+        validation,
+        recentErrorCount
       );
 
       session.experiences.push(experience);
@@ -180,12 +189,15 @@ export class LLMSudokuPlayer extends EventEmitter {
       if (validation.isCorrect) {
         gridState = this.applyMove(gridState, parsed.move);
         session.correctMoves++;
+        recentErrorCount = 0; // Reset on success
       } else if (validation.isValid) {
         // Valid but wrong - don't apply, let LLM try again
         session.validButWrongMoves++;
+        recentErrorCount++; // Count as error
       } else {
         // Invalid - rule violation
         session.invalidMoves++;
+        recentErrorCount++; // Count as error
       }
 
       // 7. Persist experience if memory enabled
@@ -228,9 +240,14 @@ export class LLMSudokuPlayer extends EventEmitter {
     puzzleId: string,
     moveNumber: number,
     gridState: number[][],
-    move: any,
-    validation: any
+    move: LLMMove,
+    validation: MoveValidation,
+    recentErrorCount: number
   ): LLMExperience {
+    // Calculate importance and context (Spec 11, Spec 03)
+    const importance = calculateImportance(move, validation, gridState, recentErrorCount);
+    const context = calculateContext(move, gridState);
+
     return {
       id: randomUUID(),
       puzzleId,
@@ -242,6 +259,8 @@ export class LLMSudokuPlayer extends EventEmitter {
       timestamp: new Date(),
       modelUsed: this.config.model,
       memoryWasEnabled: this.config.memoryEnabled,
+      importance,
+      context,
     };
   }
 
@@ -270,29 +289,40 @@ export class LLMSudokuPlayer extends EventEmitter {
     moveNumber: number,
     gridState: number[][],
     rawResponse: string,
-    parseError: string
+    parseError: string,
+    recentErrorCount: number
   ): LLMExperience {
+    const move: LLMMove = {
+      row: 0,
+      col: 0,
+      value: 0,
+      reasoning: `PARSE FAILURE: ${parseError}\n\nRaw response:\n${rawResponse}`,
+    };
+
+    const validation: MoveValidation = {
+      isValid: false,
+      isCorrect: false,
+      outcome: 'invalid',
+      error: `Parse failure: ${parseError}`,
+    };
+
+    // Calculate importance and context (Spec 11, Spec 03)
+    const importance = calculateImportance(move, validation, gridState, recentErrorCount);
+    const context = calculateContext(move, gridState);
+
     return {
       id: randomUUID(),
       puzzleId,
       puzzleHash: this.experienceStore.generatePuzzleHash(gridState),
       moveNumber,
       gridState: this.cloneGrid(gridState),
-      move: {
-        row: 0,
-        col: 0,
-        value: 0,
-        reasoning: `PARSE FAILURE: ${parseError}\n\nRaw response:\n${rawResponse}`,
-      },
-      validation: {
-        isValid: false,
-        isCorrect: false,
-        outcome: 'invalid',
-        error: `Parse failure: ${parseError}`,
-      },
+      move,
+      validation,
       timestamp: new Date(),
       modelUsed: this.config.model,
       memoryWasEnabled: this.config.memoryEnabled,
+      importance,
+      context,
     };
   }
 

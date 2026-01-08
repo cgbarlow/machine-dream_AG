@@ -36,7 +36,7 @@ export class ExperienceStore {
       return;
     }
 
-    // Store in ReasoningBank
+    // Store in ReasoningBank with full outcome details
     await this.agentMemory.reasoningBank.storeReasoning({
       trajectory_id: experience.puzzleId,
       step_index: experience.moveNumber,
@@ -46,7 +46,7 @@ export class ExperienceStore {
         value: experience.move.value,
       }),
       reasoning: experience.move.reasoning,
-      outcome: experience.validation.isCorrect ? 'success' : 'failure',
+      outcome: experience.validation.outcome, // Store full outcome: correct/invalid/valid_but_wrong
       feedback: experience.validation.error || 'Move validated',
     });
 

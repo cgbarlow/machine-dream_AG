@@ -46,7 +46,17 @@ export class DreamingConsolidator {
    */
   async consolidate(): Promise<ConsolidationReport> {
     // 1. Load experiences since last consolidation
-    const experiences = await this.experienceStore.getUnconsolidated();
+    let experiences = await this.experienceStore.getUnconsolidated();
+
+    if (experiences.length === 0) {
+      return this.createEmptyReport();
+    }
+
+    // Sort by importance (high to low) and filter low-importance experiences
+    // Spec 03: Prioritize high-importance experiences for pattern extraction
+    experiences = experiences
+      .sort((a, b) => (b.importance ?? 0.5) - (a.importance ?? 0.5))
+      .filter((e) => (e.importance ?? 0.5) >= 0.6);
 
     if (experiences.length === 0) {
       return this.createEmptyReport();
@@ -95,6 +105,7 @@ export class DreamingConsolidator {
 
   /**
    * Extract successful strategies from correct moves
+   * Weight patterns by importance score (Spec 03)
    */
   private extractStrategies(successful: LLMExperience[]): LLMPattern[] {
     const patternMap = new Map<string, LLMPattern>();
@@ -116,20 +127,24 @@ export class DreamingConsolidator {
         });
       }
 
-      // Increment success count
+      // Weight by importance instead of simple count
       const pattern = patternMap.get(signature)!;
-      pattern.successRate += 1;
+      const importance = exp.importance ?? 0.5;
+      pattern.successRate += importance;
     }
 
-    // Convert counts to rates
-    const totalSuccessful = successful.length;
+    // Convert weighted sums to normalized rates
+    const totalWeight = successful.reduce(
+      (sum, exp) => sum + (exp.importance ?? 0.5),
+      0
+    );
     const patterns = Array.from(patternMap.values());
 
     patterns.forEach((p) => {
-      p.successRate = totalSuccessful > 0 ? p.successRate / totalSuccessful : 0;
+      p.successRate = totalWeight > 0 ? p.successRate / totalWeight : 0;
     });
 
-    // Sort by success rate and return top patterns
+    // Sort by weighted success rate and return top patterns
     return patterns.sort((a, b) => b.successRate - a.successRate).slice(0, 10);
   }
 

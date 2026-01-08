@@ -988,21 +988,43 @@ export function registerLLMCommand(program: Command): void {
 
         logger.info('📋 Agent Memory Contents\n');
 
-        // Query recent moves
+        // Query all LLM experiences from metadata
         logger.info('Recent Moves:');
-        const experiences = await agentMemory.querySimilar({} as any);
-        experiences.slice(0, Math.min(limit, experiences.length)).forEach((exp: any, i) => {
-          logger.info(`  ${i + 1}. Row ${exp.row}, Col ${exp.col} = ${exp.value} (${exp.outcome})`);
-        });
+        const allExperiences = await agentMemory.reasoningBank.queryMetadata('llm_experience', {}) as any[];
+
+        // Sort by timestamp descending (most recent first)
+        allExperiences.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+        const experiencesToShow = allExperiences.slice(0, limit);
+
+        if (experiencesToShow.length === 0) {
+          logger.info('  (No experiences stored yet)');
+        } else {
+          experiencesToShow.forEach((exp: any, i) => {
+            const move = exp.move || {};
+            const validation = exp.validation || {};
+            const outcome = validation.outcome || 'unknown';
+            logger.info(`  ${i + 1}. (${move.row},${move.col})=${move.value} → ${outcome.toUpperCase()}`);
+          });
+        }
+
+        logger.info(`\nTotal experiences in database: ${allExperiences.length}`);
 
         // Query patterns
         logger.info('\nLearned Patterns:');
         const patterns = await agentMemory.distillPatterns('session-default');
-        patterns.slice(0, Math.min(limit, patterns.length)).forEach((pattern, i) => {
-          logger.info(
-            `  ${i + 1}. ${pattern.id}: ${(pattern.successRate * 100).toFixed(1)}% success (${pattern.usageCount} uses)`
-          );
-        });
+
+        if (patterns.length === 0) {
+          logger.info('  (No patterns learned yet - run "llm dream" to consolidate)');
+        } else {
+          patterns.slice(0, Math.min(limit, patterns.length)).forEach((pattern, i) => {
+            const successRate = pattern.successRate ?? 0;
+            const usageCount = pattern.usageCount ?? 0;
+            logger.info(
+              `  ${i + 1}. ${pattern.id}: ${(successRate * 100).toFixed(1)}% success (${usageCount} uses)`
+            );
+          });
+        }
       } catch (error) {
         throw new CLIError('Failed to list memory', 1, error instanceof Error ? error.message : String(error));
       }

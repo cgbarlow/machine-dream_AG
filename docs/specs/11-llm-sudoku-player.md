@@ -230,6 +230,16 @@ interface LLMExperience {
   timestamp: Date;
   modelUsed: string;
   memoryWasEnabled: boolean;
+
+  // Importance scoring (Spec 03 FR-A3)
+  importance: number;       // 0.0 - 1.0, calculated at creation
+  context: LLMExperienceContext;
+}
+
+interface LLMExperienceContext {
+  emptyCellsAtMove: number;   // Grid complexity indicator
+  reasoningLength: number;    // Token proxy (character count)
+  constraintDensity: number;  // Avg candidates per empty cell
 }
 ```
 
@@ -256,6 +266,30 @@ interface PlaySession {
   memoryWasEnabled: boolean;
 }
 ```
+
+### Experience Importance Calculation
+
+Importance is calculated at experience creation time following the GRASP framework (Spec 03). This score (0.0-1.0) helps prioritize experiences during consolidation and pattern extraction.
+
+**Formula Components:**
+
+| Factor | Contribution | Condition |
+|--------|-------------|-----------|
+| Base | 0.5 | Always applied |
+| Correct move | +0.4 | `validation.isCorrect === true` |
+| Valid but wrong | +0.2 | `validation.isValid && !validation.isCorrect` |
+| Invalid move | +0.3 | `!validation.isValid` (learning opportunity) |
+| Breakthrough | +0.3 | First correct move after 3+ consecutive errors |
+| Long reasoning | +0.1 | `move.reasoning.length > 500` characters |
+| Complex grid | +0.1 | `emptyCellsAtMove > 50` cells |
+
+**Capped at 1.0**
+
+**Examples:**
+- Correct move on simple grid: 0.5 + 0.4 = **0.9**
+- Parse failure: 0.5 + 0.3 = **0.8** (learning from malformed responses)
+- Breakthrough after struggle: 0.5 + 0.4 + 0.3 = 1.2 → **1.0** (capped)
+- Valid but wrong with deep reasoning: 0.5 + 0.2 + 0.1 = **0.8**
 
 ## Prompt Engineering
 

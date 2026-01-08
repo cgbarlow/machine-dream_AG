@@ -150,6 +150,9 @@ interface ExperienceLogOperation {
 - Insights generated during synthesis
 - Errors and corrections (AgentDB only)
 - Timing and performance metrics
+- **Importance score** (0-1, calculated at creation per Spec 03 formula)
+- **Grid context metrics** (empty cells, constraint density)
+- **Reasoning depth proxy** (character count)
 
 **Storage Format:**
 ```json
@@ -168,6 +171,12 @@ interface ExperienceLogOperation {
   ],
   "outcome": "solved",
   "duration": 45000,
+  "importance": 0.9,
+  "context": {
+    "emptyCellsAtMove": 45,
+    "reasoningLength": 312,
+    "constraintDensity": 3.2
+  },
   "insights": [
     {
       "type": "strategy",
