@@ -29,9 +29,11 @@ export class PromptBuilder {
     experiences: LLMExperience[] = [],
     fewShots: FewShotExample[] = []
   ): string {
+    const size = gridState.length;
+
     // Simplified prompt: use only row format (no visual grid)
     let prompt = 'CURRENT PUZZLE STATE:\n';
-    for (let row = 0; row < 9; row++) {
+    for (let row = 0; row < size; row++) {
       const rowStr = gridState[row]
         .map(cell => cell === 0 ? '_' : cell.toString())
         .join(',');
@@ -51,21 +53,22 @@ export class PromptBuilder {
 
     // Add move history for this puzzle
     if (experiences.length > 0) {
-      prompt += 'YOUR PREVIOUS ATTEMPTS ON THIS PUZZLE:\n';
-      prompt += this.formatMoveHistory(experiences);
-      prompt += '\n\n';
-
-      // Add forbidden moves to prevent repetition
+      // Add forbidden moves FIRST - make them impossible to miss
       const forbiddenMoves = this.extractForbiddenMoves(experiences);
       if (forbiddenMoves.length > 0) {
-        prompt += 'FORBIDDEN MOVES (do not attempt again):\n';
+        prompt += '⚠️  FORBIDDEN MOVES - DO NOT ATTEMPT THESE AGAIN ⚠️\n';
+        prompt += 'These moves have been proven WRONG. You MUST NOT propose any of these:\n';
         // Group in sets of 8 for readability
         for (let i = 0; i < forbiddenMoves.length; i += 8) {
           const group = forbiddenMoves.slice(i, i + 8).join(', ');
           prompt += `${group}\n`;
         }
-        prompt += '\n';
+        prompt += 'If you propose ANY move from this list, your response will be REJECTED.\n\n';
       }
+
+      prompt += 'YOUR PREVIOUS ATTEMPTS ON THIS PUZZLE:\n';
+      prompt += this.formatMoveHistory(experiences);
+      prompt += '\n\n';
     }
 
     // Add empty cell count
@@ -100,10 +103,11 @@ export class PromptBuilder {
    * This helps the LLM avoid proposing moves for already-filled cells
    */
   private buildConstraintInfo(gridState: number[][]): string {
+    const size = gridState.length;
     const filledCells: string[] = [];
 
-    for (let row = 0; row < 9; row++) {
-      for (let col = 0; col < 9; col++) {
+    for (let row = 0; row < size; row++) {
+      for (let col = 0; col < size; col++) {
         const value = gridState[row][col];
         if (value !== 0) {
           // Cell is filled - add to list (1-indexed for user-facing)
@@ -128,7 +132,7 @@ export class PromptBuilder {
    */
   private formatMoveHistory(experiences: LLMExperience[]): string {
     return experiences
-      .map((exp, idx) => {
+      .map((exp) => {
         const { row, col, value } = exp.move;
         const outcome = this.formatOutcome(exp.validation);
 
@@ -142,7 +146,8 @@ export class PromptBuilder {
           reasoning = `\n  Your reasoning: "${snippet}${exp.move.reasoning.length > 80 ? '...' : ''}"`;
         }
 
-        return `Move ${idx + 1}: (${row},${col})=${value} → ${outcome}${reasoning}`;
+        // Use actual move number instead of array index
+        return `Move ${exp.moveNumber}: (${row},${col})=${value} → ${outcome}${reasoning}`;
       })
       .join('\n');
   }

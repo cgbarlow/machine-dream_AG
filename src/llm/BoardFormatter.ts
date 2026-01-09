@@ -19,13 +19,13 @@ export interface FormatOptions {
 /**
  * Board Formatter
  *
- * Formats 9x9 Sudoku grids with box separators
+ * Formats Sudoku grids with box separators (supports 4x4, 9x9, 16x16, 25x25)
  */
 export class BoardFormatter {
   /**
-   * Format 9x9 grid with box separators
+   * Format grid with box separators
    *
-   * @param grid - 9x9 grid (0 = empty, 1-9 = filled)
+   * @param grid - NxN grid (0 = empty, 1-N = filled)
    * @param options - Formatting options
    * @returns Formatted grid string
    */
@@ -37,16 +37,27 @@ export class BoardFormatter {
       emptyChar = '.'
     } = options;
 
+    const size = grid.length;
+    const boxSize = Math.sqrt(size);
+
     let result = '';
 
-    // Column labels
+    // Column labels (aligned with cells)
     if (showLabels) {
-      result += '    1 2 3   4 5 6   7 8 9\n';
+      result += '    '; // Indent for row label "N │"
+      for (let col = 0; col < size; col++) {
+        result += ` ${col + 1} `;
+        if ((col + 1) % boxSize === 0 && col < size - 1) {
+          result += ' '; // Space for box separator │
+        }
+      }
+      result += '\n';
     }
 
-    result += '  ┌───────┬───────┬───────┐\n';
+    // Top border
+    result += '  ┌' + this.buildHorizontalLine(size, boxSize) + '┐\n';
 
-    for (let row = 0; row < 9; row++) {
+    for (let row = 0; row < size; row++) {
       // Row label
       if (showLabels) {
         result += `${row + 1} │`;
@@ -54,41 +65,57 @@ export class BoardFormatter {
         result += '│';
       }
 
-      for (let col = 0; col < 9; col++) {
+      for (let col = 0; col < size; col++) {
         const value = grid[row][col];
         const isHighlighted =
           highlightCell &&
           highlightCell.row === row + 1 &&
           highlightCell.col === col + 1;
 
-        // Format cell value
+        // Format cell value (3 chars: space + value + space)
         let cellStr: string;
         if (value === 0) {
-          cellStr = ` ${emptyChar}`;
+          cellStr = ` ${emptyChar} `;
         } else if (isHighlighted) {
-          cellStr = ` ${highlightColor}${value}\x1b[0m`; // Colored
+          cellStr = ` ${highlightColor}${value}\x1b[0m `;
         } else {
-          cellStr = ` ${value}`;
+          cellStr = ` ${value} `;
         }
 
         result += cellStr;
 
         // Box separators
-        if (col === 2 || col === 5) {
-          result += ' │';
-        } else if (col === 8) {
-          result += ' │\n';
+        if ((col + 1) % boxSize === 0 && col < size - 1) {
+          result += '│';
+        } else if (col === size - 1) {
+          result += '│\n';
         }
       }
 
-      // Row separators
-      if (row === 2 || row === 5) {
-        result += '  ├───────┼───────┼───────┤\n';
+      // Row separators between boxes
+      if ((row + 1) % boxSize === 0 && row < size - 1) {
+        result += '  ├' + this.buildHorizontalLine(size, boxSize) + '┤\n';
       }
     }
 
-    result += '  └───────┴───────┴───────┘';
+    // Bottom border
+    result += '  └' + this.buildHorizontalLine(size, boxSize) + '┘';
     return result;
+  }
+
+  /**
+   * Build horizontal line for grid borders
+   * Each cell is 3 chars wide, box separators are 1 char
+   */
+  private static buildHorizontalLine(size: number, boxSize: number): string {
+    let line = '';
+    for (let i = 0; i < size; i++) {
+      line += '───'; // 3 dashes per cell
+      if ((i + 1) % boxSize === 0 && i < size - 1) {
+        line += '┼'; // Box separator
+      }
+    }
+    return line;
   }
 
   /**

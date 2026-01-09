@@ -73,14 +73,15 @@ export function calculateContext(
   move: LLMMove,
   gridState: number[][]
 ): LLMExperienceContext {
+  const size = gridState.length;
   const emptyCells = BoardFormatter.countEmptyCells(gridState);
 
   // Calculate constraint density: average number of candidates per empty cell
   let totalCandidates = 0;
   let emptyCellCount = 0;
 
-  for (let row = 0; row < 9; row++) {
-    for (let col = 0; col < 9; col++) {
+  for (let row = 0; row < size; row++) {
+    for (let col = 0; col < size; col++) {
       if (gridState[row][col] === 0) {
         const candidates = countCandidates(gridState, row, col);
         totalCandidates += candidates;
@@ -103,12 +104,13 @@ export function calculateContext(
  * Count valid candidates for a cell
  *
  * NOTE: This duplicates logic from StrategyEngine to avoid circular dependencies.
- * Counts how many values (1-9) are valid for a given empty cell.
+ * Counts how many values (1-N) are valid for a given empty cell.
+ * Supports variable grid sizes (4x4, 9x9, 16x16, 25x25).
  *
  * @param grid - Current grid state (0-indexed, 0 = empty)
  * @param row - Row index (0-indexed)
  * @param col - Column index (0-indexed)
- * @returns Number of valid candidates (1-9)
+ * @returns Number of valid candidates (1-N)
  */
 function countCandidates(
   grid: number[][],
@@ -117,27 +119,34 @@ function countCandidates(
 ): number {
   if (grid[row][col] !== 0) return 0; // Cell already filled
 
-  const candidates = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  const size = grid.length;
+  const boxSize = Math.sqrt(size);
+
+  // Initialize candidates 1 to size
+  const candidates = new Set<number>();
+  for (let i = 1; i <= size; i++) {
+    candidates.add(i);
+  }
 
   // Check row
-  for (let c = 0; c < 9; c++) {
+  for (let c = 0; c < size; c++) {
     if (grid[row][c] !== 0) {
       candidates.delete(grid[row][c]);
     }
   }
 
   // Check column
-  for (let r = 0; r < 9; r++) {
+  for (let r = 0; r < size; r++) {
     if (grid[r][col] !== 0) {
       candidates.delete(grid[r][col]);
     }
   }
 
-  // Check 3x3 box
-  const boxRow = Math.floor(row / 3) * 3;
-  const boxCol = Math.floor(col / 3) * 3;
-  for (let r = boxRow; r < boxRow + 3; r++) {
-    for (let c = boxCol; c < boxCol + 3; c++) {
+  // Check box
+  const boxRowStart = Math.floor(row / boxSize) * boxSize;
+  const boxColStart = Math.floor(col / boxSize) * boxSize;
+  for (let r = boxRowStart; r < boxRowStart + boxSize; r++) {
+    for (let c = boxColStart; c < boxColStart + boxSize; c++) {
       if (grid[r][c] !== 0) {
         candidates.delete(grid[r][c]);
       }

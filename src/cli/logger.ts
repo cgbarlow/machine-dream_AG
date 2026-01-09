@@ -11,17 +11,20 @@ interface LoggerOptions {
     quiet?: boolean;
     noColor?: boolean;
     verbose?: boolean;
+    simple?: boolean; // Disable timestamp/level prefix for clean CLI output
 }
 
 export class Logger {
     private logLevel: 'debug' | 'info' | 'warn' | 'error';
     private quiet: boolean;
     private noColor: boolean;
+    private simple: boolean;
 
     constructor(options: LoggerOptions = {}) {
         this.logLevel = options.logLevel || 'info';
         this.quiet = options.quiet || false;
         this.noColor = options.noColor || false;
+        this.simple = options.simple || false;
         // verbose option not yet implemented
         void options.verbose;
     }
@@ -37,6 +40,11 @@ export class Logger {
     }
 
     private formatMessage(level: string, message: string): string {
+        // Simple mode: just return the message without prefix
+        if (this.simple) {
+            return message;
+        }
+
         const timestamp = new Date().toISOString();
 
         if (this.noColor) {
@@ -119,8 +127,8 @@ export class Logger {
     }
 }
 
-// Global logger instance
-export const logger = new Logger();
+// Global logger instance (simple mode by default for clean CLI output)
+export const logger = new Logger({ simple: true });
 
 // Function to configure global logger
 export function configureLogger(options: LoggerOptions): void {
@@ -129,6 +137,7 @@ export function configureLogger(options: LoggerOptions): void {
         logLevel: options.logLevel || globalLogger.logLevel,
         quiet: options.quiet || globalLogger.quiet,
         noColor: options.noColor || globalLogger.noColor,
-        verbose: options.verbose || globalLogger.verbose
+        verbose: options.verbose || globalLogger.verbose,
+        simple: options.simple !== undefined ? options.simple : globalLogger.simple
     });
 }

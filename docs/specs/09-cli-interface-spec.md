@@ -719,7 +719,7 @@ Options:
 
 #### 3.8.5 `llm memory show` - View Experience Details
 
-View complete details of a stored LLM experience including full reasoning text.
+View complete details of a stored LLM experience including full reasoning text and board state.
 
 ```bash
 machine-dream llm memory show <experience-id> [options]
@@ -729,7 +729,7 @@ Arguments:
 
 Options:
   --format <format>            # Output format (text|json), default: text
-  --include-grid               # Show grid state at time of move
+  --no-grid                    # Hide grid state (shown by default)
 ```
 
 **Output includes:**
@@ -740,17 +740,18 @@ Options:
 - Profile name and model used
 - Learning context (few-shots used, patterns available)
 - Timestamp
+- **Grid state at time of move (9x9 board, shown by default)**
 
 **Example:**
 ```bash
-# View experience in detail
+# View experience in detail (includes grid by default)
 machine-dream llm memory show exp-abc123
 
 # Output as JSON for processing
 machine-dream llm memory show exp-abc123 --format json
 
-# Include grid state
-machine-dream llm memory show exp-abc123 --include-grid
+# Hide grid state if you only want text details
+machine-dream llm memory show exp-abc123 --no-grid
 ```
 
 #### 3.8.6 `llm memory list` - Enhanced Experience List

@@ -37,19 +37,31 @@ export const DEFAULT_LLM_CONFIG: LLMConfig = {
  * System Prompt (Spec 11 - Prompt Engineering)
  * Simplified: removed meta-instructions, let LLM learn naturally from feedback
  * Anti-rambling: Enforces concise reasoning with strict constraints
+ *
+ * NOTE: This is the default 9x9 prompt. Use buildSystemPrompt() for dynamic size.
  */
-export const SYSTEM_PROMPT = `You are solving Sudoku puzzles through trial and error.
+export const SYSTEM_PROMPT = buildSystemPrompt(9);
+
+/**
+ * Build system prompt for specific grid size
+ * Supports 4x4, 9x9, 16x16, 25x25 grids
+ */
+export function buildSystemPrompt(gridSize: number): string {
+  const boxSize = Math.sqrt(gridSize);
+  const maxValue = gridSize;
+
+  return `You are solving Sudoku puzzles through trial and error.
 
 RULES:
-- 9x9 grid, nine 3x3 boxes
-- Each row contains 1-9 exactly once
-- Each column contains 1-9 exactly once
-- Each box contains 1-9 exactly once
+- ${gridSize}x${gridSize} grid, ${gridSize} ${boxSize}x${boxSize} boxes
+- Each row contains 1-${maxValue} exactly once
+- Each column contains 1-${maxValue} exactly once
+- Each box contains 1-${maxValue} exactly once
 
 NOTATION:
-- Numbers 1-9 are filled cells (cannot be changed)
+- Numbers 1-${maxValue} are filled cells (cannot be changed)
 - Underscore (_) is empty cell you can fill
-- Rows/columns numbered 1-9
+- Rows/columns numbered 1-${gridSize}
 
 FEEDBACK:
 - CORRECT: Move accepted
@@ -62,9 +74,9 @@ CRITICAL CONSTRAINT:
 - You MUST choose a different cell or value
 
 OUTPUT FORMAT:
-ROW: <1-9>
-COL: <1-9>
-VALUE: <1-9>
+ROW: <1-${gridSize}>
+COL: <1-${gridSize}>
+VALUE: <1-${maxValue}>
 REASONING: <brief analysis>
 
 CRITICAL INSTRUCTIONS FOR REASONING:
@@ -74,6 +86,7 @@ CRITICAL INSTRUCTIONS FOR REASONING:
 - Do NOT say "wait", "actually", "let me recheck"
 - Do NOT explain what you already tried
 - One analysis per move - commit to your choice`;
+}
 
 /**
  * Validate LLM configuration

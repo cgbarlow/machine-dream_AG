@@ -111,6 +111,7 @@ export class LMStudioClient {
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let fullContent = '';
+    let finishReason: string | null = null;
 
     try {
       while (true) {
@@ -138,6 +139,11 @@ export class LMStudioClient {
                 fullContent += token;
                 onStream(token);
               }
+              // Capture finish_reason when it appears
+              const reason = parsed.choices?.[0]?.finish_reason;
+              if (reason) {
+                finishReason = reason;
+              }
             } catch {
               // Skip malformed JSON
             }
@@ -146,6 +152,11 @@ export class LMStudioClient {
       }
     } finally {
       reader.releaseLock();
+    }
+
+    // Check if response was truncated
+    if (finishReason && finishReason !== 'stop') {
+      throw new Error(`LLM response incomplete: finish_reason=${finishReason}`);
     }
 
     return fullContent;

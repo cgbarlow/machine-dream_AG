@@ -44,6 +44,7 @@ export interface MoveValidation {
 
 export interface LLMExperience {
   id: string;
+  sessionId: string;        // Unique session identifier (GUID)
   puzzleId: string;
   puzzleHash: string;       // For finding similar puzzles
   moveNumber: number;
@@ -91,6 +92,7 @@ export interface LearningContext {
  * Play Session (Spec 11 - Play Session)
  */
 export interface PlaySession {
+  id: string;                       // Unique session identifier (GUID)
   puzzleId: string;
   startTime: Date;
   endTime?: Date;
@@ -98,6 +100,7 @@ export interface PlaySession {
   // Outcome
   solved: boolean;
   abandoned: boolean;
+  abandonReason?: string;           // Why session was abandoned (max_moves, error, parse_error, etc.)
 
   // Statistics
   totalMoves: number;

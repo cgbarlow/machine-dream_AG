@@ -12,13 +12,14 @@ import type {
   ChatMessage,
   LLMMove,
   MoveValidation,
+  LearningContext,
 } from './types.js';
 import { LMStudioClient } from './LMStudioClient.js';
 import { PromptBuilder } from './PromptBuilder.js';
 import { ResponseParser } from './ResponseParser.js';
 import { MoveValidator } from './MoveValidator.js';
 import { ExperienceStore } from './ExperienceStore.js';
-import { SYSTEM_PROMPT } from './config.js';
+import { buildSystemPrompt } from './config.js';
 import type { AgentMemory } from '../memory/AgentMemory.js';
 import { calculateImportance, calculateContext } from './ImportanceCalculator.js';
 
@@ -37,12 +38,14 @@ export class LLMSudokuPlayer extends EventEmitter {
   private responseParser: ResponseParser;
   private validator: MoveValidator;
   private experienceStore: ExperienceStore;
+  private agentMemory: AgentMemory;
 
   private streamingEnabled = false;
 
   constructor(
     private config: LLMConfig,
-    _agentMemory: AgentMemory
+    _agentMemory: AgentMemory,
+    private profileName: string = 'default'
   ) {
     super();
     this.client = new LMStudioClient(config);
@@ -50,6 +53,7 @@ export class LLMSudokuPlayer extends EventEmitter {
     this.responseParser = new ResponseParser();
     this.validator = new MoveValidator();
     this.experienceStore = new ExperienceStore(_agentMemory, config);
+    this.agentMemory = _agentMemory;
   }
 
   /**
@@ -70,21 +74,30 @@ export class LLMSudokuPlayer extends EventEmitter {
     solution: number[][],
     maxMoves = 200
   ): Promise<PlaySession> {
-    const session = this.initSession(puzzleId);
-    let gridState = this.cloneGrid(initialGrid);
-
     // Load few-shot examples if memory enabled
     const fewShots = this.config.memoryEnabled
       ? await this.experienceStore.getFewShots()
       : [];
 
+    // Capture learning context at session start
+    const learningContext = await this.captureLearningContext(fewShots);
+
+    const session = this.initSession(puzzleId, learningContext);
+    let gridState = this.cloneGrid(initialGrid);
+
     // Track consecutive errors for breakthrough detection
     let recentErrorCount = 0;
+
+    // Track consecutive forbidden move attempts to prevent infinite loops
+    // If LLM keeps proposing the same forbidden moves, we abandon
+    let consecutiveForbiddenCount = 0;
+    const MAX_CONSECUTIVE_FORBIDDEN = 10;
 
     while (!this.validator.isSolved(gridState) && !session.abandoned) {
       // Check max moves limit
       if (session.totalMoves >= maxMoves) {
         session.abandoned = true;
+        session.abandonReason = 'max_moves';
         this.emit('session:abandoned', { session, reason: 'max_moves' });
         break;
       }
@@ -100,9 +113,10 @@ export class LLMSudokuPlayer extends EventEmitter {
         fewShots
       );
 
-      // 2. Call LLM
+      // 2. Call LLM (use dynamic system prompt based on grid size)
+      const gridSize = gridState.length;
       const messages: ChatMessage[] = [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: buildSystemPrompt(gridSize) },
         { role: 'user', content: prompt },
       ];
 
@@ -121,13 +135,15 @@ export class LLMSudokuPlayer extends EventEmitter {
         }
         this.emit('llm:response', { rawResponse });
       } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
         this.emit('llm:error', { error });
         session.abandoned = true;
+        session.abandonReason = `llm_error: ${errorMsg}`;
         break;
       }
 
-      // 3. Parse response
-      const parsed = this.responseParser.parse(rawResponse);
+      // 3. Parse response (pass grid size for validation)
+      const parsed = this.responseParser.parse(rawResponse, gridSize);
 
       if (!parsed.parseSuccess) {
         // Malformed response - record as experience per Spec 11
@@ -138,12 +154,14 @@ export class LLMSudokuPlayer extends EventEmitter {
 
         // Record parse failure as an experience
         const failureExperience = this.recordParseFailure(
+          session.id,
           puzzleId,
           session.totalMoves + 1,
           gridState,
           rawResponse,
           parsed.parseError || 'Unknown parse error',
-          recentErrorCount
+          recentErrorCount,
+          learningContext
         );
 
         session.experiences.push(failureExperience);
@@ -162,21 +180,61 @@ export class LLMSudokuPlayer extends EventEmitter {
 
       this.emit('llm:move_proposed', { move: parsed.move });
 
-      // 4. Validate move
-      const validation = this.validator.validate(
-        gridState,
-        parsed.move,
-        solution
-      );
+      // 3.5. Check if move is in forbidden list (prevent LLM from ignoring instructions)
+      const moveKey = `(${parsed.move.row},${parsed.move.col})=${parsed.move.value}`;
+      const isForbidden = session.experiences.some(exp => {
+        const expKey = `(${exp.move.row},${exp.move.col})=${exp.move.value}`;
+        return expKey === moveKey && (exp.validation.outcome === 'invalid' || exp.validation.outcome === 'valid_but_wrong');
+      });
+
+      let validation: MoveValidation;
+      if (isForbidden) {
+        // Reject forbidden move immediately without validating
+        validation = {
+          isValid: false,
+          isCorrect: false,
+          outcome: 'invalid',
+          error: 'This move was already attempted and proven wrong (FORBIDDEN)',
+        };
+        consecutiveForbiddenCount++;
+        this.emit('llm:forbidden_move_rejected', {
+          move: parsed.move,
+          consecutiveCount: consecutiveForbiddenCount
+        });
+
+        // Check if we've hit the consecutive forbidden limit
+        if (consecutiveForbiddenCount >= MAX_CONSECUTIVE_FORBIDDEN) {
+          session.abandoned = true;
+          session.abandonReason = `consecutive_forbidden: LLM proposed ${consecutiveForbiddenCount} forbidden moves in a row`;
+          this.emit('session:abandoned', {
+            session,
+            reason: 'consecutive_forbidden',
+            count: consecutiveForbiddenCount
+          });
+          break;
+        }
+      } else {
+        // Non-forbidden move - reset the consecutive counter
+        consecutiveForbiddenCount = 0;
+
+        // 4. Validate move normally
+        validation = this.validator.validate(
+          gridState,
+          parsed.move,
+          solution
+        );
+      }
 
       // 5. Record experience
       const experience = this.createExperience(
+        session.id,
         puzzleId,
         session.totalMoves + 1,
         gridState,
         parsed.move,
         validation,
-        recentErrorCount
+        recentErrorCount,
+        learningContext
       );
 
       session.experiences.push(experience);
@@ -216,10 +274,43 @@ export class LLMSudokuPlayer extends EventEmitter {
   }
 
   /**
+   * Capture learning context at session start
+   * Queries memory to determine what learning features are available
+   */
+  private async captureLearningContext(fewShots: any[]): Promise<LearningContext> {
+    let patternsAvailable = 0;
+    let consolidatedExperiences = 0;
+
+    if (this.config.memoryEnabled) {
+      try {
+        // Query patterns from memory
+        const patterns = await this.agentMemory.distillPatterns('session-default');
+        patternsAvailable = patterns.length;
+
+        // Query consolidated experiences count
+        const allExperiences = await this.agentMemory.reasoningBank.queryMetadata('llm_experience', {}) as any[];
+        consolidatedExperiences = allExperiences.filter((exp: any) => exp.consolidated === true).length;
+      } catch (error) {
+        // If queries fail, default to 0
+        patternsAvailable = 0;
+        consolidatedExperiences = 0;
+      }
+    }
+
+    return {
+      fewShotsUsed: fewShots.length > 0,
+      fewShotCount: fewShots.length,
+      patternsAvailable,
+      consolidatedExperiences,
+    };
+  }
+
+  /**
    * Initialize play session
    */
-  private initSession(puzzleId: string): PlaySession {
+  private initSession(puzzleId: string, learningContext: LearningContext): PlaySession {
     return {
+      id: randomUUID(),
       puzzleId,
       startTime: new Date(),
       solved: false,
@@ -230,6 +321,8 @@ export class LLMSudokuPlayer extends EventEmitter {
       validButWrongMoves: 0,
       experiences: [],
       memoryWasEnabled: this.config.memoryEnabled,
+      profileName: this.profileName,
+      learningContext,
     };
   }
 
@@ -237,12 +330,14 @@ export class LLMSudokuPlayer extends EventEmitter {
    * Create experience record
    */
   private createExperience(
+    sessionId: string,
     puzzleId: string,
     moveNumber: number,
     gridState: number[][],
     move: LLMMove,
     validation: MoveValidation,
-    recentErrorCount: number
+    recentErrorCount: number,
+    learningContext: LearningContext
   ): LLMExperience {
     // Calculate importance and context (Spec 11, Spec 03)
     const importance = calculateImportance(move, validation, gridState, recentErrorCount);
@@ -250,6 +345,7 @@ export class LLMSudokuPlayer extends EventEmitter {
 
     return {
       id: randomUUID(),
+      sessionId,
       puzzleId,
       puzzleHash: this.experienceStore.generatePuzzleHash(gridState),
       moveNumber,
@@ -261,6 +357,8 @@ export class LLMSudokuPlayer extends EventEmitter {
       memoryWasEnabled: this.config.memoryEnabled,
       importance,
       context,
+      profileName: this.profileName,
+      learningContext,
     };
   }
 
@@ -285,12 +383,14 @@ export class LLMSudokuPlayer extends EventEmitter {
    * Spec 11: Parse failures should be tracked for learning
    */
   private recordParseFailure(
+    sessionId: string,
     puzzleId: string,
     moveNumber: number,
     gridState: number[][],
     rawResponse: string,
     parseError: string,
-    recentErrorCount: number
+    recentErrorCount: number,
+    learningContext: LearningContext
   ): LLMExperience {
     const move: LLMMove = {
       row: 0,
@@ -312,6 +412,7 @@ export class LLMSudokuPlayer extends EventEmitter {
 
     return {
       id: randomUUID(),
+      sessionId,
       puzzleId,
       puzzleHash: this.experienceStore.generatePuzzleHash(gridState),
       moveNumber,
@@ -323,6 +424,8 @@ export class LLMSudokuPlayer extends EventEmitter {
       memoryWasEnabled: this.config.memoryEnabled,
       importance,
       context,
+      profileName: this.profileName,
+      learningContext,
     };
   }
 

@@ -12,13 +12,15 @@ import type { LLMMove, MoveValidation } from './types.js';
  * 1. Cell is empty (not already filled)
  * 2. No rule violations (row/col/box constraints)
  * 3. Matches solution (correct vs wrong)
+ *
+ * Supports variable grid sizes (4x4, 9x9, 16x16, 25x25)
  */
 export class MoveValidator {
   /**
    * Validate a move against current state and solution
    *
-   * @param gridState - Current 9x9 grid (0 = empty)
-   * @param move - Proposed move (row, col, value in 1-9 format)
+   * @param gridState - Current NxN grid (0 = empty)
+   * @param move - Proposed move (row, col, value in 1-N format)
    * @param solution - Complete solution grid (for correctness check)
    * @returns Validation result with outcome
    */
@@ -27,6 +29,9 @@ export class MoveValidator {
     move: LLMMove,
     solution: number[][]
   ): MoveValidation {
+    const size = gridState.length;
+    const boxSize = Math.sqrt(size);
+
     // Convert to 0-indexed
     const row = move.row - 1;
     const col = move.col - 1;
@@ -64,12 +69,12 @@ export class MoveValidator {
     }
 
     // Check 4: Box constraint
-    const boxRow = Math.floor(row / 3) * 3;
-    const boxCol = Math.floor(col / 3) * 3;
-    const boxNum = Math.floor(row / 3) * 3 + Math.floor(col / 3) + 1;
+    const boxRowStart = Math.floor(row / boxSize) * boxSize;
+    const boxColStart = Math.floor(col / boxSize) * boxSize;
+    const boxNum = Math.floor(row / boxSize) * boxSize + Math.floor(col / boxSize) + 1;
 
-    for (let r = boxRow; r < boxRow + 3; r++) {
-      for (let c = boxCol; c < boxCol + 3; c++) {
+    for (let r = boxRowStart; r < boxRowStart + boxSize; r++) {
+      for (let c = boxColStart; c < boxColStart + boxSize; c++) {
         if (gridState[r][c] === value) {
           return {
             isValid: false,
@@ -98,9 +103,13 @@ export class MoveValidator {
    * Check if puzzle is completely solved
    */
   isSolved(gridState: number[][]): boolean {
+    const size = gridState.length;
+    const boxSize = Math.sqrt(size);
+    const numBoxes = size; // e.g., 9 boxes for 9x9, 4 boxes for 4x4
+
     // No empty cells
-    for (let row = 0; row < 9; row++) {
-      for (let col = 0; col < 9; col++) {
+    for (let row = 0; row < size; row++) {
+      for (let col = 0; col < size; col++) {
         if (gridState[row][col] === 0) {
           return false;
         }
@@ -108,10 +117,12 @@ export class MoveValidator {
     }
 
     // All constraints satisfied (redundant check, but for completeness)
-    for (let i = 0; i < 9; i++) {
-      if (!this.isValidSet(this.getRow(gridState, i))) return false;
-      if (!this.isValidSet(this.getColumn(gridState, i))) return false;
-      if (!this.isValidSet(this.getBox(gridState, i))) return false;
+    for (let i = 0; i < size; i++) {
+      if (!this.isValidSet(this.getRow(gridState, i), size)) return false;
+      if (!this.isValidSet(this.getColumn(gridState, i), size)) return false;
+    }
+    for (let i = 0; i < numBoxes; i++) {
+      if (!this.isValidSet(this.getBox(gridState, i, boxSize), size)) return false;
     }
 
     return true;
@@ -132,15 +143,16 @@ export class MoveValidator {
   }
 
   /**
-   * Get box values (boxes numbered 0-8)
+   * Get box values (boxes numbered 0 to size-1)
    */
-  private getBox(grid: number[][], boxIndex: number): number[] {
-    const boxRow = Math.floor(boxIndex / 3) * 3;
-    const boxCol = (boxIndex % 3) * 3;
+  private getBox(grid: number[][], boxIndex: number, boxSize: number): number[] {
+    const boxesPerRow = grid.length / boxSize;
+    const boxRowStart = Math.floor(boxIndex / boxesPerRow) * boxSize;
+    const boxColStart = (boxIndex % boxesPerRow) * boxSize;
     const values: number[] = [];
 
-    for (let r = boxRow; r < boxRow + 3; r++) {
-      for (let c = boxCol; c < boxCol + 3; c++) {
+    for (let r = boxRowStart; r < boxRowStart + boxSize; r++) {
+      for (let c = boxColStart; c < boxColStart + boxSize; c++) {
         values.push(grid[r][c]);
       }
     }
@@ -149,11 +161,11 @@ export class MoveValidator {
   }
 
   /**
-   * Check if set contains 1-9 exactly once
+   * Check if set contains 1-N exactly once
    */
-  private isValidSet(values: number[]): boolean {
-    const sorted = [...values].sort();
-    for (let i = 0; i < 9; i++) {
+  private isValidSet(values: number[], size: number): boolean {
+    const sorted = [...values].sort((a, b) => a - b);
+    for (let i = 0; i < size; i++) {
       if (sorted[i] !== i + 1) {
         return false;
       }

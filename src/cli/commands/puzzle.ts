@@ -33,7 +33,7 @@ export function registerPuzzleCommand(program: Command): void {
     .option('--no-validate', 'Skip uniqueness validation (faster but may have multiple solutions)')
     .option('--max-retries <n>', 'Maximum generation retry attempts (default: 100)', parseInt, 100)
     .option('--output <file>', 'Save puzzle to file (JSON format)')
-    .option('--show-solution', 'Include solution in output file')
+    .option('--no-solution', 'Exclude solution from output file')
     .action(async (options) => {
       const { outputFormat: outputFormat1 } = getCommandConfig(puzzleCommand);
 
@@ -54,9 +54,9 @@ export function registerPuzzleCommand(program: Command): void {
         // Display result
         displayPuzzle(puzzle, outputFormat1 || 'text');
 
-        // Save to file if requested
+        // Save to file if requested (solution included by default, use --no-solution to exclude)
         if (options.output) {
-          await savePuzzleToFile(puzzle, options.output, options.showSolution);
+          await savePuzzleToFile(puzzle, options.output, options.solution !== false);
           logger.info(`💾 Puzzle saved to: ${options.output}`);
         }
 
@@ -77,7 +77,7 @@ export function registerPuzzleCommand(program: Command): void {
     .option('--difficulty <level>', 'Difficulty: easy|medium|hard|expert|diabolical (default: medium)', 'medium')
     .option('--symmetry <type>', 'Symmetry: none|rotational|reflectional|diagonal (default: none)', 'none')
     .option('--output <file>', 'Save puzzle to file (JSON format)')
-    .option('--show-solution', 'Include solution in output file')
+    .option('--no-solution', 'Exclude solution from output file')
     .action(async (seed, options) => {
       const { outputFormat: _outputFormat } = getCommandConfig(puzzleCommand);
 
@@ -97,7 +97,7 @@ export function registerPuzzleCommand(program: Command): void {
         displayPuzzle(puzzle, _outputFormat || 'text');
 
         if (options.output) {
-          await savePuzzleToFile(puzzle, options.output, options.showSolution);
+          await savePuzzleToFile(puzzle, options.output, options.solution !== false);
           logger.info(`💾 Puzzle saved to: ${options.output}`);
         }
 

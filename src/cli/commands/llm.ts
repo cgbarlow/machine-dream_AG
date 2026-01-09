@@ -10,13 +10,13 @@ import { CLIError } from '../errors.js';
 import { LLMSudokuPlayer } from '../../llm/index.js';
 import { DEFAULT_LLM_CONFIG, validateConfig, getLLMConfig } from '../../llm/config.js';
 import { BoardFormatter } from '../../llm/BoardFormatter.js';
-import type { LLMConfig } from '../../llm/types.js';
+import type { LLMConfig, LLMExperience } from '../../llm/types.js';
 import { AgentMemory } from '../../memory/AgentMemory.js';
 import type { AgentDBConfig } from '../../types.js';
 import { LLMProfileManager, ProfileValidator } from '../../llm/profiles/index.js';
 import type { CreateProfileOptions, LLMProvider } from '../../llm/profiles/index.js';
 import { readFileSync, writeFileSync } from 'fs';
-import { resolve, join } from 'path';
+import { resolve, join, basename } from 'path';
 import * as readline from 'readline/promises';
 import { homedir } from 'os';
 
@@ -466,13 +466,24 @@ export function registerLLMCommand(program: Command): void {
         const puzzlePath = resolve(puzzleFile);
         const puzzleData = JSON.parse(readFileSync(puzzlePath, 'utf-8'));
 
-        if (!puzzleData.initial || !puzzleData.solution) {
-          throw new CLIError('Invalid puzzle file format', 1, 'Puzzle file must contain "initial" and "solution" grids');
+        // Support both formats: "initial" (legacy) and "grid" (from puzzle generator)
+        const initialGrid = puzzleData.initial || puzzleData.grid;
+        if (!initialGrid || !puzzleData.solution) {
+          throw new CLIError('Invalid puzzle file format', 1, 'Puzzle file must contain "initial" (or "grid") and "solution" grids');
+        }
+        // Normalize to use initialGrid going forward
+        puzzleData.initial = initialGrid;
+
+        // Derive puzzle ID from filename if not present in JSON
+        if (!puzzleData.id) {
+          puzzleData.id = basename(puzzlePath, '.json');
         }
 
         // Initialize player
         const memory = new AgentMemory(createDefaultMemoryConfig());
-        const player = new LLMSudokuPlayer(config, memory);
+        // Get profile name from options or active profile
+        const profileName = options.profile || (new LLMProfileManager().getActive()?.name) || 'default';
+        const player = new LLMSudokuPlayer(config, memory, profileName);
 
         // Enable streaming if debug or visualize enabled
         if (options.debug || options.visualize) {
@@ -580,6 +591,15 @@ export function registerLLMCommand(program: Command): void {
           }
         });
 
+        player.on('llm:forbidden_move_rejected', ({ move, consecutiveCount }: { move: any; consecutiveCount: number }) => {
+          if (options.visualize) {
+            logger.warn(`   ⛔ FORBIDDEN: (${move.row},${move.col})=${move.value} - already tried and proven wrong`);
+            if (consecutiveCount > 1) {
+              logger.warn(`   ⚠️  Consecutive forbidden attempts: ${consecutiveCount}/10`);
+            }
+          }
+        });
+
         player.on('llm:move_validated', ({ experience }: { experience: any }) => {
           if (options.visualize) {
             const emoji = experience.validation.isCorrect ? '✓' : experience.validation.isValid ? '~' : '✗';
@@ -635,7 +655,7 @@ export function registerLLMCommand(program: Command): void {
 
         try {
           session = await player.playPuzzle(
-            puzzleData.id || 'puzzle-1',
+            puzzleData.id,
             puzzleData.initial,
             puzzleData.solution,
             parseInt(options.maxMoves, 10)
@@ -720,7 +740,20 @@ export function registerLLMCommand(program: Command): void {
         logger.info('\n' + '─'.repeat(50));
         logger.info(`Session ended: ${exitReason}`);
         if (session) {
-          logger.info(`Reason: ${session.solved ? 'Puzzle solved successfully' : session.abandoned ? 'Max moves reached' : 'Completed'}`);
+          let reason = 'Completed';
+          if (session.solved) {
+            reason = 'Puzzle solved successfully';
+          } else if (session.abandoned) {
+            // Display actual abandonment reason
+            if (session.abandonReason === 'max_moves') {
+              reason = `Max moves reached (${parseInt(options.maxMoves, 10)} moves)`;
+            } else if (session.abandonReason) {
+              reason = session.abandonReason;
+            } else {
+              reason = 'Session abandoned';
+            }
+          }
+          logger.info(`Reason: ${reason}`);
         }
         logger.info(`Exit code: ${exitCode}`);
         logger.info('─'.repeat(50));
@@ -743,7 +776,7 @@ export function registerLLMCommand(program: Command): void {
         logger.info('📊 LLM Statistics...');
 
         const memory = new AgentMemory(createDefaultMemoryConfig());
-        const player = new LLMSudokuPlayer(DEFAULT_LLM_CONFIG, memory);
+        const player = new LLMSudokuPlayer(DEFAULT_LLM_CONFIG, memory, 'default');
         const stats = await player.getStats();
 
         if (options.format === 'json') {
@@ -788,7 +821,7 @@ export function registerLLMCommand(program: Command): void {
         const consolidator = new DreamingConsolidator(experienceStore, config);
 
         // Check LM Studio connection
-        const player = new LLMSudokuPlayer(config, memory);
+        const player = new LLMSudokuPlayer(config, memory, 'default');
         const isHealthy = await player.healthCheck();
 
         if (!isHealthy) {
@@ -860,7 +893,7 @@ export function registerLLMCommand(program: Command): void {
         });
 
         // Health check
-        const player = new LLMSudokuPlayer(DEFAULT_LLM_CONFIG, memory);
+        const player = new LLMSudokuPlayer(DEFAULT_LLM_CONFIG, memory, 'default');
         const isHealthy = await player.healthCheck();
 
         if (!isHealthy) {
@@ -979,54 +1012,234 @@ export function registerLLMCommand(program: Command): void {
   memory
     .command('list')
     .description('List all memory entries')
-    .option('--session <id>', 'Filter by session ID')
-    .option('--limit <n>', 'Maximum entries to show', '50')
+    .option('--session <id>', 'Filter by session ID (puzzle ID)')
+    .option('--puzzle <id>', 'Filter by puzzle ID')
+    .option('--profile <name>', 'Filter by LLM profile name')
+    .option('--outcome <type>', 'Filter by outcome (correct|invalid|valid_but_wrong)')
+    .option('--importance <n>', 'Filter by minimum importance (0.0-1.0)')
+    .option('--with-learning', 'Only show experiences that used learning features')
+    .option('--limit <n>', 'Maximum entries to show (0 = all)', '50')
+    .option('--verbose', 'Show reasoning snippet (first 100 chars)')
+    .option('--format <format>', 'Output format (text|json)', 'text')
     .action(async (options) => {
       try {
         const agentMemory = new AgentMemory(createDefaultMemoryConfig());
         const limit = parseInt(options.limit, 10);
 
-        logger.info('📋 Agent Memory Contents\n');
-
         // Query all LLM experiences from metadata
-        logger.info('Recent Moves:');
-        const allExperiences = await agentMemory.reasoningBank.queryMetadata('llm_experience', {}) as any[];
+        let allExperiences = await agentMemory.reasoningBank.queryMetadata('llm_experience', {}) as LLMExperience[];
+
+        // Apply filters
+        if (options.session || options.puzzle) {
+          const puzzleId = options.session || options.puzzle;
+          allExperiences = allExperiences.filter(exp => exp.puzzleId === puzzleId);
+        }
+
+        if (options.profile) {
+          allExperiences = allExperiences.filter(exp =>
+            (exp.profileName || 'default') === options.profile
+          );
+        }
+
+        if (options.outcome) {
+          allExperiences = allExperiences.filter(exp =>
+            exp.validation.outcome === options.outcome
+          );
+        }
+
+        if (options.importance) {
+          const minImportance = parseFloat(options.importance);
+          allExperiences = allExperiences.filter(exp =>
+            (exp.importance || 0) >= minImportance
+          );
+        }
+
+        if (options.withLearning) {
+          allExperiences = allExperiences.filter(exp =>
+            exp.learningContext && (
+              exp.learningContext.fewShotsUsed ||
+              exp.learningContext.patternsAvailable > 0 ||
+              exp.learningContext.consolidatedExperiences > 0
+            )
+          );
+        }
 
         // Sort by timestamp descending (most recent first)
         allExperiences.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-        const experiencesToShow = allExperiences.slice(0, limit);
+        // If limit is 0 or negative, show all; otherwise limit
+        const experiencesToShow = limit > 0 ? allExperiences.slice(0, limit) : allExperiences;
+
+        // JSON output
+        if (options.format === 'json') {
+          console.log(JSON.stringify(experiencesToShow, null, 2));
+          return;
+        }
+
+        // Text output
+        logger.info('\n📋 Agent Memory Contents\n');
+        logger.info('Recent Experiences:');
 
         if (experiencesToShow.length === 0) {
-          logger.info('  (No experiences stored yet)');
+          logger.info('  (No experiences found matching filters)');
         } else {
-          experiencesToShow.forEach((exp: any, i) => {
-            const move = exp.move || {};
-            const validation = exp.validation || {};
+          experiencesToShow.forEach((exp: LLMExperience, i) => {
+            const move = exp.move || { row: 0, col: 0, value: 0 };
+            const validation = exp.validation || { outcome: 'unknown' };
             const outcome = validation.outcome || 'unknown';
-            logger.info(`  ${i + 1}. (${move.row},${move.col})=${move.value} → ${outcome.toUpperCase()}`);
+            const profile = exp.profileName || 'default';
+            const puzzle = exp.puzzleId || 'unknown';
+            const importance = exp.importance ? `[${Math.round(exp.importance * 100)}%]` : '';
+
+            // Learning flags
+            const learningFlags = [];
+            if (exp.learningContext?.fewShotsUsed) learningFlags.push('F');
+            if (exp.learningContext?.patternsAvailable > 0) learningFlags.push('P');
+            if (exp.learningContext?.consolidatedExperiences > 0) learningFlags.push('C');
+            const flags = learningFlags.length > 0 ? `[${learningFlags.join('][')}]` : '';
+
+            logger.info(`  ${i + 1}. [${puzzle}] ${exp.id}`);
+            logger.info(`     ${profile} ${flags} | (${move.row},${move.col})=${move.value} → ${outcome.toUpperCase()} ${importance}`);
+
+            if (options.verbose && exp.move.reasoning) {
+              const snippet = exp.move.reasoning.substring(0, 100).replace(/\n/g, ' ');
+              logger.info(`     💭 "${snippet}..."`);
+            }
+            logger.info('');
           });
         }
 
-        logger.info(`\nTotal experiences in database: ${allExperiences.length}`);
+        logger.info(`Showing ${experiencesToShow.length} of ${allExperiences.length} experiences`);
 
-        // Query patterns
-        logger.info('\nLearned Patterns:');
-        const patterns = await agentMemory.distillPatterns('session-default');
-
-        if (patterns.length === 0) {
-          logger.info('  (No patterns learned yet - run "llm dream" to consolidate)');
-        } else {
-          patterns.slice(0, Math.min(limit, patterns.length)).forEach((pattern, i) => {
-            const successRate = pattern.successRate ?? 0;
-            const usageCount = pattern.usageCount ?? 0;
-            logger.info(
-              `  ${i + 1}. ${pattern.id}: ${(successRate * 100).toFixed(1)}% success (${usageCount} uses)`
-            );
-          });
+        if (options.withLearning || options.profile || options.outcome || options.importance) {
+          logger.info('(Filters applied)');
         }
+
+        logger.info('');
+        logger.info('Legend: [F]=Few-shots, [P]=Patterns, [C]=Consolidated');
+        logger.info(`\n💡 Tip: Use 'llm memory show <id>' to view full details (copy ID from above)`);
+
       } catch (error) {
         throw new CLIError('Failed to list memory', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm memory show <id>
+  memory
+    .command('show')
+    .description('View complete experience details with full reasoning')
+    .argument('<experience-id>', 'Experience ID')
+    .option('--format <format>', 'Output format (text|json)', 'text')
+    .option('--no-grid', 'Hide grid state (shown by default)')
+    .action(async (experienceId, options) => {
+      try {
+        const agentMemory = new AgentMemory(createDefaultMemoryConfig());
+
+        // Query all experiences and find the one with matching ID
+        const allExperiences = await agentMemory.reasoningBank.queryMetadata('llm_experience', {}) as LLMExperience[];
+        const experience = allExperiences.find(exp => exp.id === experienceId);
+
+        if (!experience) {
+          throw new CLIError(`Experience not found: ${experienceId}`, 1);
+        }
+
+        // JSON output
+        if (options.format === 'json') {
+          console.log(JSON.stringify(experience, null, 2));
+          return;
+        }
+
+        // Text output
+        logger.info(`\n📋 Experience: ${experience.id}`);
+        logger.info('='.repeat(60));
+        logger.info('');
+
+        // Move details
+        logger.info('🎯 Move Details:');
+        logger.info(`  Position: (${experience.move.row}, ${experience.move.col})`);
+        logger.info(`  Value: ${experience.move.value}`);
+        logger.info(`  Move #: ${experience.moveNumber}`);
+        if (experience.move.confidence !== undefined) {
+          logger.info(`  Confidence: ${(experience.move.confidence * 100).toFixed(1)}%`);
+        }
+        logger.info('');
+
+        // Validation
+        const outcomeEmoji = experience.validation.isCorrect ? '✓' : experience.validation.isValid ? '~' : '✗';
+        logger.info(`${outcomeEmoji} Validation:`);
+        logger.info(`  Outcome: ${experience.validation.outcome.toUpperCase()}`);
+        logger.info(`  Valid: ${experience.validation.isValid ? 'Yes' : 'No'}`);
+        logger.info(`  Correct: ${experience.validation.isCorrect ? 'Yes' : 'No'}`);
+        if (experience.validation.error) {
+          logger.info(`  Error: ${experience.validation.error}`);
+        }
+        logger.info('');
+
+        // Full reasoning
+        logger.info('💭 Full Reasoning:');
+        logger.info('-'.repeat(60));
+        // Word wrap reasoning at 58 characters
+        const words = experience.move.reasoning.split(' ');
+        let line = '  ';
+        words.forEach(word => {
+          if (line.length + word.length + 1 > 60) {
+            logger.info(line);
+            line = '  ' + word;
+          } else {
+            line += (line.length > 2 ? ' ' : '') + word;
+          }
+        });
+        if (line.length > 2) {
+          logger.info(line);
+        }
+        logger.info('-'.repeat(60));
+        logger.info('');
+
+        // Metrics
+        logger.info('📊 Metrics:');
+        if (experience.importance !== undefined) {
+          logger.info(`  Importance: ${(experience.importance * 100).toFixed(1)}%`);
+        }
+        if (experience.context) {
+          logger.info(`  Empty cells at move: ${experience.context.emptyCellsAtMove}`);
+          logger.info(`  Reasoning length: ${experience.context.reasoningLength} chars`);
+          logger.info(`  Constraint density: ${experience.context.constraintDensity.toFixed(2)}`);
+        } else {
+          logger.info('  (Context metrics not available for this experience)');
+        }
+        logger.info('');
+
+        // Profile & Learning
+        logger.info('🔧 Profile & Learning:');
+        logger.info(`  Profile: ${experience.profileName || 'default'}`);
+        logger.info(`  Model: ${experience.modelUsed}`);
+        logger.info(`  Memory enabled: ${experience.memoryWasEnabled ? 'Yes' : 'No'}`);
+
+        if (experience.learningContext) {
+          logger.info(`  Few-shots used: ${experience.learningContext.fewShotsUsed ? `Yes (${experience.learningContext.fewShotCount} examples)` : 'No'}`);
+          logger.info(`  Patterns available: ${experience.learningContext.patternsAvailable}`);
+          logger.info(`  Consolidated experiences: ${experience.learningContext.consolidatedExperiences}`);
+        }
+        logger.info('');
+
+        // Metadata
+        logger.info('📅 Metadata:');
+        logger.info(`  Puzzle ID: ${experience.puzzleId}`);
+        logger.info(`  Puzzle Hash: ${experience.puzzleHash}`);
+        logger.info(`  Timestamp: ${new Date(experience.timestamp).toLocaleString()}`);
+        logger.info('');
+
+        // Grid state (shown by default, hide with --no-grid)
+        // Commander.js converts --no-grid to options.grid = false
+        if (options.grid !== false) {
+          logger.info('📋 Grid State at Move:');
+          const gridStr = BoardFormatter.formatForCLI(experience.gridState);
+          gridStr.split('\n').forEach((line: string) => logger.info(`  ${line}`));
+          logger.info('');
+        }
+
+      } catch (error) {
+        throw new CLIError('Failed to show experience', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -1168,6 +1381,321 @@ export function registerLLMCommand(program: Command): void {
         }
       } catch (error) {
         throw new CLIError('Failed to import memory', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // ===================================================================
+  // llm session - Session management commands
+  // ===================================================================
+
+  const session = llm.command('session').description('View play session history and statistics');
+
+  // llm session list
+  session
+    .command('list')
+    .description('List play sessions with aggregate statistics')
+    .option('--profile <name>', 'Filter by LLM profile name')
+    .option('--solved', 'Only show solved sessions')
+    .option('--limit <n>', 'Maximum sessions to show', '20')
+    .option('--format <format>', 'Output format (text|json)', 'text')
+    .action(async (options) => {
+      try {
+        const agentMemory = new AgentMemory(createDefaultMemoryConfig());
+        const limit = parseInt(options.limit, 10);
+
+        // Query all experiences
+        const allExperiences = await agentMemory.reasoningBank.queryMetadata('llm_experience', {}) as LLMExperience[];
+
+        // Group by session ID
+        const sessionMap = new Map<string, {
+          sessionId: string;
+          puzzleId: string;
+          profileName: string;
+          experiences: LLMExperience[];
+          firstTimestamp: Date;
+        }>();
+
+        allExperiences.forEach(exp => {
+          // Use sessionId if available, otherwise fall back to composite key for old experiences
+          const key = exp.sessionId || `${exp.puzzleId}-${exp.profileName || 'default'}`;
+          if (!sessionMap.has(key)) {
+            sessionMap.set(key, {
+              sessionId: key,
+              puzzleId: exp.puzzleId,
+              profileName: exp.profileName || 'default',
+              experiences: [],
+              firstTimestamp: exp.timestamp,
+            });
+          }
+          const sessionData = sessionMap.get(key)!;
+          sessionData.experiences.push(exp);
+          // Update first timestamp if this is earlier
+          if (exp.timestamp < sessionData.firstTimestamp) {
+            sessionData.firstTimestamp = exp.timestamp;
+          }
+        });
+
+        // Convert to array and calculate stats
+        let sessions = Array.from(sessionMap.values()).map(sessionData => {
+          const exps = sessionData.experiences;
+          const totalMoves = exps.length;
+          const correctMoves = exps.filter(e => e.validation.isCorrect).length;
+          const invalidMoves = exps.filter(e => !e.validation.isValid).length;
+          const validButWrong = exps.filter(e => e.validation.isValid && !e.validation.isCorrect).length;
+          const accuracy = totalMoves > 0 ? (correctMoves / totalMoves) * 100 : 0;
+
+          // Check if solved and calculate completion percentage
+          // gridState is recorded BEFORE the move, so adjust for last correct move
+          const firstExp = exps[0];
+          const lastExp = exps[exps.length - 1];
+          let solved = false;
+          let completionPct = 0;
+
+          if (firstExp?.gridState && lastExp?.gridState) {
+            const originalEmpty = firstExp.gridState.flat().filter(cell => cell === 0).length;
+            let remainingEmpty = lastExp.gridState.flat().filter(cell => cell === 0).length;
+
+            // If last move was correct, one more cell was filled
+            if (lastExp.validation?.isCorrect) {
+              remainingEmpty = Math.max(0, remainingEmpty - 1);
+            }
+
+            // Solved if no remaining empty cells
+            solved = remainingEmpty === 0;
+
+            // Completion percentage
+            if (originalEmpty > 0) {
+              completionPct = ((originalEmpty - remainingEmpty) / originalEmpty) * 100;
+            }
+          }
+
+          // Learning flags from first experience
+          const learningContext = firstExp.learningContext;
+
+          return {
+            sessionId: sessionData.sessionId,
+            puzzleId: sessionData.puzzleId,
+            profileName: sessionData.profileName,
+            solved,
+            completionPct,
+            totalMoves,
+            correctMoves,
+            invalidMoves,
+            validButWrong,
+            accuracy,
+            learningContext,
+            timestamp: sessionData.firstTimestamp,
+          };
+        });
+
+        // Apply filters
+        if (options.profile) {
+          sessions = sessions.filter(s => s.profileName === options.profile);
+        }
+
+        if (options.solved) {
+          sessions = sessions.filter(s => s.solved);
+        }
+
+        // Sort by timestamp descending (most recent first)
+        sessions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+        const sessionsToShow = sessions.slice(0, limit);
+
+        // JSON output
+        if (options.format === 'json') {
+          console.log(JSON.stringify(sessionsToShow, null, 2));
+          return;
+        }
+
+        // Text output
+        logger.info('\n📋 Play Sessions\n');
+
+        if (sessionsToShow.length === 0) {
+          logger.info('  (No sessions found)');
+          return;
+        }
+
+        // Header
+        logger.info('ID                                    Profile           Puzzle            Solved  Done%  Moves   Acc%    Learning    Date');
+        logger.info('─'.repeat(130));
+
+        sessionsToShow.forEach(s => {
+          const sessionIdShort = s.sessionId.substring(0, 36).padEnd(36);
+          const profile = s.profileName.substring(0, 16).padEnd(16);
+          const puzzle = s.puzzleId.substring(0, 16).padEnd(16);
+          const solvedMark = s.solved ? '✓ YES' : '✗ NO ';
+          const donePct = `${s.completionPct.toFixed(0)}%`.padStart(5);
+          const moves = s.totalMoves.toString().padStart(5);
+          const acc = `${s.accuracy.toFixed(1)}%`.padStart(6);
+
+          // Learning flags - only show actually useful ones
+          const flags = [];
+          if (s.learningContext?.fewShotsUsed) flags.push(`F${s.learningContext.fewShotCount}`);
+          if (s.learningContext?.consolidatedExperiences > 0) flags.push('C');
+
+          const learningStr = flags.length > 0
+            ? `[${flags.join('][')}]`.padEnd(10)
+            : '[ ]'.padEnd(10);
+
+          const date = new Date(s.timestamp).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+
+          logger.info(`${sessionIdShort}  ${profile}  ${puzzle}  ${solvedMark}  ${donePct}  ${moves}  ${acc}  ${learningStr}  ${date}`);
+        });
+
+        logger.info('');
+        logger.info(`Showing ${sessionsToShow.length} of ${sessions.length} sessions`);
+        logger.info('Legend: [F#]=Few-shots used (#=count), [C]=Consolidated experiences, Done%=Puzzle completion, Acc%=Move accuracy');
+        logger.info(`\n💡 Tip: Use 'llm session show <id>' to view detailed breakdown`);
+
+      } catch (error) {
+        throw new CLIError('Failed to list sessions', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm session show <id>
+  session
+    .command('show')
+    .description('Show detailed session statistics and breakdown')
+    .argument('<session-id>', 'Session ID (from session list)')
+    .option('--format <format>', 'Output format (text|json)', 'text')
+    .action(async (sessionId, options) => {
+      try {
+        const agentMemory = new AgentMemory(createDefaultMemoryConfig());
+
+        // Query experiences for this session
+        const allExperiences = await agentMemory.reasoningBank.queryMetadata('llm_experience', {}) as LLMExperience[];
+        const sessionExperiences = allExperiences.filter(exp => {
+          // Support both new GUID sessionIds and old composite key format
+          if (exp.sessionId) {
+            return exp.sessionId === sessionId;
+          } else {
+            // Fallback for old experiences without sessionId
+            return `${exp.puzzleId}-${exp.profileName || 'default'}` === sessionId;
+          }
+        });
+
+        if (sessionExperiences.length === 0) {
+          throw new CLIError(`Session not found: ${sessionId}`, 1);
+        }
+
+        // Sort by move number
+        sessionExperiences.sort((a, b) => a.moveNumber - b.moveNumber);
+
+        // Extract metadata from experiences
+        const firstExp = sessionExperiences[0];
+        const puzzleId = firstExp.puzzleId;
+        const profileName = firstExp.profileName || 'default';
+
+        // Calculate stats
+        const totalMoves = sessionExperiences.length;
+        const correctMoves = sessionExperiences.filter(e => e.validation.isCorrect).length;
+        const invalidMoves = sessionExperiences.filter(e => !e.validation.isValid).length;
+        const validButWrong = sessionExperiences.filter(e => e.validation.isValid && !e.validation.isCorrect).length;
+        const accuracy = totalMoves > 0 ? (correctMoves / totalMoves) * 100 : 0;
+
+        const lastExp = sessionExperiences[sessionExperiences.length - 1];
+        // Check if solved - gridState is BEFORE the move, so if last move was correct
+        // and there was only 1 empty cell, the puzzle is now solved
+        let solved = false;
+        if (lastExp?.gridState) {
+          const emptyCells = lastExp.gridState.flat().filter(cell => cell === 0).length;
+          // Solved if: no empty cells OR (1 empty cell AND last move was correct)
+          solved = emptyCells === 0 || (emptyCells === 1 && lastExp.validation?.isCorrect === true);
+        }
+        const startTime = new Date(firstExp.timestamp);
+        const endTime = new Date(lastExp.timestamp);
+        const durationMs = endTime.getTime() - startTime.getTime();
+        const durationMin = Math.round(durationMs / 60000);
+
+        // JSON output
+        if (options.format === 'json') {
+          const sessionData = {
+            sessionId,
+            puzzleId,
+            profileName,
+            solved,
+            totalMoves,
+            correctMoves,
+            invalidMoves,
+            validButWrong,
+            accuracy,
+            durationMinutes: durationMin,
+            learningContext: firstExp.learningContext,
+            experiences: sessionExperiences,
+          };
+          console.log(JSON.stringify(sessionData, null, 2));
+          return;
+        }
+
+        // Text output
+        logger.info(`\n📋 Session: ${sessionId}`);
+        logger.info('='.repeat(60));
+        logger.info('');
+
+        // Summary
+        logger.info('📊 Summary:');
+        logger.info(`  Profile: ${profileName}`);
+        logger.info(`  Puzzle: ${puzzleId}`);
+        logger.info(`  Outcome: ${solved ? '✓ SOLVED' : '✗ UNSOLVED'}`);
+        logger.info(`  Duration: ${durationMin} minutes`);
+        logger.info('');
+
+        // Move statistics
+        logger.info('🎯 Move Statistics:');
+        logger.info(`  Total moves: ${totalMoves}`);
+        logger.info(`  Correct: ${correctMoves} (${((correctMoves / totalMoves) * 100).toFixed(1)}%)`);
+        logger.info(`  Invalid: ${invalidMoves} (${((invalidMoves / totalMoves) * 100).toFixed(1)}%)`);
+        logger.info(`  Valid but wrong: ${validButWrong} (${((validButWrong / totalMoves) * 100).toFixed(1)}%)`);
+        logger.info('');
+
+        // Learning context
+        if (firstExp.learningContext) {
+          logger.info('📚 Learning Context (at session start):');
+          logger.info(`  Memory enabled: ${firstExp.memoryWasEnabled ? 'Yes' : 'No'}`);
+          logger.info(`  Few-shots used: ${firstExp.learningContext.fewShotsUsed ? `Yes (${firstExp.learningContext.fewShotCount} examples)` : 'No'}`);
+          logger.info(`  Patterns available: ${firstExp.learningContext.patternsAvailable}`);
+          logger.info(`  Consolidated experiences: ${firstExp.learningContext.consolidatedExperiences}`);
+          logger.info('');
+        }
+
+        // Accuracy progression (in buckets of 20 moves)
+        logger.info('📈 Accuracy Progression:');
+        const bucketSize = 20;
+        const numBuckets = Math.ceil(totalMoves / bucketSize);
+
+        for (let i = 0; i < numBuckets; i++) {
+          const start = i * bucketSize;
+          const end = Math.min((i + 1) * bucketSize, totalMoves);
+          const bucketExps = sessionExperiences.slice(start, end);
+          const bucketCorrect = bucketExps.filter(e => e.validation.isCorrect).length;
+          const bucketAccuracy = (bucketCorrect / bucketExps.length) * 100;
+
+          logger.info(`  Moves ${start + 1}-${end}:   ${bucketAccuracy.toFixed(1)}% accuracy`);
+        }
+
+        // Trend analysis
+        if (numBuckets >= 2) {
+          const firstBucket = sessionExperiences.slice(0, bucketSize);
+          const lastBucket = sessionExperiences.slice(-bucketSize);
+          const firstAccuracy = (firstBucket.filter(e => e.validation.isCorrect).length / firstBucket.length) * 100;
+          const lastAccuracy = (lastBucket.filter(e => e.validation.isCorrect).length / lastBucket.length) * 100;
+          const trend = lastAccuracy > firstAccuracy ? 'Improving' : lastAccuracy < firstAccuracy ? 'Declining' : 'Stable';
+
+          logger.info('');
+          logger.info(`  Trend: ${trend} ${lastAccuracy > firstAccuracy ? '📈' : lastAccuracy < firstAccuracy ? '📉' : '→'}`);
+        }
+
+        logger.info('');
+        logger.info(`🔍 Use 'llm memory list --session ${puzzleId}' to see all moves`);
+
+      } catch (error) {
+        throw new CLIError('Failed to show session', 1, error instanceof Error ? error.message : String(error));
       }
     });
 

@@ -9,10 +9,12 @@ import type { LLMMove, LLMResponse } from './types.js';
  * Response Parser
  *
  * Spec 11: Parses LLM response to extract:
- * - ROW: 1-9
- * - COL: 1-9
- * - VALUE: 1-9
+ * - ROW: 1-N (depends on grid size)
+ * - COL: 1-N (depends on grid size)
+ * - VALUE: 1-N (depends on grid size)
  * - REASONING: step-by-step analysis
+ *
+ * Supports variable grid sizes (4x4, 9x9, 16x16, 25x25)
  */
 export class ResponseParser {
   /**
@@ -23,8 +25,11 @@ export class ResponseParser {
    * COL: <number>
    * VALUE: <number>
    * REASONING: <text>
+   *
+   * @param rawResponse - Raw LLM response text
+   * @param gridSize - Grid size for validation (default: 9)
    */
-  parse(rawResponse: string): LLMResponse {
+  parse(rawResponse: string, gridSize: number = 9): LLMResponse {
     try {
       const move = this.extractMove(rawResponse);
 
@@ -37,8 +42,8 @@ export class ResponseParser {
         };
       }
 
-      // Validate extracted values
-      const validation = this.validateMove(move);
+      // Validate extracted values against grid size
+      const validation = this.validateMove(move, gridSize);
       if (!validation.valid) {
         return {
           move: this.createEmptyMove(),
@@ -120,21 +125,21 @@ export class ResponseParser {
   }
 
   /**
-   * Validate extracted move values
+   * Validate extracted move values against grid size
    */
-  private validateMove(move: LLMMove): { valid: boolean; error?: string } {
-    if (move.row < 1 || move.row > 9) {
-      return { valid: false, error: `Invalid row: ${move.row} (must be 1-9)` };
+  private validateMove(move: LLMMove, gridSize: number): { valid: boolean; error?: string } {
+    if (move.row < 1 || move.row > gridSize) {
+      return { valid: false, error: `Invalid row: ${move.row} (must be 1-${gridSize})` };
     }
 
-    if (move.col < 1 || move.col > 9) {
-      return { valid: false, error: `Invalid col: ${move.col} (must be 1-9)` };
+    if (move.col < 1 || move.col > gridSize) {
+      return { valid: false, error: `Invalid col: ${move.col} (must be 1-${gridSize})` };
     }
 
-    if (move.value < 1 || move.value > 9) {
+    if (move.value < 1 || move.value > gridSize) {
       return {
         valid: false,
-        error: `Invalid value: ${move.value} (must be 1-9)`,
+        error: `Invalid value: ${move.value} (must be 1-${gridSize})`,
       };
     }
 

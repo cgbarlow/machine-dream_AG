@@ -4,6 +4,7 @@ import { Cell, Grid, ValidationResult } from '../types';
 export class SudokuRules {
     /**
      * Checks if placing a value at a cell is valid according to Sudoku rules.
+     * Supports variable grid sizes (4x4, 9x9, 16x16, 25x25).
      *
      * @param grid - The Sudoku grid
      * @param cell - Target cell
@@ -14,14 +15,16 @@ export class SudokuRules {
         // 0 is always valid (clearing a cell), though usually we check for non-zero in solving
         if (value === 0) return true;
 
+        const size = grid.length;
+
         // Check row
-        if (!this.isValidInRow(grid, cell.row, value)) return false;
+        if (!this.isValidInRow(grid, cell.row, value, size)) return false;
 
         // Check column
-        if (!this.isValidInColumn(grid, cell.col, value)) return false;
+        if (!this.isValidInColumn(grid, cell.col, value, size)) return false;
 
         // Check box
-        if (!this.isValidInBox(grid, cell, value)) return false;
+        if (!this.isValidInBox(grid, cell, value, size)) return false;
 
         return true;
     }
@@ -42,22 +45,24 @@ export class SudokuRules {
 
     /**
      * Validates entire grid for constraint satisfaction.
+     * Supports variable grid sizes.
      *
      * @param grid - The Sudoku grid
      * @returns Validation result with all conflicts
      */
     static isValidGrid(grid: Grid): ValidationResult {
+        const size = grid.length;
+
         // Basic implementation: check every non-zero cell
-        // In a real optimized engine, we might do this more efficiently
-        for (let r = 0; r < 9; r++) {
-            for (let c = 0; c < 9; c++) {
+        for (let r = 0; r < size; r++) {
+            for (let c = 0; c < size; c++) {
                 const value = grid[r][c];
                 if (value !== 0) {
                     // Temporarily clear cell to check if it would be valid to place it there
                     const tempGrid = grid.map(row => [...row]);
                     tempGrid[r][c] = 0;
                     if (!this.isValidMove(tempGrid, { row: r, col: c }, value)) {
-                        // For now, simple return on first failure. 
+                        // For now, simple return on first failure.
                         // Full implementation would collect all conflicts.
                         return {
                             move: { cell: { row: r, col: c }, value, strategy: 'check', timestamp: Date.now() },
@@ -79,26 +84,28 @@ export class SudokuRules {
         };
     }
 
-    private static isValidInRow(grid: Grid, row: number, value: number): boolean {
-        for (let c = 0; c < 9; c++) {
+    private static isValidInRow(grid: Grid, row: number, value: number, size: number): boolean {
+        for (let c = 0; c < size; c++) {
             if (grid[row][c] === value) return false;
         }
         return true;
     }
 
-    private static isValidInColumn(grid: Grid, col: number, value: number): boolean {
-        for (let r = 0; r < 9; r++) {
+    private static isValidInColumn(grid: Grid, col: number, value: number, size: number): boolean {
+        for (let r = 0; r < size; r++) {
             if (grid[r][col] === value) return false;
         }
         return true;
     }
 
-    private static isValidInBox(grid: Grid, cell: Cell, value: number): boolean {
-        const boxRow = Math.floor(cell.row / 3) * 3;
-        const boxCol = Math.floor(cell.col / 3) * 3;
+    private static isValidInBox(grid: Grid, cell: Cell, value: number, size: number): boolean {
+        // Box size is sqrt of grid size (e.g., 3 for 9x9, 2 for 4x4, 4 for 16x16)
+        const boxSize = Math.sqrt(size);
+        const boxRow = Math.floor(cell.row / boxSize) * boxSize;
+        const boxCol = Math.floor(cell.col / boxSize) * boxSize;
 
-        for (let r = 0; r < 3; r++) {
-            for (let c = 0; c < 3; c++) {
+        for (let r = 0; r < boxSize; r++) {
+            for (let c = 0; c < boxSize; c++) {
                 if (grid[boxRow + r][boxCol + c] === value) return false;
             }
         }

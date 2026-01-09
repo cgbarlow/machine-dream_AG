@@ -21,7 +21,6 @@ export function configureGlobalOptions(program: Command): void {
         .option('--quiet, -q', 'Suppress non-essential output')
         .option('--verbose, -V', 'Show detailed output')
         .option('--no-color', 'Disable colored output')
-        .option('--help, -h', 'Show help for command')
         .hook('preAction', async (thisCommand) => {
             // Load configuration
             const configPath = thisCommand.opts().config;
