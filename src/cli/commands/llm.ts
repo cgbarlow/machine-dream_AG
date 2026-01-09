@@ -1266,9 +1266,16 @@ export function registerLLMCommand(program: Command): void {
             {}
           ) as LLMExperience[];
 
-          const sessionExperiences = allExperiences.filter(
-            exp => exp.sessionId === options.session
-          );
+          // Filter by session ID, supporting both new (GUID) and old (composite key) formats
+          const sessionExperiences = allExperiences.filter(exp => {
+            // New format: direct sessionId match
+            if (exp.sessionId === options.session) {
+              return true;
+            }
+            // Old format: composite key (puzzleId-profileName)
+            const compositeKey = `${exp.puzzleId}-${exp.profileName || 'default'}`;
+            return compositeKey === options.session;
+          });
 
           if (sessionExperiences.length === 0) {
             logger.warn(`No experiences found for session: ${options.session}`);
