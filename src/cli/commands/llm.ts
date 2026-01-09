@@ -1260,9 +1260,25 @@ export function registerLLMCommand(program: Command): void {
 
         // Handle session-specific deletion
         if (options.session) {
+          // Query all experiences for this session FIRST (to show count)
+          const allExperiences = await agentMemory.reasoningBank.queryMetadata(
+            'llm_experience',
+            {}
+          ) as LLMExperience[];
+
+          const sessionExperiences = allExperiences.filter(
+            exp => exp.sessionId === options.session
+          );
+
+          if (sessionExperiences.length === 0) {
+            logger.warn(`No experiences found for session: ${options.session}`);
+            return;
+          }
+
           // Interactive confirmation if --confirm not provided
           if (!options.confirm) {
             logger.warn(`⚠️  This will delete all memories for session: ${options.session}`);
+            logger.warn(`   ${sessionExperiences.length} experience(s) will be permanently deleted`);
             logger.warn('   This action cannot be undone!\n');
 
             const rl = readline.createInterface({
@@ -1281,23 +1297,6 @@ export function registerLLMCommand(program: Command): void {
 
           logger.info(`🗑️  Deleting session: ${options.session}...`);
 
-          // Query all experiences for this session
-          const allExperiences = await agentMemory.reasoningBank.queryMetadata(
-            'llm_experience',
-            {}
-          ) as LLMExperience[];
-
-          const sessionExperiences = allExperiences.filter(
-            exp => exp.sessionId === options.session
-          );
-
-          if (sessionExperiences.length === 0) {
-            logger.warn(`No experiences found for session: ${options.session}`);
-            return;
-          }
-
-          logger.info(`📦 Found ${sessionExperiences.length} experiences to delete`);
-
           // Delete each experience from metadata table
           for (const exp of sessionExperiences) {
             await agentMemory.reasoningBank.deleteMetadata(exp.id, 'llm_experience');
@@ -1310,9 +1309,14 @@ export function registerLLMCommand(program: Command): void {
 
         // Handle full database deletion
         if (!options.confirm) {
+          // Count what will be deleted
+          const allExperiences = await agentMemory.reasoningBank.queryMetadata('llm_experience', {}) as LLMExperience[];
+          const uniqueSessions = new Set(allExperiences.map(exp => exp.sessionId)).size;
+          const uniqueProfiles = new Set(allExperiences.map(exp => exp.profileName || 'default')).size;
+
           logger.warn('⚠️  This will delete ALL agent memory data!');
-          logger.warn('   - All LLM experiences (all sessions)');
-          logger.warn('   - All few-shot examples (all profiles)');
+          logger.warn(`   - ${allExperiences.length} LLM experiences across ${uniqueSessions} session(s)`);
+          logger.warn(`   - Few-shot examples for ${uniqueProfiles} profile(s)`);
           logger.warn('   - All reasoning bank data');
           logger.warn('   This action cannot be undone!\n');
 
