@@ -1579,6 +1579,94 @@ export function registerLLMCommand(program: Command): void {
       }
     });
 
+  // llm dream show
+  dream
+    .command('show')
+    .description('Show few-shot examples and learning data')
+    .option('--profile <name>', 'LLM profile to show (default: active profile)')
+    .option('--limit <n>', 'Maximum few-shots to display', '10')
+    .option('--format <format>', 'Output format (text|json)', 'text')
+    .action(async (options) => {
+      try {
+        const manager = new LLMProfileManager();
+        const agentMemory = new AgentMemory(createDefaultMemoryConfig());
+
+        // Determine profile
+        let profileName: string;
+        if (options.profile) {
+          profileName = options.profile;
+        } else {
+          const activeProfile = manager.getActive();
+          if (!activeProfile) {
+            throw new CLIError('No active profile. Use --profile or set an active profile.', 1);
+          }
+          profileName = activeProfile.name;
+        }
+
+        const config = getLLMConfig(profileName);
+        const { ExperienceStore } = await import('../../llm/ExperienceStore.js');
+        const experienceStore = new ExperienceStore(agentMemory, config, profileName);
+
+        // Get data
+        const fewShots = await experienceStore.getFewShots(profileName, parseInt(options.limit, 10));
+        const unconsolidated = await experienceStore.getUnconsolidated(profileName);
+
+        // Get consolidated count
+        const allExperiences = await agentMemory.reasoningBank.queryMetadata('llm_experience', {}) as LLMExperience[];
+        const profileExperiences = allExperiences.filter((exp: any) => exp.profileName === profileName);
+        const consolidated = profileExperiences.filter((exp: any) => exp.consolidated === true);
+
+        if (options.format === 'json') {
+          console.log(JSON.stringify({
+            profile: profileName,
+            statistics: {
+              totalExperiences: profileExperiences.length,
+              consolidatedExperiences: consolidated.length,
+              unconsolidatedExperiences: unconsolidated.length,
+              fewShotCount: fewShots.length,
+            },
+            fewShots: fewShots,
+          }, null, 2));
+        } else {
+          logger.info(`\n🧠 Dream Storage: ${profileName}\n`);
+          logger.info('═'.repeat(70));
+
+          // Statistics
+          logger.info(`\n📊 Statistics:`);
+          logger.info(`   Total experiences: ${profileExperiences.length}`);
+          logger.info(`   Consolidated: ${consolidated.length}`);
+          logger.info(`   Unconsolidated: ${unconsolidated.length}`);
+          logger.info(`   Few-shot examples: ${fewShots.length}`);
+
+          // Few-shots
+          if (fewShots.length === 0) {
+            logger.info(`\n📚 Few-Shot Examples: None`);
+            logger.info(`   Run 'llm dream run' to generate few-shots from experiences`);
+          } else {
+            logger.info(`\n📚 Few-Shot Examples (${fewShots.length}):\n`);
+
+            fewShots.forEach((fs: any, i: number) => {
+              logger.info(`   ${i + 1}. ${fs.gridContext || 'No context'}`);
+              logger.info(`      Move: (${fs.move?.row}, ${fs.move?.col}) = ${fs.move?.value}`);
+              logger.info(`      Outcome: ${fs.outcome || 'CORRECT'}`);
+              if (fs.analysis) {
+                const shortAnalysis = fs.analysis.length > 100
+                  ? fs.analysis.substring(0, 100) + '...'
+                  : fs.analysis;
+                logger.info(`      Reasoning: ${shortAnalysis}`);
+              }
+              logger.info('');
+            });
+          }
+
+          logger.info('─'.repeat(70));
+          logger.info(`💡 These few-shots are injected into prompts during 'llm play'\n`);
+        }
+      } catch (error) {
+        throw new CLIError('Failed to show dream data', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
   // ===================================================================
   // llm session - Session management commands
   // ===================================================================
