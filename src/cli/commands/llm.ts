@@ -1252,7 +1252,7 @@ export function registerLLMCommand(program: Command): void {
     .command('clear')
     .description('Clear agent memory')
     .option('--session <id>', 'Clear specific session only (deletes all experiences for that session)')
-    .option('--confirm', 'Skip confirmation prompt')
+    .option('--confirm', 'Skip confirmation prompt (for scripts)')
     .action(async (options) => {
       try {
         const config = createDefaultMemoryConfig();
@@ -1260,10 +1260,23 @@ export function registerLLMCommand(program: Command): void {
 
         // Handle session-specific deletion
         if (options.session) {
+          // Interactive confirmation if --confirm not provided
           if (!options.confirm) {
             logger.warn(`⚠️  This will delete all memories for session: ${options.session}`);
-            logger.warn('   Use --confirm to proceed');
-            return;
+            logger.warn('   This action cannot be undone!\n');
+
+            const rl = readline.createInterface({
+              input: process.stdin,
+              output: process.stdout
+            });
+
+            const answer = await rl.question('Type "yes" to confirm deletion: ');
+            rl.close();
+
+            if (answer.trim().toLowerCase() !== 'yes') {
+              logger.info('Deletion cancelled.');
+              return;
+            }
           }
 
           logger.info(`🗑️  Deleting session: ${options.session}...`);
@@ -1301,8 +1314,20 @@ export function registerLLMCommand(program: Command): void {
           logger.warn('   - All LLM experiences (all sessions)');
           logger.warn('   - All few-shot examples (all profiles)');
           logger.warn('   - All reasoning bank data');
-          logger.warn('   Use --confirm to proceed');
-          return;
+          logger.warn('   This action cannot be undone!\n');
+
+          const rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout
+          });
+
+          const answer = await rl.question('Type "yes" to confirm deletion: ');
+          rl.close();
+
+          if (answer.trim().toLowerCase() !== 'yes') {
+            logger.info('Deletion cancelled.');
+            return;
+          }
         }
 
         const { unlinkSync, existsSync } = await import('fs');
