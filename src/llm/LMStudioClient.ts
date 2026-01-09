@@ -76,7 +76,7 @@ export class LMStudioClient {
 
       // Handle streaming response
       if (onStream && response.body) {
-        return await this.handleStreamingResponse(response, onStream);
+        return await this.handleStreamingResponse(response, onStream, controller.signal);
       }
 
       // Handle non-streaming response
@@ -101,10 +101,12 @@ export class LMStudioClient {
 
   /**
    * Handle streaming response from LM Studio
+   * Now properly respects abort signal during streaming
    */
   private async handleStreamingResponse(
     response: Response,
-    onStream: (token: string) => void
+    onStream: (token: string) => void,
+    signal: AbortSignal
   ): Promise<string> {
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
@@ -112,6 +114,12 @@ export class LMStudioClient {
 
     try {
       while (true) {
+        // Check if request was aborted (timeout or manual cancellation)
+        if (signal.aborted) {
+          reader.cancel('Request timeout');
+          throw new Error('LM Studio request timeout during streaming');
+        }
+
         const { done, value } = await reader.read();
         if (done) break;
 

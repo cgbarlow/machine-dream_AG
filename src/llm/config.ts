@@ -25,7 +25,7 @@ export const DEFAULT_LLM_CONFIG: LLMConfig = {
   // Generation parameters
   temperature: parseFloat(process.env.LLM_TEMPERATURE || '0.3'), // Lower temp for more deterministic reasoning
   maxTokens: parseInt(process.env.LLM_MAX_TOKENS || '2048', 10), // Increased to allow complete reasoning without cutoff
-  timeout: parseInt(process.env.LLM_TIMEOUT || '60000', 10),
+  timeout: parseInt(process.env.LLM_TIMEOUT || '240000', 10), // 4 minutes for slow models (ROCm/AMD at ~12 tokens/sec)
 
   // Learning settings
   memoryEnabled: process.env.LLM_MEMORY_ENABLED !== 'false',
@@ -36,6 +36,7 @@ export const DEFAULT_LLM_CONFIG: LLMConfig = {
 /**
  * System Prompt (Spec 11 - Prompt Engineering)
  * Simplified: removed meta-instructions, let LLM learn naturally from feedback
+ * Anti-rambling: Enforces concise reasoning with strict constraints
  */
 export const SYSTEM_PROMPT = `You are solving Sudoku puzzles through trial and error.
 
@@ -64,7 +65,15 @@ OUTPUT FORMAT:
 ROW: <1-9>
 COL: <1-9>
 VALUE: <1-9>
-REASONING: <brief analysis>`;
+REASONING: <brief analysis>
+
+CRITICAL INSTRUCTIONS FOR REASONING:
+- State your move choice IMMEDIATELY in the first line
+- Keep reasoning under 200 characters total
+- Do NOT second-guess or restart your analysis
+- Do NOT say "wait", "actually", "let me recheck"
+- Do NOT explain what you already tried
+- One analysis per move - commit to your choice`;
 
 /**
  * Validate LLM configuration
