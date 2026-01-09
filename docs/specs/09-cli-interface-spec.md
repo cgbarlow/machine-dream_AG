@@ -717,6 +717,195 @@ Options:
   --output <dir>               # Benchmark report directory
 ```
 
+#### 3.8.5 `llm memory show` - View Experience Details
+
+View complete details of a stored LLM experience including full reasoning text.
+
+```bash
+machine-dream llm memory show <experience-id> [options]
+
+Arguments:
+  <experience-id>              # Experience ID (from `llm memory list`)
+
+Options:
+  --format <format>            # Output format (text|json), default: text
+  --include-grid               # Show grid state at time of move
+```
+
+**Output includes:**
+- Move details (row, col, value)
+- Full reasoning text (complete LLM explanation)
+- Validation outcome and error message (if any)
+- Importance score and context metrics
+- Profile name and model used
+- Learning context (few-shots used, patterns available)
+- Timestamp
+
+**Example:**
+```bash
+# View experience in detail
+machine-dream llm memory show exp-abc123
+
+# Output as JSON for processing
+machine-dream llm memory show exp-abc123 --format json
+
+# Include grid state
+machine-dream llm memory show exp-abc123 --include-grid
+```
+
+#### 3.8.6 `llm memory list` - Enhanced Experience List
+
+Enhanced version of `llm memory list` with additional filtering and display options.
+
+```bash
+machine-dream llm memory list [options]
+
+Options:
+  --session <id>               # Filter by session ID
+  --puzzle <id>                # Filter by puzzle ID
+  --profile <name>             # Filter by LLM profile name
+  --outcome <type>             # Filter: correct|invalid|valid_but_wrong
+  --importance <n>             # Filter by minimum importance (0.0-1.0)
+  --with-learning              # Only show experiences that used learning features
+  --limit <n>                  # Maximum entries to show (default: 50)
+  --verbose                    # Show reasoning snippet (first 100 chars)
+  --format <format>            # Output format (text|json), default: text
+```
+
+**Examples:**
+```bash
+# List experiences from specific profile
+machine-dream llm memory list --profile lm-studio-qwen3
+
+# List only experiences that used few-shot learning
+machine-dream llm memory list --with-learning
+
+# List with reasoning snippets
+machine-dream llm memory list --verbose
+
+# Compare profiles (export as JSON for analysis)
+machine-dream llm memory list --profile openai-gpt4 --format json > gpt4.json
+machine-dream llm memory list --profile lm-studio-qwen3 --format json > qwen3.json
+```
+
+#### 3.8.7 `llm session list` - List Play Sessions
+
+List play sessions with aggregate statistics and learning flags for A/B testing analysis.
+
+```bash
+machine-dream llm session list [options]
+
+Options:
+  --profile <name>             # Filter by LLM profile name
+  --solved                     # Only show solved sessions
+  --limit <n>                  # Maximum sessions to show (default: 20)
+  --format <format>            # Output format (text|json), default: text
+```
+
+**Output columns:**
+- Session ID
+- Profile name
+- Puzzle ID
+- Solved (Yes/No)
+- Total moves / Correct / Invalid / Wrong
+- Accuracy %
+- Learning flags: [F]=Few-shots, [P]=Patterns, [C]=Consolidated
+- Timestamp
+
+**Example output:**
+```
+📋 Play Sessions
+
+ID          Profile           Puzzle    Solved  Moves  Accuracy  Learning   Date
+────────────────────────────────────────────────────────────────────────────────────
+sess-abc1   lm-studio-qwen3   easy-01   ✓ YES   93     54.8%     [F][P]     Jan 9
+sess-def2   lm-studio-qwen3   easy-01   ✗ NO    200    21.0%     [  ]       Jan 8
+sess-ghi3   openai-gpt4       med-02    ✓ YES   65     78.5%     [F][P][C]  Jan 8
+
+Legend: [F]=Few-shots used, [P]=Patterns available, [C]=Consolidated data used
+```
+
+**Examples:**
+```bash
+# List all sessions
+machine-dream llm session list
+
+# Only solved sessions
+machine-dream llm session list --solved
+
+# Filter by profile
+machine-dream llm session list --profile lm-studio-qwen3
+
+# Export as JSON
+machine-dream llm session list --format json > sessions.json
+```
+
+#### 3.8.8 `llm session show` - Session Details
+
+Show detailed breakdown of a play session including move-by-move analysis and learning context.
+
+```bash
+machine-dream llm session show <session-id> [options]
+
+Arguments:
+  <session-id>                 # Session ID (from `llm session list`)
+
+Options:
+  --format <format>            # Output format (text|json), default: text
+```
+
+**Output includes:**
+- Session summary (profile, puzzle, outcome, duration)
+- Learning context at session start
+- Move-by-move breakdown with outcomes
+- Aggregate statistics
+- Accuracy progression over time
+- Comparison to baseline (if available)
+
+**Example:**
+```bash
+# Show session details
+machine-dream llm session show sess-abc123
+
+# Export as JSON
+machine-dream llm session show sess-abc123 --format json
+```
+
+**Example output:**
+```
+📋 Session: sess-abc1
+============================================================
+
+📊 Summary:
+  Profile: lm-studio-qwen3
+  Puzzle: easy-01
+  Outcome: ✓ SOLVED
+  Duration: 27 minutes
+
+🎯 Move Statistics:
+  Total moves: 93
+  Correct: 51 (54.8%)
+  Invalid: 32 (34.4%)
+  Valid but wrong: 10 (10.8%)
+
+📚 Learning Context (at session start):
+  Memory enabled: Yes
+  Few-shots used: 3 examples
+  Patterns available: 5
+  Consolidated experiences: 130
+
+📈 Accuracy Progression:
+  Moves 1-20:   35.0% accuracy
+  Moves 21-40:  50.0% accuracy
+  Moves 41-60:  55.0% accuracy
+  Moves 61-80:  65.0% accuracy
+  Moves 81-93:  72.0% accuracy
+
+  Trend: Improving (learning from mistakes)
+
+🔍 Use 'llm memory list --session sess-abc1' to see all moves
+```
+
 ---
 
 ### 3.9 System Command

@@ -234,12 +234,25 @@ interface LLMExperience {
   // Importance scoring (Spec 03 FR-A3)
   importance: number;       // 0.0 - 1.0, calculated at creation
   context: LLMExperienceContext;
+
+  // Profile tracking (for A/B testing and configuration analysis)
+  profileName: string;      // LLM profile used (e.g., "lm-studio-qwen3")
+
+  // Learning features active at time of move
+  learningContext: LearningContext;
 }
 
 interface LLMExperienceContext {
   emptyCellsAtMove: number;   // Grid complexity indicator
   reasoningLength: number;    // Token proxy (character count)
   constraintDensity: number;  // Avg candidates per empty cell
+}
+
+interface LearningContext {
+  fewShotsUsed: boolean;              // Were few-shot examples injected?
+  fewShotCount: number;               // How many few-shots were used (0-5 typically)
+  patternsAvailable: number;          // Learned patterns available at session start
+  consolidatedExperiences: number;    // Prior consolidated experience count
 }
 ```
 
@@ -264,6 +277,10 @@ interface PlaySession {
   // Learning data
   experiences: LLMExperience[];
   memoryWasEnabled: boolean;
+
+  // Profile and learning tracking (for A/B testing)
+  profileName: string;              // LLM profile used for this session
+  learningContext: LearningContext; // Learning features available at session start
 }
 ```
 
