@@ -818,57 +818,6 @@ export function registerLLMCommand(program: Command): void {
       }
     });
 
-  // llm dream
-  llm
-    .command('dream')
-    .description('Run dreaming consolidation on LLM experiences')
-    .option('--dry-run', 'Show what would be consolidated without saving')
-    .action(async (options) => {
-      try {
-        logger.info('🌙 Starting dreaming consolidation...');
-
-        const memory = new AgentMemory(createDefaultMemoryConfig());
-        const { DreamingConsolidator, ExperienceStore } = await import('../../llm/index.js');
-
-        const config: LLMConfig = {
-          ...DEFAULT_LLM_CONFIG,
-          memoryEnabled: true,
-        };
-
-        const experienceStore = new ExperienceStore(memory, config);
-        const consolidator = new DreamingConsolidator(experienceStore, config);
-
-        // Check LM Studio connection
-        const player = new LLMSudokuPlayer(config, memory, 'default');
-        const isHealthy = await player.healthCheck();
-
-        if (!isHealthy) {
-          logger.warn('LM Studio not available - using basic consolidation');
-        }
-
-        // Run consolidation
-        logger.info('Analyzing experiences...');
-        const report = await consolidator.consolidate();
-
-        // Display results
-        logger.info('\n📊 Consolidation Results:');
-        logger.info(`  Experiences processed: ${report.experiencesConsolidated}`);
-        logger.info(`  Few-shots updated: ${report.fewShotsUpdated}`);
-        logger.info(`  Success patterns: ${report.patterns.successStrategies.length}`);
-        logger.info(`  Error patterns: ${report.patterns.commonErrors.length}`);
-        logger.info(`  Wrong path patterns: ${report.patterns.wrongPathPatterns.length}`);
-
-        logger.info('\n💡 Insights:');
-        logger.info(report.insights);
-
-        if (options.dryRun) {
-          logger.info('\n(Dry run mode - no changes were saved)');
-        }
-      } catch (error) {
-        throw new CLIError('Failed to run dreaming', 1, error instanceof Error ? error.message : String(error));
-      }
-    });
-
   // llm benchmark
   llm
     .command('benchmark')
