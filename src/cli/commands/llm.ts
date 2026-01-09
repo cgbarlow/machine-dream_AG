@@ -1251,23 +1251,67 @@ export function registerLLMCommand(program: Command): void {
   memory
     .command('clear')
     .description('Clear agent memory')
-    .option('--session <id>', 'Clear specific session only')
+    .option('--session <id>', 'Clear specific session only (deletes all experiences for that session)')
     .option('--confirm', 'Skip confirmation prompt')
     .action(async (options) => {
       try {
+        const config = createDefaultMemoryConfig();
+        const agentMemory = new AgentMemory(config);
+
+        // Handle session-specific deletion
+        if (options.session) {
+          if (!options.confirm) {
+            logger.warn(`⚠️  This will delete all memories for session: ${options.session}`);
+            logger.warn('   Use --confirm to proceed');
+            return;
+          }
+
+          logger.info(`🗑️  Deleting session: ${options.session}...`);
+
+          // Query all experiences for this session
+          const allExperiences = await agentMemory.reasoningBank.queryMetadata(
+            'llm_experience',
+            {}
+          ) as LLMExperience[];
+
+          const sessionExperiences = allExperiences.filter(
+            exp => exp.sessionId === options.session
+          );
+
+          if (sessionExperiences.length === 0) {
+            logger.warn(`No experiences found for session: ${options.session}`);
+            return;
+          }
+
+          logger.info(`📦 Found ${sessionExperiences.length} experiences to delete`);
+
+          // Delete each experience from metadata table
+          for (const exp of sessionExperiences) {
+            await agentMemory.reasoningBank.deleteMetadata(exp.id, 'llm_experience');
+          }
+
+          logger.info(`✓ Deleted ${sessionExperiences.length} experiences for session: ${options.session}`);
+          logger.info(`💡 Few-shot examples and other sessions remain intact`);
+          return;
+        }
+
+        // Handle full database deletion
         if (!options.confirm) {
-          logger.warn('⚠️  This will delete all agent memory data!');
+          logger.warn('⚠️  This will delete ALL agent memory data!');
+          logger.warn('   - All LLM experiences (all sessions)');
+          logger.warn('   - All few-shot examples (all profiles)');
+          logger.warn('   - All reasoning bank data');
           logger.warn('   Use --confirm to proceed');
           return;
         }
 
-        const config = createDefaultMemoryConfig();
         const { unlinkSync, existsSync } = await import('fs');
         const dbPath = config.dbPath + '/agent.db';
 
         if (existsSync(dbPath)) {
           unlinkSync(dbPath);
           logger.info('✓ Memory cleared successfully');
+          logger.info('   All sessions, experiences, and few-shots deleted');
         } else {
           logger.info('No memory database found');
         }

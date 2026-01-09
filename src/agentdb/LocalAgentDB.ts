@@ -185,6 +185,14 @@ export class LocalAgentDB {
                     }
                     return true;
                 });
+            },
+
+            deleteMetadata: async (key, type) => {
+                const stmt = this.db.prepare(
+                    'DELETE FROM metadata WHERE key = ? AND type = ?'
+                );
+                const result = stmt.run(key, type);
+                return result.changes > 0;
             }
         };
     }

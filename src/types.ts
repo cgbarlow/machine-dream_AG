@@ -29,6 +29,7 @@ export interface AgentDBReasoningBank {
   getTrajectory(trajectoryId: string): Promise<{ steps: Array<{ step_index: number }> } | null>;
   getMetadata(key: string, type: string): Promise<unknown>;
   queryMetadata(type: string, filter: Record<string, unknown>): Promise<unknown[]>;
+  deleteMetadata(key: string, type: string): Promise<boolean>;
 }
 
 export interface AgentDBReflexionMemory {
