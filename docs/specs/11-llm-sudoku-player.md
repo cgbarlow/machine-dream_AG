@@ -541,6 +541,99 @@ async consolidate(): Promise<ConsolidationReport> {
 }
 ```
 
+## Profile-Specific Learning
+
+Each LLM profile maintains its own independent learning trajectory. This enables:
+1. **A/B Testing** - Compare performance of different models/configurations
+2. **Learning Isolation** - Prevent cross-contamination between profiles
+3. **Baseline Comparison** - Test with/without learned patterns
+
+### Storage Namespacing
+
+Few-shot examples are stored per-profile using namespaced keys:
+
+```typescript
+// Storage key format
+const fewShotsKey = `llm_fewshots:${profileName}`;
+
+// Example keys:
+// - llm_fewshots:qwen3-coder
+// - llm_fewshots:gpt4-turbo
+// - llm_fewshots:default
+```
+
+### Profile-Aware Consolidation
+
+The `DreamingConsolidator.consolidate()` method accepts an optional `profileName` parameter:
+
+```typescript
+// Consolidate only experiences from specific profile
+async consolidate(profileName?: string): Promise<ConsolidationReport> {
+  // Get experiences for this profile only
+  const experiences = await this.store.getUnconsolidated(profileName);
+
+  // Process and extract patterns
+  const patterns = this.extractPatterns(experiences);
+
+  // Save few-shots for THIS profile
+  await this.store.saveFewShots(patterns.fewShots, profileName);
+
+  // Mark experiences as consolidated
+  await this.store.markConsolidated(experiences.map(e => e.id));
+
+  return { experiencesProcessed: experiences.length, ...patterns };
+}
+```
+
+### ExperienceStore Interface
+
+The ExperienceStore provides profile-aware methods:
+
+```typescript
+interface ExperienceStore {
+  // Save single experience
+  save(experience: LLMExperience): Promise<void>;
+
+  // Profile-aware methods
+  getFewShots(profileName?: string, limit?: number): Promise<FewShotExample[]>;
+  saveFewShots(examples: FewShotExample[], profileName?: string): Promise<void>;
+  getUnconsolidated(profileName?: string): Promise<LLMExperience[]>;
+  markConsolidated(experienceIds: string[]): Promise<void>;
+
+  // Statistics
+  getStats(): Promise<ExperienceStats>;
+}
+```
+
+### Learning Control
+
+Players can enable/disable learning via the `useLearning` parameter:
+
+```typescript
+// Play WITH learned patterns (default)
+const session = await player.playPuzzle(
+  puzzleId,
+  grid,
+  solution,
+  maxMoves,
+  true  // useLearning = true
+);
+
+// Play WITHOUT learned patterns (baseline)
+const baselineSession = await player.playPuzzle(
+  puzzleId,
+  grid,
+  solution,
+  maxMoves,
+  false // useLearning = false
+);
+```
+
+This enables rigorous A/B testing:
+- **Control group**: `--no-learning` flag (no few-shots injected)
+- **Treatment group**: Default behavior (few-shots loaded if available)
+- **Comparison**: Measure performance difference to verify learning works
+
 ## Metrics
 
 ### Per-Puzzle Metrics

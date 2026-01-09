@@ -664,7 +664,14 @@ Options:
   --temperature <n>            # Override temperature from profile (default: from profile)
   --output <file>              # Save session results to file
   --visualize                  # Show live solving visualization
+  --no-learning                # Disable few-shot learning injection (baseline mode)
+  --learning                   # Enable few-shot learning injection (default when available)
 ```
+
+**Learning Modes:**
+- **Default**: Load few-shots if available for profile (learning enabled)
+- **`--no-learning`**: Run without any learned patterns (for A/B testing baseline)
+- **`--learning`**: Explicitly enable (useful after --no-learning was default)
 
 **Example:**
 ```bash
@@ -676,6 +683,9 @@ machine-dream llm play puzzles/easy-01.json --profile lm-studio-qwen3
 
 # Play without memory (baseline for comparison)
 machine-dream llm play puzzles/easy-01.json --no-memory
+
+# Play without learning (disable few-shot injection)
+machine-dream llm play puzzles/easy-01.json --no-learning
 
 # Override profile settings
 machine-dream llm play puzzles/medium-01.json \
@@ -695,15 +705,102 @@ Options:
   --format <format>            # json|table|yaml (default: table)
 ```
 
-#### 3.8.3 `llm dream` - Consolidate LLM Experiences
+#### 3.8.3 `llm dream` - Consolidate LLM Learning
+
+Commands for consolidating LLM learning from play experiences into reusable few-shot examples.
+
+**Subcommands:**
+
+##### 3.8.3.1 `llm dream run` - Run Consolidation
+
+Consolidate experiences into few-shot examples for a specific profile.
 
 ```bash
-machine-dream llm dream [options]
+machine-dream llm dream run [options]
 
 Options:
-  --sessions <list>            # Specific session IDs to consolidate
-  --update-fewshots            # Update few-shot examples from best moves
+  --profile <name>             # LLM profile to consolidate (default: active profile)
+  --all                        # Consolidate all profiles separately
   --output <file>              # Save consolidation report
+```
+
+**Output:**
+- Experiences found and processed
+- Few-shots created
+- Patterns extracted
+- Updated few-shot count for profile
+
+**Example:**
+```bash
+# Consolidate experiences for active profile
+machine-dream llm dream run
+
+# Consolidate for specific profile
+machine-dream llm dream run --profile qwen3-coder
+
+# Consolidate all profiles
+machine-dream llm dream run --all
+
+# Save consolidation report
+machine-dream llm dream run --profile qwen3-coder --output dream-report.json
+```
+
+**Example output:**
+```
+🌙 Starting LLM dream cycle for profile: qwen3-coder
+📊 Found 42 unconsolidated experiences
+
+🌙 Dream Cycle Complete
+────────────────────────────────────────
+Profile: qwen3-coder
+Experiences processed: 42
+Few-shots created: 5
+Patterns extracted: 8
+
+✅ Profile now has 12 few-shot examples for learning
+```
+
+##### 3.8.3.2 `llm dream status` - Check Learning Status
+
+Show current learning state for a profile.
+
+```bash
+machine-dream llm dream status [options]
+
+Options:
+  --profile <name>             # LLM profile to check (default: active profile)
+  --all                        # Show status for all profiles
+  --format <format>            # Output format (table|json), default: table
+```
+
+**Output:**
+- Unconsolidated experience count
+- Few-shot examples available
+- Last consolidation timestamp
+- Profile name and model
+
+**Example:**
+```bash
+# Check status for active profile
+machine-dream llm dream status
+
+# Check status for specific profile
+machine-dream llm dream status --profile qwen3-coder
+
+# Check all profiles
+machine-dream llm dream status --all
+```
+
+**Example output:**
+```
+📊 Learning Status: qwen3-coder
+────────────────────────────────────────
+Unconsolidated experiences: 42
+Few-shot examples: 12
+Last consolidation: 2024-01-15 14:32:15
+Model: qwen3-30b
+
+💡 Run 'llm dream run --profile qwen3-coder' to consolidate
 ```
 
 #### 3.8.4 `llm benchmark` - Compare Memory ON vs OFF
