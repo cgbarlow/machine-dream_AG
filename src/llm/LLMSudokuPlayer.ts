@@ -52,7 +52,7 @@ export class LLMSudokuPlayer extends EventEmitter {
     this.promptBuilder = new PromptBuilder(config.includeReasoning);
     this.responseParser = new ResponseParser();
     this.validator = new MoveValidator();
-    this.experienceStore = new ExperienceStore(_agentMemory, config);
+    this.experienceStore = new ExperienceStore(_agentMemory, config, profileName);
     this.agentMemory = _agentMemory;
   }
 
@@ -66,21 +66,22 @@ export class LLMSudokuPlayer extends EventEmitter {
   /**
    * Play a puzzle using pure LLM reasoning
    *
-   * Spec 11 - Play Loop Algorithm
+   * Spec 11 - Play Loop Algorithm + Profile-Specific Learning
    */
   async playPuzzle(
     puzzleId: string,
     initialGrid: number[][],
     solution: number[][],
-    maxMoves = 200
+    maxMoves = 200,
+    useLearning = true
   ): Promise<PlaySession> {
-    // Load few-shot examples if memory enabled
-    const fewShots = this.config.memoryEnabled
-      ? await this.experienceStore.getFewShots()
+    // Load few-shot examples only if memory enabled AND learning enabled
+    const fewShots = (this.config.memoryEnabled && useLearning)
+      ? await this.experienceStore.getFewShots(this.profileName)
       : [];
 
     // Capture learning context at session start
-    const learningContext = await this.captureLearningContext(fewShots);
+    const learningContext = await this.captureLearningContext(fewShots, useLearning);
 
     const session = this.initSession(puzzleId, learningContext);
     let gridState = this.cloneGrid(initialGrid);
@@ -276,31 +277,28 @@ export class LLMSudokuPlayer extends EventEmitter {
   /**
    * Capture learning context at session start
    * Queries memory to determine what learning features are available
+   * Spec 11: Profile-Specific Learning
    */
-  private async captureLearningContext(fewShots: any[]): Promise<LearningContext> {
-    let patternsAvailable = 0;
+  private async captureLearningContext(fewShots: any[], useLearning: boolean): Promise<LearningContext> {
     let consolidatedExperiences = 0;
 
-    if (this.config.memoryEnabled) {
+    if (this.config.memoryEnabled && useLearning) {
       try {
-        // Query patterns from memory
-        const patterns = await this.agentMemory.distillPatterns('session-default');
-        patternsAvailable = patterns.length;
-
-        // Query consolidated experiences count
+        // Query consolidated experiences count for this profile
         const allExperiences = await this.agentMemory.reasoningBank.queryMetadata('llm_experience', {}) as any[];
-        consolidatedExperiences = allExperiences.filter((exp: any) => exp.consolidated === true).length;
+        consolidatedExperiences = allExperiences.filter(
+          (exp: any) => exp.consolidated === true && exp.profileName === this.profileName
+        ).length;
       } catch (error) {
         // If queries fail, default to 0
-        patternsAvailable = 0;
         consolidatedExperiences = 0;
       }
     }
 
     return {
-      fewShotsUsed: fewShots.length > 0,
+      fewShotsUsed: fewShots.length > 0 && useLearning,
       fewShotCount: fewShots.length,
-      patternsAvailable,
+      patternsAvailable: 0,  // Deprecated - always 0 (removed deterministic solver pattern queries)
       consolidatedExperiences,
     };
   }

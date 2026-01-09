@@ -1,3 +1,16 @@
+/**
+ * Dreaming Controller - Deterministic Solver Consolidation
+ *
+ * ⚠️ IMPORTANT: This class handles consolidation for DETERMINISTIC SOLVER experiences.
+ * For LLM-specific learning consolidation, use:
+ *   - src/llm/DreamingConsolidator.ts (consolidation logic)
+ *   - `machine-dream llm dream run` (CLI command)
+ *
+ * This separation ensures:
+ * - Deterministic solver strategies don't mix with LLM learnings
+ * - LLM profiles maintain independent learning trajectories
+ * - Different consolidation approaches for different problem types
+ */
 
 import {
     AgentDBConfig,

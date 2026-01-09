@@ -22,7 +22,8 @@ import { createHash } from 'crypto';
 export class ExperienceStore {
   constructor(
     private agentMemory: AgentMemory,
-    private config: LLMConfig
+    private config: LLMConfig,
+    private profileName: string = 'default'
   ) {}
 
   /**
@@ -50,12 +51,13 @@ export class ExperienceStore {
       feedback: experience.validation.error || 'Move validated',
     });
 
-    // Store full experience as metadata
+    // Store full experience as metadata with profile name
     await this.agentMemory.reasoningBank.storeMetadata(
       experience.id,
       'llm_experience',
       {
         ...experience,
+        profileName: this.profileName,
         consolidated: false,
       }
     );
@@ -92,15 +94,18 @@ export class ExperienceStore {
 
   /**
    * Get unconsolidated experiences for dreaming
+   * Optionally filter by profile name
    */
-  async getUnconsolidated(): Promise<LLMExperience[]> {
+  async getUnconsolidated(profileName?: string): Promise<LLMExperience[]> {
     // Query all LLM experiences that haven't been consolidated
     const allExperiences = await this.agentMemory.reasoningBank.queryMetadata(
       'llm_experience',
       { consolidated: false }
-    );
+    ) as LLMExperience[];
 
-    return allExperiences as LLMExperience[];
+    // Filter by profile if specified
+    const profile = profileName || this.profileName;
+    return allExperiences.filter((exp: any) => exp.profileName === profile);
   }
 
   /**
@@ -128,24 +133,29 @@ export class ExperienceStore {
 
   /**
    * Save few-shot examples from consolidation
+   * Stores per-profile using namespaced key: llm_fewshots:${profileName}
    */
-  async saveFewShots(examples: FewShotExample[]): Promise<void> {
+  async saveFewShots(examples: FewShotExample[], profileName?: string): Promise<void> {
+    const profile = profileName || this.profileName;
     await this.agentMemory.reasoningBank.storeMetadata(
-      'llm_fewshots',
+      `llm_fewshots:${profile}`,
       'fewshot_examples',
       {
         examples,
         updated: new Date(),
+        profileName: profile,
       }
     );
   }
 
   /**
    * Get few-shot examples for prompts
+   * Loads from profile-specific storage: llm_fewshots:${profileName}
    */
-  async getFewShots(limit = 5): Promise<FewShotExample[]> {
+  async getFewShots(profileName?: string, limit = 5): Promise<FewShotExample[]> {
+    const profile = profileName || this.profileName;
     const data = await this.agentMemory.reasoningBank.getMetadata(
-      'llm_fewshots',
+      `llm_fewshots:${profile}`,
       'fewshot_examples'
     );
 

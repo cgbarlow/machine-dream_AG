@@ -59,6 +59,10 @@ export function registerDreamCommand(program: Command): void {
             const { outputFormat } = getCommandConfig(runCommand);
 
             try {
+                // Warning about LLM vs deterministic dreaming
+                logger.warn('⚠️  This command is for DETERMINISTIC SOLVER dreaming.');
+                logger.warn('⚠️  For LLM learning consolidation, use: machine-dream llm dream run\n');
+
                 logger.info('🌙 Starting dream cycle...');
 
                 // Initialize memory and dreaming controller with real backends

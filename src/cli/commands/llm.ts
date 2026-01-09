@@ -392,6 +392,8 @@ export function registerLLMCommand(program: Command): void {
     .argument('<puzzle-file>', 'Path to puzzle file')
     .option('--profile <name>', 'Use specific profile (Spec 13)')
     .option('--no-memory', 'Disable memory (baseline mode)')
+    .option('--no-learning', 'Disable few-shot learning injection (baseline mode)')
+    .option('--learning', 'Enable few-shot learning injection (default when available)')
     .option('--model <model>', 'Override model name')
     .option('--endpoint <url>', 'Override LLM endpoint')
     .option('--timeout <ms>', 'Request timeout in milliseconds', '120000')
@@ -654,11 +656,27 @@ export function registerLLMCommand(program: Command): void {
         let exitCode = 0;
 
         try {
+          // Determine learning mode (--no-learning sets learning to false)
+          const useLearning = options.learning !== false;
+
+          // Display learning status at session start
+          if (config.memoryEnabled) {
+            if (useLearning) {
+              const { ExperienceStore } = await import('../../llm/ExperienceStore.js');
+              const experienceStore = new ExperienceStore(memory, config, profileName);
+              const fewShots = await experienceStore.getFewShots(profileName);
+              logger.info(`📚 Learning: ${fewShots.length} few-shots loaded for profile: ${profileName}`);
+            } else {
+              logger.info(`📚 Learning: DISABLED (baseline mode)`);
+            }
+          }
+
           session = await player.playPuzzle(
             puzzleData.id,
             puzzleData.initial,
             puzzleData.solution,
-            parseInt(options.maxMoves, 10)
+            parseInt(options.maxMoves, 10),
+            useLearning
           );
 
           if (!options.visualize) {
@@ -1381,6 +1399,154 @@ export function registerLLMCommand(program: Command): void {
         }
       } catch (error) {
         throw new CLIError('Failed to import memory', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // ===================================================================
+  // llm dream - LLM learning consolidation commands
+  // ===================================================================
+
+  const dream = llm.command('dream').description('Consolidate LLM learning from experiences');
+
+  // llm dream run
+  dream
+    .command('run')
+    .description('Run dreaming consolidation for a profile')
+    .option('--profile <name>', 'LLM profile to consolidate (default: active profile)')
+    .option('--all', 'Consolidate all profiles separately')
+    .option('--output <file>', 'Save consolidation report')
+    .action(async (options) => {
+      try {
+        const manager = new LLMProfileManager();
+        const agentMemory = new AgentMemory(createDefaultMemoryConfig());
+
+        // Determine which profiles to consolidate
+        let profilesToProcess: string[] = [];
+        if (options.all) {
+          profilesToProcess = manager.list().map(p => p.name);
+        } else if (options.profile) {
+          profilesToProcess = [options.profile];
+        } else {
+          const activeProfile = manager.getActive();
+          if (!activeProfile) {
+            throw new CLIError('No active profile. Use --profile or set an active profile.', 1);
+          }
+          profilesToProcess = [activeProfile.name];
+        }
+
+        logger.info(`\n🌙 Starting LLM Dream Cycle\n`);
+
+        for (const profileName of profilesToProcess) {
+          logger.info(`\n📊 Profile: ${profileName}`);
+          logger.info('─'.repeat(50));
+
+          // Get profile config
+          const config = getLLMConfig(profileName);
+
+          // Import required classes
+          const { ExperienceStore } = await import('../../llm/ExperienceStore.js');
+          const { DreamingConsolidator } = await import('../../llm/DreamingConsolidator.js');
+
+          // Create store and consolidator
+          const experienceStore = new ExperienceStore(agentMemory, config, profileName);
+          const consolidator = new DreamingConsolidator(experienceStore, config);
+
+          // Get unconsolidated count before
+          const before = await experienceStore.getUnconsolidated(profileName);
+          logger.info(`📦 Found ${before.length} unconsolidated experiences`);
+
+          if (before.length === 0) {
+            logger.info('💤 No experiences to consolidate');
+            continue;
+          }
+
+          // Run consolidation
+          const report = await consolidator.consolidate(profileName);
+
+          // Show results
+          logger.info(`\n✅ Dream Cycle Complete`);
+          logger.info(`   Experiences processed: ${report.experiencesConsolidated}`);
+          logger.info(`   Few-shots created: ${report.fewShotsUpdated}`);
+          logger.info(`   Patterns extracted: ${report.patterns.successStrategies.length}`);
+
+          // Verify few-shots exist
+          const fewShots = await experienceStore.getFewShots(profileName);
+          logger.info(`\n📚 Profile now has ${fewShots.length} few-shot examples for learning\n`);
+
+          // Save report if requested
+          if (options.output) {
+            const reportPath = resolve(options.output);
+            writeFileSync(reportPath, JSON.stringify(report, null, 2));
+            logger.info(`💾 Report saved to: ${reportPath}`);
+          }
+        }
+
+        logger.info(`\n🎉 All profiles consolidated successfully\n`);
+      } catch (error) {
+        throw new CLIError('Failed to run dream consolidation', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm dream status
+  dream
+    .command('status')
+    .description('Show learning status for a profile')
+    .option('--profile <name>', 'LLM profile to check (default: active profile)')
+    .option('--all', 'Show status for all profiles')
+    .option('--format <format>', 'Output format (table|json)', 'table')
+    .action(async (options) => {
+      try {
+        const manager = new LLMProfileManager();
+        const agentMemory = new AgentMemory(createDefaultMemoryConfig());
+
+        // Determine which profiles to check
+        let profilesToCheck: string[] = [];
+        if (options.all) {
+          profilesToCheck = manager.list().map(p => p.name);
+        } else if (options.profile) {
+          profilesToCheck = [options.profile];
+        } else {
+          const activeProfile = manager.getActive();
+          if (!activeProfile) {
+            throw new CLIError('No active profile. Use --profile or set an active profile.', 1);
+          }
+          profilesToCheck = [activeProfile.name];
+        }
+
+        // Import required class
+        const { ExperienceStore } = await import('../../llm/ExperienceStore.js');
+
+        logger.info(`\n📊 Learning Status\n`);
+
+        for (const profileName of profilesToCheck) {
+          const config = getLLMConfig(profileName);
+          const experienceStore = new ExperienceStore(agentMemory, config, profileName);
+
+          // Get status
+          const unconsolidated = await experienceStore.getUnconsolidated(profileName);
+          const fewShots = await experienceStore.getFewShots(profileName);
+
+          if (options.format === 'json') {
+            console.log(JSON.stringify({
+              profile: profileName,
+              unconsolidatedExperiences: unconsolidated.length,
+              fewShotExamples: fewShots.length,
+            }, null, 2));
+          } else {
+            logger.info(`🤖 ${profileName}`);
+            logger.info('─'.repeat(50));
+            logger.info(`   Unconsolidated experiences: ${unconsolidated.length}`);
+            logger.info(`   Few-shot examples: ${fewShots.length}`);
+
+            if (unconsolidated.length > 0) {
+              logger.info(`\n   💡 Run 'machine-dream llm dream run --profile ${profileName}' to consolidate\n`);
+            } else {
+              logger.info('   ✨ All experiences consolidated\n');
+            }
+          }
+        }
+      } catch (error) {
+        throw new CLIError('Failed to get dream status', 1, error instanceof Error ? error.message : String(error));
       }
     });
 

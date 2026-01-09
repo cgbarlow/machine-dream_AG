@@ -2,6 +2,17 @@
  * Dreaming Consolidator - Pattern synthesis from LLM experiences
  * Specification: docs/specs/11-llm-sudoku-player.md
  * Specification: docs/specs/05-dreaming-pipeline-spec.md Section 8
+ *
+ * ⚠️ IMPORTANT: This class handles consolidation for LLM EXPERIENCES ONLY.
+ * For deterministic solver consolidation, use:
+ *   - src/consolidation/DreamingController.ts (5-phase pipeline)
+ *   - `machine-dream dream run` (CLI command)
+ *
+ * LLM-specific features:
+ * - Profile-specific few-shot generation
+ * - Independent learning trajectories per LLM profile
+ * - Optimized for chat-based reasoning patterns
+ * - A/B testing support with learning enable/disable
  */
 
 import type {
@@ -41,12 +52,13 @@ export class DreamingConsolidator {
 
   /**
    * Run consolidation on unconsolidated experiences
+   * Optionally filter by profile for profile-specific learning
    *
-   * Spec 11: Dreaming Consolidation algorithm
+   * Spec 11: Dreaming Consolidation algorithm + Profile-Specific Learning
    */
-  async consolidate(): Promise<ConsolidationReport> {
-    // 1. Load experiences since last consolidation
-    let experiences = await this.experienceStore.getUnconsolidated();
+  async consolidate(profileName?: string): Promise<ConsolidationReport> {
+    // 1. Load experiences since last consolidation (filtered by profile if specified)
+    let experiences = await this.experienceStore.getUnconsolidated(profileName);
 
     if (experiences.length === 0) {
       return this.createEmptyReport();
@@ -84,8 +96,8 @@ export class DreamingConsolidator {
     // 5. Generate few-shot examples from best patterns
     const fewShots = this.generateFewShots(successStrategies);
 
-    // 6. Update few-shot examples in storage
-    await this.experienceStore.saveFewShots(fewShots);
+    // 6. Update few-shot examples in storage (profile-specific)
+    await this.experienceStore.saveFewShots(fewShots, profileName);
 
     // 7. Mark experiences as consolidated
     const experienceIds = experiences.map((e) => e.id);
