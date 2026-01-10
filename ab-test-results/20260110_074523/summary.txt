@@ -1,0 +1,21 @@
+A/B Test Results
+================
+Profile: qwen3-coder
+Puzzle: puzzles/9x9-hard.json
+Runs per phase: 3
+Skip dream cycle: true
+Date: Sat Jan 10 07:45:23 NZDT 2026
+
+
+--- Baseline Runs (no learning) ---
+Run 1: Not solved, 100 moves, 24.0% acc
+Run 2: Not solved, 30 moves, 20.0% acc
+Run 3: Not solved, 84 moves, 23.8% acc
+
+Baseline summary: 0/3 solved, avg moves: -, avg accuracy: 22.6%
+
+--- Dream Cycle: SKIPPED ---
+Using existing learned strategies
+
+--- Learning Runs (with learning) ---
+Run 1: Not solved, 20 moves, 20.0% acc

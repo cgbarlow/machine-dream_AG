@@ -1,0 +1,38 @@
+A/B Test Results
+================
+Profile: qwen3-coder
+Puzzle: puzzles/4x4-expert.json
+Runs per phase: 2
+Skip dream cycle: true
+Date: Sat Jan 10 07:17:53 NZDT 2026
+
+
+--- Baseline Runs (no learning) ---
+Run 1: SOLVED, 13 moves, 69.2% acc
+Run 2: SOLVED, 16 moves, 56.3% acc
+
+Baseline summary: 2/2 solved, avg moves: 14.5, avg accuracy: 62.7%
+
+--- Dream Cycle: SKIPPED ---
+Using existing learned strategies
+
+--- Learning Runs (with learning) ---
+Run 1: SOLVED, 9 moves, 100.0% acc
+Run 2: SOLVED, 25 moves, 36.0% acc
+
+Learning summary: 2/2 solved, avg moves: 17.0, avg accuracy: 68.0%
+
+--- Enhanced Analysis ---
+
+==============================================
+ENHANCED ANALYSIS RESULTS
+==============================================
+
+                    Baseline    Learning    Diff
+----------------------------------------------
+Solve rate:         2/2        2/2        0
+Avg moves:          14.5          17.0          2.5
+Avg accuracy:       62.7%         68.0%         5.3%
+----------------------------------------------
+
+==============================================

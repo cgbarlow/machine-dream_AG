@@ -1,0 +1,39 @@
+Initializing AgentDB at /home/chris/.machine-dream/agentdb...
+AgentDB (Local SQLite) initialized successfully.
+
+🌙 Starting LLM Dream Cycle
+
+
+📊 Profile: qwen3-coder
+──────────────────────────────────────────────────
+📦 Found 290 unconsolidated experiences
+🌙 Starting LLM Dream Cycle...
+📊 Found 290 unconsolidated experiences
+   Successful: 190, Invalid: 86, Wrong: 14
+🔍 Clustering by reasoning approach...
+🧠 LLM synthesizing pattern from cluster "general_reasoning" (80 experiences)...
+🧠 LLM synthesizing pattern from cluster "constraint_must be" (5 experiences)...
+🧠 LLM synthesizing pattern from cluster "constraint" (90 experiences)...
+🧠 LLM synthesizing pattern from cluster "must be" (14 experiences)...
+✅ Created 4 synthesized strategies
+📈 Building abstraction hierarchy...
+✅ Built 4-level abstraction hierarchy
+💡 Generating few-shot examples from synthesized patterns...
+🎯 Asking LLM to select diverse strategies from 4 patterns...
+   LLM selected 4 diverse strategies: 0, 2, 3, 1
+💾 Saved 4 few-shot examples
+
+📊 Compression ratio: 290:4 (72.5:1)
+🔍 Asking LLM to analyze 86 mistakes and identify anti-patterns...
+   ✅ LLM synthesized anti-patterns
+
+✅ Dream Cycle Complete
+   Experiences processed: 290
+   Few-shots created: 4
+   Patterns extracted: 4
+
+📚 Profile now has 4 few-shot examples for learning
+
+
+🎉 All profiles consolidated successfully
+

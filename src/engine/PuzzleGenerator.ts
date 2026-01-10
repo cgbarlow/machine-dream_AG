@@ -31,10 +31,10 @@ const DIFFICULTY_CLUE_COUNTS: Record<GridSize, Record<DifficultyLevel, number>> 
   },
   9: {
     easy: 45,       // 56% filled (45/81)
-    medium: 35,     // 43% filled
-    hard: 28,       // 35% filled
-    expert: 23,     // 28% filled
-    diabolical: 20  // 25% filled
+    medium: 36,     // 44% filled
+    hard: 30,       // 37% filled
+    expert: 27,     // 33% filled
+    diabolical: 23  // 28% filled - pushes toward minimum achievable
   },
   16: {
     easy: 140,      // 55% filled (140/256)
@@ -204,6 +204,7 @@ export class PuzzleGenerator {
 
   /**
    * Remove cells from solution to create puzzle
+   * Uses incremental removal with uniqueness validation for better success rate
    */
   private removeCells(solution: number[][], targetClueCount: number): number[][] {
     const size = solution.length;
@@ -213,8 +214,13 @@ export class PuzzleGenerator {
     const cellsToRemove = totalCells - targetClueCount;
 
     if (this.config.symmetry === 'none') {
-      // Simple random removal
-      return this.removeRandomCells(grid, cellsToRemove);
+      // Use incremental removal with uniqueness checking for better success rate
+      if (this.config.validateUniqueness) {
+        return this.removeRandomCellsIncremental(grid, cellsToRemove);
+      } else {
+        // Simple random removal (no uniqueness check)
+        return this.removeRandomCells(grid, cellsToRemove);
+      }
     } else {
       // Symmetric removal
       return this.removeSymmetricCells(grid, cellsToRemove);
@@ -222,7 +228,64 @@ export class PuzzleGenerator {
   }
 
   /**
-   * Remove cells randomly without symmetry
+   * Remove cells with incremental uniqueness checking
+   * This is slower but has much higher success rate for valid puzzles
+   */
+  private removeRandomCellsIncremental(grid: number[][], count: number): number[][] {
+    const size = grid.length;
+    const cells: [number, number][] = [];
+
+    // Collect all cell positions
+    for (let row = 0; row < size; row++) {
+      for (let col = 0; col < size; col++) {
+        cells.push([row, col]);
+      }
+    }
+
+    // Shuffle cells for random removal order
+    this.rng.shuffle(cells);
+
+    let removed = 0;
+    let attempts = 0;
+    const maxAttempts = cells.length; // Try each cell at most once
+
+    for (const [row, col] of cells) {
+      if (removed >= count) break;
+      if (attempts >= maxAttempts) break;
+
+      attempts++;
+
+      // Skip already empty cells
+      if (grid[row][col] === 0) continue;
+
+      // Temporarily remove the cell
+      const savedValue = grid[row][col];
+      grid[row][col] = 0;
+
+      // Check if puzzle still has unique solution
+      const solutionCount = this.validator.countSolutions(grid, 2);
+
+      if (solutionCount === 1) {
+        // Good - still unique, keep the removal
+        removed++;
+      } else {
+        // Bad - multiple solutions or unsolvable, restore the cell
+        grid[row][col] = savedValue;
+      }
+    }
+
+    // Allow some flexibility - accept if we removed at least 95% of target
+    // This means at most 3-4 extra clues for a 9x9 puzzle
+    const minRequired = Math.floor(count * 0.95);
+    if (removed < minRequired) {
+      throw new Error(`Could only remove ${removed}/${count} cells while maintaining uniqueness`);
+    }
+
+    return grid;
+  }
+
+  /**
+   * Remove cells randomly without uniqueness checking (fast but unreliable)
    */
   private removeRandomCells(grid: number[][], count: number): number[][] {
     const size = grid.length;

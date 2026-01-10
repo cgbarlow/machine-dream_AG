@@ -137,30 +137,56 @@ export interface LLMResponse {
 
 /**
  * Few-Shot Example (for memory-enabled prompts)
+ *
+ * Spec 11: Few-shots must be LLM-synthesized strategies, not raw move data
+ * Each example teaches a strategy that can be applied to similar situations
  */
 export interface FewShotExample {
-  gridContext: string;
-  analysis: string;
+  // Strategy identification
+  strategy: string;           // Strategy name (e.g., "Last Digit in Row")
+  abstractionLevel: number;   // 0=Instance, 1=Technique, 2=Category, 3=Principle
+
+  // Teaching content
+  situation: string;          // When this strategy applies
+  analysis: string;           // Step-by-step reasoning to follow
+
+  // Example move
   move: {
     row: number;
     col: number;
     value: number;
   };
   outcome: 'CORRECT';
+
+  // Legacy compatibility (deprecated, use strategy/situation instead)
+  gridContext?: string;
 }
 
 /**
  * Consolidation Report (from dreaming phase)
+ *
+ * Spec 11: LLM-driven consolidation produces synthesized patterns
+ * and a 4-level abstraction hierarchy
  */
 export interface ConsolidationReport {
+  // Synthesized patterns from LLM analysis
   patterns: {
-    successStrategies: LLMPattern[];
+    successStrategies: SynthesizedPattern[];
     commonErrors: LLMErrorPattern[];
     wrongPathPatterns: LLMWrongPath[];
   };
+
+  // Abstraction hierarchy built by LLM
+  hierarchy?: AbstractionHierarchy;
+
+  // LLM-generated insights summary
   insights: string;
+
+  // Metrics
   fewShotsUpdated: number;
   experiencesConsolidated: number;
+  compressionRatio?: number;       // experiences / patterns (target: 10:1)
+  abstractionLevels?: number;      // Number of hierarchy levels built
 }
 
 export interface LLMPattern {
@@ -184,4 +210,79 @@ export interface LLMWrongPath {
   wrongMove: LLMMove;
   correctMove: { row: number; col: number; value: number };
   frequency: number;
+}
+
+// ============================================================================
+// LLM-Driven Dreaming Types (Spec 11, Spec 05 Section 8)
+// ============================================================================
+
+/**
+ * Abstraction Level for the 4-level hierarchy
+ *
+ * Level 0: Specific instances ("Cell (3,5) had only 7 missing from row")
+ * Level 1: Named techniques ("Last Digit in Row")
+ * Level 2: Strategy categories ("Completion Strategies")
+ * Level 3: General principles ("Constraint Satisfaction")
+ */
+export interface AbstractionLevel {
+  level: 0 | 1 | 2 | 3;
+  name: string;
+  description: string;
+}
+
+/**
+ * Synthesized Pattern - LLM-generated strategy from analyzing experiences
+ *
+ * This is the output of the "dreaming brain" analyzing a cluster of
+ * similar successful moves and extracting the underlying strategy.
+ *
+ * IMPORTANT: The LLM must analyze FULL reasoning chains, never truncated.
+ */
+export interface SynthesizedPattern {
+  // Strategy identification
+  strategyName: string;           // e.g., "Last Digit in Row"
+  clusterName: string;            // The cluster this was extracted from
+
+  // Teaching content
+  whenToUse: string;              // Conditions that signal this strategy applies
+  reasoningSteps: string[];       // Step-by-step reasoning to follow
+  example: string;                // One clear example from the experiences
+  successInsight: string;         // Why this approach reliably works
+
+  // Metadata
+  abstractionLevel: AbstractionLevel;
+  sourceExperienceCount: number;  // How many experiences contributed
+  confidence: number;             // LLM's confidence in this pattern (0-1)
+}
+
+/**
+ * Abstraction Hierarchy - Multi-level organization of patterns
+ *
+ * Built by the LLM to organize strategies from specific to general.
+ */
+export interface AbstractionHierarchy {
+  levels: HierarchyLevel[];
+  profileName: string;
+  createdAt: Date;
+  totalPatterns: number;
+}
+
+export interface HierarchyLevel {
+  level: 0 | 1 | 2 | 3;
+  name: string;                   // e.g., "Specific Instances", "Named Techniques"
+  items: string[];                // Items at this level
+  description?: string;
+}
+
+/**
+ * Anti-Pattern - LLM-synthesized description of what NOT to do
+ *
+ * Spec 11: Negative Example Learning (2026-01-09)
+ * The LLM analyzes its mistakes and synthesizes anti-patterns as free text.
+ * This is stored as part of the consolidation report, not as a separate structure.
+ */
+export interface AntiPattern {
+  mistake: string;            // What went wrong
+  whyWrong: string;           // Why this approach fails
+  instead: string;            // What to do instead
 }

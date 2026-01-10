@@ -1,0 +1,65 @@
+Initializing AgentDB at /home/chris/.machine-dream/agentdb...
+AgentDB (Local SQLite) initialized successfully.
+
+🧠 Dream Storage: qwen3-coder
+
+══════════════════════════════════════════════════════════════════════
+
+📊 Statistics:
+   Total experiences: 1883
+   Consolidated: 1883
+   Unconsolidated: 0
+   Learned strategies: 3
+
+📚 Learned Strategies (3):
+
+   1. ""Last Digit in Constraint""
+      Level: 1 (Technique)
+      When: When a row, column, or box has only one empty cell that can legally contain a specific digit.
+      Reasoning:
+         Identify a constraint (row, column, or box) that is nearly complete with several digits filled.
+         Check which digits from 1-9 are missing in that constraint.
+         For each missing digit, determine if it has only one possible location within the constraint where it won't violate Sudoku rules.
+         If exactly one empty cell remains as the valid placement for a specific digit, place that digit there.
+
+   2. ""Last Digit Elimination""
+      Level: 1 (Technique)
+      When: When a cell has many constraints (highly restricted) and only one digit remains possible after eliminating all other candidates based on row, column, and box constraints.
+      Reasoning:
+         Identify a cell that is constrained by its row, column, and box - look for cells with 7+ of the 9 digits already placed in their respective regions
+         List all known values in the cell's row, column, and box to identify which digits are blocked from placement
+         Eliminate each blocked digit from the set of possible candidates (1-9)
+         If only one candidate remains, that must be the solution
+
+   3. ""Intersection Consistency Check""
+      Level: 1 (Technique)
+      When: When a cell's value can be determined by analyzing the intersection of row, column, and box constraints simultaneously, particularly when one or more of these constraint sets contain limited options.
+      Reasoning:
+         Identify all possible values for the target cell based on its row constraints
+         Identify all possible values for the target cell based on its column constraints
+         Identify all possible values for the target cell based on its box constraints
+         Find the unique value that satisfies ALL three constraint sets simultaneously
+         Verify this value doesn't violate any of the individual constraint rules
+
+
+🧠 Abstraction Hierarchy:
+
+   Level 0: Specific Instances
+      - Last Digit in Constraint: Single empty cell with one possible digit
+      - Last Digit Elimination: Highly restricted cell with only one remaining candidate
+      - Intersection Consistency Check: Cell value determined by simultaneous row/column/box analysis
+   Level 1: Named Techniques
+      - Last Digit Strategies: All variants focusing on single remaining possibilities
+      - Intersection Analysis: Methods using overlapping constraint intersections
+      - Elimination Techniques: Approaches narrowing candidates through constraint analysis
+   Level 2: Strategy Categories
+      - Completion Strategies: Filling in final digits when options are limited
+      - Constraint Intersections: Using multiple constraint overlaps to solve cells
+      - Candidate Reduction: Narrowing possibilities through systematic elimination
+   Level 3: General Principles
+      - Single Possibility Principle: When only one option remains, it must be correct
+      - Intersection Consistency Principle: Overlapping constraints provide definitive solutions
+
+──────────────────────────────────────────────────────────────────────
+💡 These strategies are injected into prompts during 'llm play'
+

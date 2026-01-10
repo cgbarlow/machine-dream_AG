@@ -41,9 +41,8 @@ export class PromptBuilder {
     }
     prompt += '\n';
 
-    // Add constraint information to prevent invalid moves
-    prompt += this.buildConstraintInfo(gridState);
-    prompt += '\n';
+    // NOTE: Removed buildConstraintInfo() call - redundant with grid display
+    // The grid already shows filled cells; listing them again wastes ~500 tokens
 
     // Add few-shot examples if memory enabled
     if (fewShots.length > 0) {
@@ -53,22 +52,25 @@ export class PromptBuilder {
 
     // Add move history for this puzzle
     if (experiences.length > 0) {
-      // Add forbidden moves FIRST - make them impossible to miss
-      const forbiddenMoves = this.extractForbiddenMoves(experiences);
-      if (forbiddenMoves.length > 0) {
-        prompt += '⚠️  FORBIDDEN MOVES - DO NOT ATTEMPT THESE AGAIN ⚠️\n';
-        prompt += 'These moves have been proven WRONG. You MUST NOT propose any of these:\n';
-        // Group in sets of 8 for readability
-        for (let i = 0; i < forbiddenMoves.length; i += 8) {
-          const group = forbiddenMoves.slice(i, i + 8).join(', ');
-          prompt += `${group}\n`;
-        }
-        prompt += 'If you propose ANY move from this list, your response will be REJECTED.\n\n';
-      }
-
       prompt += 'YOUR PREVIOUS ATTEMPTS ON THIS PUZZLE:\n';
       prompt += this.formatMoveHistory(experiences);
       prompt += '\n\n';
+
+      // Add forbidden moves (capped at 15 to prevent prompt bloat)
+      const forbiddenMoves = this.extractForbiddenMoves(experiences);
+      if (forbiddenMoves.length > 0) {
+        const cappedMoves = forbiddenMoves.slice(0, 15);
+        prompt += 'FORBIDDEN MOVES (do not repeat):\n';
+        // Group in sets of 8 for readability
+        for (let i = 0; i < cappedMoves.length; i += 8) {
+          const group = cappedMoves.slice(i, i + 8).join(', ');
+          prompt += `${group}\n`;
+        }
+        if (forbiddenMoves.length > 15) {
+          prompt += `(${forbiddenMoves.length - 15} more omitted)\n`;
+        }
+        prompt += '\n';
+      }
     }
 
     // Add empty cell count
@@ -98,33 +100,9 @@ export class PromptBuilder {
     return Array.from(forbidden).sort();
   }
 
-  /**
-   * Build constraint information about filled cells
-   * This helps the LLM avoid proposing moves for already-filled cells
-   */
-  private buildConstraintInfo(gridState: number[][]): string {
-    const size = gridState.length;
-    const filledCells: string[] = [];
-
-    for (let row = 0; row < size; row++) {
-      for (let col = 0; col < size; col++) {
-        const value = gridState[row][col];
-        if (value !== 0) {
-          // Cell is filled - add to list (1-indexed for user-facing)
-          filledCells.push(`(${row + 1},${col + 1})=${value}`);
-        }
-      }
-    }
-
-    let info = 'FILLED CELLS (cannot be changed):\n';
-    // Group in sets of 10 for readability
-    for (let i = 0; i < filledCells.length; i += 10) {
-      const group = filledCells.slice(i, i + 10).join(', ');
-      info += `${group}\n`;
-    }
-
-    return info;
-  }
+  // NOTE: buildConstraintInfo() was removed (2026-01-09)
+  // It listed filled cells which is redundant - the grid already shows them.
+  // This was adding ~500 tokens of noise per prompt.
 
   /**
    * Format move history with outcomes - facts only
@@ -170,16 +148,35 @@ export class PromptBuilder {
   }
 
   /**
-   * Format few-shot examples from successful patterns
+   * Format few-shot examples from synthesized strategies
+   *
+   * Few-shots are now LLM-synthesized teaching examples, not raw move data.
+   * Each teaches a strategy that can be applied to similar situations.
    */
   private formatFewShots(fewShots: FewShotExample[]): string {
-    let result = 'LEARNED PATTERNS FROM PREVIOUS PUZZLES:\n\n';
+    if (fewShots.length === 0) return '';
+
+    let result = 'LEARNED STRATEGIES FROM PREVIOUS PUZZLES:\n\n';
 
     fewShots.forEach((example, idx) => {
-      result += `Example ${idx + 1} - ${example.gridContext}:\n`;
-      result += `Analysis: ${example.analysis}\n`;
-      result += `Move: (${example.move.row},${example.move.col})=${example.move.value} → CORRECT\n\n`;
+      // Use new synthesized format if available, fall back to legacy format
+      const strategyName = example.strategy || `Strategy ${idx + 1}`;
+      const situation = example.situation || example.gridContext || 'General puzzle solving';
+      const analysis = example.analysis;
+
+      result += `Strategy ${idx + 1}: ${strategyName}\n`;
+      result += `When this applies: ${situation}\n`;
+      result += `How I reasoned:\n${analysis}\n`;
+
+      // Include example move if coordinates are valid
+      if (example.move.row > 0 && example.move.col > 0) {
+        result += `Result: Move (${example.move.row},${example.move.col}) = ${example.move.value} → ${example.outcome}\n`;
+      }
+
+      result += '\n---\n\n';
     });
+
+    result += 'Apply these strategies when you see similar patterns.\n';
 
     return result.trim();
   }

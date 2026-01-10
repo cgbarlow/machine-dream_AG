@@ -1,5 +1,5 @@
 /**
- * Dreaming Consolidator - Pattern synthesis from LLM experiences
+ * Dreaming Consolidator - LLM-Driven Pattern Synthesis
  * Specification: docs/specs/11-llm-sudoku-player.md
  * Specification: docs/specs/05-dreaming-pipeline-spec.md Section 8
  *
@@ -8,21 +8,23 @@
  *   - src/consolidation/DreamingController.ts (5-phase pipeline)
  *   - `machine-dream dream run` (CLI command)
  *
- * LLM-specific features:
- * - Profile-specific few-shot generation
- * - Independent learning trajectories per LLM profile
- * - Optimized for chat-based reasoning patterns
- * - A/B testing support with learning enable/disable
+ * KEY PRINCIPLE: The LLM is the "brain" that performs consolidation.
+ * Like human sleep cycles, the LLM analyzes its experiences and SYNTHESIZES
+ * what it learned - NOT just copy raw data.
+ *
+ * CRITICAL: Full reasoning must be used - NEVER truncate reasoning chains.
  */
 
 import type {
   LLMExperience,
   FewShotExample,
   ConsolidationReport,
-  LLMPattern,
   LLMErrorPattern,
   LLMWrongPath,
   LLMConfig,
+  SynthesizedPattern,
+  AbstractionHierarchy,
+  HierarchyLevel,
 } from './types.js';
 import { LMStudioClient } from './LMStudioClient.js';
 import { ExperienceStore } from './ExperienceStore.js';
@@ -30,134 +32,679 @@ import { ExperienceStore } from './ExperienceStore.js';
 /**
  * Dreaming Consolidator
  *
- * Spec 11 Section: Dreaming Consolidation
+ * Spec 11 Section: Dreaming Consolidation (LLM-Driven)
  * Spec 05 Section 8: LLM Experience Consolidation
  *
- * Analyzes accumulated LLM experiences to:
- * - Extract successful patterns
- * - Identify common error types
- * - Analyze wrong path patterns
- * - Generate few-shot examples
- * - Synthesize meta-insights using LLM
+ * The LLM "brain" analyzes experiences and synthesizes:
+ * - Reusable strategies from successful moves
+ * - A 4-level abstraction hierarchy
+ * - Few-shot examples that TEACH strategies (not raw data)
  */
 export class DreamingConsolidator {
   private llmClient: LMStudioClient;
 
   constructor(
     private experienceStore: ExperienceStore,
-    _config: LLMConfig
+    config: LLMConfig
   ) {
-    this.llmClient = new LMStudioClient(_config);
+    this.llmClient = new LMStudioClient(config);
   }
 
   /**
-   * Run consolidation on unconsolidated experiences
-   * Optionally filter by profile for profile-specific learning
+   * Run LLM-driven consolidation on unconsolidated experiences
    *
-   * Spec 11: Dreaming Consolidation algorithm + Profile-Specific Learning
+   * 5-Phase Pipeline:
+   * 1. CAPTURE (already done during play)
+   * 2. TRIAGE - Filter by importance
+   * 3. COMPRESSION - Cluster and LLM synthesizes patterns
+   * 4. ABSTRACTION - LLM builds hierarchy
+   * 5. INTEGRATION - Generate few-shots and store
    */
   async consolidate(profileName?: string): Promise<ConsolidationReport> {
-    // 1. Load experiences since last consolidation (filtered by profile if specified)
+    // Phase 1: CAPTURE (already done during play)
     let experiences = await this.experienceStore.getUnconsolidated(profileName);
 
     if (experiences.length === 0) {
       return this.createEmptyReport();
     }
 
-    // Sort by importance (high to low) and filter low-importance experiences
-    // Spec 03: Prioritize high-importance experiences for pattern extraction
+    console.log(`🌙 Starting LLM Dream Cycle...`);
+    console.log(`📊 Found ${experiences.length} unconsolidated experiences`);
+
+    // Phase 2: TRIAGE - Filter by importance
     experiences = experiences
       .sort((a, b) => (b.importance ?? 0.5) - (a.importance ?? 0.5))
       .filter((e) => (e.importance ?? 0.5) >= 0.6);
 
-    if (experiences.length === 0) {
+    if (experiences.length < 5) {
+      console.log(`⚠️  Only ${experiences.length} high-importance experiences - need at least 5`);
       return this.createEmptyReport();
     }
 
-    // 2. Group by outcome
+    // Group by outcome
     const successful = experiences.filter((e) => e.validation.isCorrect);
     const invalid = experiences.filter((e) => !e.validation.isValid);
     const wrong = experiences.filter(
       (e) => e.validation.isValid && !e.validation.isCorrect
     );
 
-    // 3. Extract patterns
-    const successStrategies = this.extractStrategies(successful);
-    const commonErrors = this.groupErrors(invalid);
-    const wrongPathPatterns = this.analyzeWrongPaths(wrong);
+    console.log(`   Successful: ${successful.length}, Invalid: ${invalid.length}, Wrong: ${wrong.length}`);
 
-    // 4. Use LLM to synthesize insights
-    const insights = await this.synthesizeInsights({
-      successStrategies,
-      commonErrors,
-      wrongPathPatterns,
-    });
+    // Phase 3: COMPRESSION - Cluster similar experiences
+    console.log(`🔍 Clustering by reasoning approach...`);
+    const clusters = this.clusterByReasoning(successful);
 
-    // 5. Generate few-shot examples from best patterns
-    const fewShots = this.generateFewShots(successStrategies);
+    // Phase 3b: LLM SYNTHESIZES pattern for each cluster
+    const synthesizedPatterns: SynthesizedPattern[] = [];
+    for (const [clusterName, cluster] of clusters.entries()) {
+      if (cluster.length >= 2) {
+        console.log(`🧠 LLM synthesizing pattern from cluster "${clusterName}" (${cluster.length} experiences)...`);
+        try {
+          const pattern = await this.synthesizePattern(cluster, clusterName);
+          if (pattern) {
+            synthesizedPatterns.push(pattern);
+          }
+        } catch (error) {
+          console.warn(`⚠️  Failed to synthesize pattern for cluster "${clusterName}":`, error);
+        }
+      }
+    }
 
-    // 6. Update few-shot examples in storage (profile-specific)
+    console.log(`✅ Created ${synthesizedPatterns.length} synthesized strategies`);
+
+    // Phase 4: ABSTRACTION - Build hierarchy
+    let hierarchy: AbstractionHierarchy | undefined;
+    if (synthesizedPatterns.length >= 2) {
+      console.log(`📈 Building abstraction hierarchy...`);
+      try {
+        hierarchy = await this.buildAbstractionHierarchy(synthesizedPatterns, profileName);
+        console.log(`✅ Built ${hierarchy.levels.length}-level abstraction hierarchy`);
+      } catch (error) {
+        console.warn(`⚠️  Failed to build hierarchy:`, error);
+      }
+    }
+
+    // Phase 5: INTEGRATION - Generate few-shots from synthesized patterns
+    console.log(`💡 Generating few-shot examples from synthesized patterns...`);
+    const fewShots = await this.generateFewShotsFromPatterns(synthesizedPatterns);
+    console.log(`💾 Saved ${fewShots.length} few-shot examples`);
+
+    // Store results
     await this.experienceStore.saveFewShots(fewShots, profileName);
+    if (hierarchy) {
+      await this.experienceStore.saveAbstractionHierarchy(hierarchy, profileName);
+    }
 
-    // 7. Mark experiences as consolidated
+    // Mark experiences as consolidated
     const experienceIds = experiences.map((e) => e.id);
     await this.experienceStore.markConsolidated(experienceIds);
 
+    // Calculate compression ratio
+    const compressionRatio = synthesizedPatterns.length > 0
+      ? experiences.length / synthesizedPatterns.length
+      : 0;
+
+    console.log(`\n📊 Compression ratio: ${experiences.length}:${synthesizedPatterns.length} (${compressionRatio.toFixed(1)}:1)`);
+
+    // Synthesize anti-patterns from invalid moves (LLM-driven)
+    let antiPatternInsights = '';
+    if (invalid.length >= 3) {
+      antiPatternInsights = await this.synthesizeAntiPatterns(invalid);
+    }
+
+    // Generate insights summary
+    let insights = await this.synthesizeInsightsSummary(synthesizedPatterns, hierarchy);
+    if (antiPatternInsights) {
+      insights += '\n\n### Anti-Patterns (What NOT to Do)\n' + antiPatternInsights;
+    }
+
+    // Analyze errors for the report (keep existing error analysis)
+    const commonErrors = this.groupErrors(invalid);
+    const wrongPathPatterns = this.analyzeWrongPaths(wrong);
+
     return {
       patterns: {
-        successStrategies,
+        successStrategies: synthesizedPatterns,
         commonErrors,
         wrongPathPatterns,
       },
+      hierarchy,
       insights,
       fewShotsUpdated: fewShots.length,
       experiencesConsolidated: experiences.length,
+      compressionRatio,
+      abstractionLevels: hierarchy?.levels.length,
     };
   }
 
   /**
-   * Extract successful strategies from correct moves
-   * Weight patterns by importance score (Spec 03)
+   * Cluster experiences by reasoning approach
+   * Uses keyword extraction to group similar reasoning patterns
    */
-  private extractStrategies(successful: LLMExperience[]): LLMPattern[] {
-    const patternMap = new Map<string, LLMPattern>();
+  private clusterByReasoning(experiences: LLMExperience[]): Map<string, LLMExperience[]> {
+    const clusters = new Map<string, LLMExperience[]>();
 
-    for (const exp of successful) {
-      // Create pattern signature based on reasoning approach
+    for (const exp of experiences) {
       const signature = this.extractReasoningSignature(exp.move.reasoning);
 
-      if (!patternMap.has(signature)) {
-        patternMap.set(signature, {
-          gridContext: this.describeGridContext(exp.gridState, exp.move),
-          reasoning: exp.move.reasoning,
-          move: {
-            row: exp.move.row,
-            col: exp.move.col,
-            value: exp.move.value,
-          },
-          successRate: 0,
-        });
+      if (!clusters.has(signature)) {
+        clusters.set(signature, []);
       }
-
-      // Weight by importance instead of simple count
-      const pattern = patternMap.get(signature)!;
-      const importance = exp.importance ?? 0.5;
-      pattern.successRate += importance;
+      clusters.get(signature)!.push(exp);
     }
 
-    // Convert weighted sums to normalized rates
-    const totalWeight = successful.reduce(
-      (sum, exp) => sum + (exp.importance ?? 0.5),
-      0
-    );
-    const patterns = Array.from(patternMap.values());
+    return clusters;
+  }
 
-    patterns.forEach((p) => {
-      p.successRate = totalWeight > 0 ? p.successRate / totalWeight : 0;
+  /**
+   * LLM synthesizes a reusable pattern from a cluster of experiences
+   *
+   * This is the "dreaming brain" analyzing what worked.
+   *
+   * CRITICAL: Uses FULL reasoning chain, never truncated!
+   */
+  private async synthesizePattern(
+    cluster: LLMExperience[],
+    clusterName: string
+  ): Promise<SynthesizedPattern | null> {
+    // Build prompt with FULL reasoning for each experience
+    const experienceDescriptions = cluster.slice(0, 5).map((exp, i) => `
+${i + 1}. Grid context: ${this.describeGridContext(exp.gridState, exp.move)}
+   Your move: (${exp.move.row},${exp.move.col}) = ${exp.move.value}
+
+   YOUR FULL REASONING:
+   ${exp.move.reasoning}
+`).join('\n');
+
+    const prompt = `You are reviewing ${cluster.length} successful Sudoku moves you made.
+Analyze them and extract a REUSABLE STRATEGY that you can apply in future puzzles.
+
+Your successful moves:
+${experienceDescriptions}
+
+Now synthesize what you learned. Respond in EXACTLY this format:
+
+STRATEGY_NAME: [A short, memorable name for this approach, e.g., "Last Digit in Row"]
+WHEN_TO_USE: [The conditions that signal when this strategy applies]
+REASONING_STEPS:
+1. [First step of the reasoning process]
+2. [Second step]
+3. [Continue as needed]
+EXAMPLE: [One clear example showing the strategy in action from the experiences above]
+SUCCESS_INSIGHT: [Why this approach reliably works - the underlying principle]
+CONFIDENCE: [A number 0.0-1.0 indicating how reliable this strategy is]`;
+
+    try {
+      const response = await this.llmClient.chat([
+        {
+          role: 'system',
+          content: 'You are reflecting on your Sudoku solving experiences to extract reusable strategies. Be specific and practical.',
+        },
+        { role: 'user', content: prompt },
+      ]);
+
+      return this.parsePatternResponse(response, clusterName, cluster.length);
+    } catch (error) {
+      console.warn(`Failed to synthesize pattern:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Parse LLM response into a SynthesizedPattern
+   */
+  private parsePatternResponse(
+    response: string,
+    clusterName: string,
+    sourceCount: number
+  ): SynthesizedPattern | null {
+    try {
+      // Extract fields using regex
+      const strategyName = this.extractField(response, 'STRATEGY_NAME') || clusterName;
+      const whenToUse = this.extractField(response, 'WHEN_TO_USE') || 'Not specified';
+      const reasoningSteps = this.extractReasoningSteps(response);
+      const example = this.extractField(response, 'EXAMPLE') || '';
+      const successInsight = this.extractField(response, 'SUCCESS_INSIGHT') || '';
+      const confidenceStr = this.extractField(response, 'CONFIDENCE');
+      const confidence = confidenceStr ? parseFloat(confidenceStr) || 0.7 : 0.7;
+
+      return {
+        strategyName,
+        clusterName,
+        whenToUse,
+        reasoningSteps,
+        example,
+        successInsight,
+        abstractionLevel: {
+          level: 1, // Named technique level by default
+          name: 'Technique',
+          description: 'A named technique extracted from successful moves',
+        },
+        sourceExperienceCount: sourceCount,
+        confidence,
+      };
+    } catch (error) {
+      console.warn(`Failed to parse pattern response:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Extract a field value from LLM response
+   * Handles both single and double newlines before the next field marker
+   */
+  private extractField(response: string, fieldName: string): string | null {
+    // Match field content until we hit another FIELD: marker (allowing blank lines before it)
+    const regex = new RegExp(`${fieldName}:\\s*(.+?)(?=\\n\\s*[A-Z_]+:|$)`, 's');
+    const match = response.match(regex);
+    return match ? match[1].trim() : null;
+  }
+
+  /**
+   * Extract reasoning steps as array
+   */
+  private extractReasoningSteps(response: string): string[] {
+    const stepsSection = this.extractField(response, 'REASONING_STEPS');
+    if (!stepsSection) return ['Apply constraint reasoning'];
+
+    const steps = stepsSection
+      .split(/\n/)
+      .map(line => line.replace(/^\d+\.\s*/, '').trim())
+      .filter(line => line.length > 0);
+
+    return steps.length > 0 ? steps : ['Apply constraint reasoning'];
+  }
+
+  /**
+   * LLM builds abstraction hierarchy from synthesized patterns
+   */
+  private async buildAbstractionHierarchy(
+    patterns: SynthesizedPattern[],
+    profileName?: string
+  ): Promise<AbstractionHierarchy> {
+    const patternList = patterns.map(p => `- ${p.strategyName}: ${p.whenToUse}`).join('\n');
+
+    const prompt = `You have ${patterns.length} Sudoku solving strategies. Organize them into a 4-level abstraction hierarchy.
+
+Your strategies:
+${patternList}
+
+Create a hierarchy with these 4 levels:
+
+LEVEL_0_INSTANCES:
+[List 2-3 specific examples/instances from the strategies above]
+
+LEVEL_1_TECHNIQUES:
+[Group similar strategies into named techniques, 2-4 items]
+
+LEVEL_2_CATEGORIES:
+[Group techniques into broader categories like "Completion" or "Elimination", 1-3 items]
+
+LEVEL_3_PRINCIPLES:
+[Extract 1-2 universal problem-solving principles]
+
+Be concise. Each item should be a short phrase or sentence.`;
+
+    try {
+      const response = await this.llmClient.chat([
+        {
+          role: 'system',
+          content: 'You are organizing Sudoku strategies into an abstraction hierarchy, from specific to general.',
+        },
+        { role: 'user', content: prompt },
+      ]);
+
+      return this.parseHierarchyResponse(response, patterns.length, profileName);
+    } catch (error) {
+      // Return a basic hierarchy if LLM fails
+      return this.createBasicHierarchy(patterns, profileName);
+    }
+  }
+
+  /**
+   * Parse hierarchy response from LLM
+   */
+  private parseHierarchyResponse(
+    response: string,
+    patternCount: number,
+    profileName?: string
+  ): AbstractionHierarchy {
+    const levels: HierarchyLevel[] = [
+      { level: 0, name: 'Specific Instances', items: this.extractLevelItems(response, 'LEVEL_0_INSTANCES') },
+      { level: 1, name: 'Named Techniques', items: this.extractLevelItems(response, 'LEVEL_1_TECHNIQUES') },
+      { level: 2, name: 'Strategy Categories', items: this.extractLevelItems(response, 'LEVEL_2_CATEGORIES') },
+      { level: 3, name: 'General Principles', items: this.extractLevelItems(response, 'LEVEL_3_PRINCIPLES') },
+    ];
+
+    return {
+      levels: levels.filter(l => l.items.length > 0),
+      profileName: profileName || 'default',
+      createdAt: new Date(),
+      totalPatterns: patternCount,
+    };
+  }
+
+  /**
+   * Extract items for a hierarchy level
+   * Uses explicit boundary detection to avoid bleeding between levels
+   */
+  private extractLevelItems(response: string, levelKey: string): string[] {
+    // Find start of this level
+    const startMatch = response.match(new RegExp(`${levelKey}:`, 'i'));
+    if (!startMatch || startMatch.index === undefined) return [];
+
+    const startIdx = startMatch.index + startMatch[0].length;
+
+    // Find start of next LEVEL_X marker after this one
+    const nextLevelRegex = /LEVEL_\d+_[A-Z]+:/gi;
+    nextLevelRegex.lastIndex = startIdx; // Start searching after current level
+
+    const nextMatch = nextLevelRegex.exec(response);
+    const endIdx = nextMatch ? nextMatch.index : response.length;
+
+    // Extract just this level's section
+    const section = response.substring(startIdx, endIdx);
+
+    return section
+      .split(/\n/)
+      .map(line => line.replace(/^[-•*]\s*/, '').trim())
+      .filter(line =>
+        line.length > 0 &&
+        !line.startsWith('[') &&
+        !line.match(/^LEVEL_\d+/)
+      );
+  }
+
+  /**
+   * Create basic hierarchy when LLM fails
+   */
+  private createBasicHierarchy(
+    patterns: SynthesizedPattern[],
+    profileName?: string
+  ): AbstractionHierarchy {
+    return {
+      levels: [
+        {
+          level: 1,
+          name: 'Named Techniques',
+          items: patterns.map(p => p.strategyName),
+        },
+      ],
+      profileName: profileName || 'default',
+      createdAt: new Date(),
+      totalPatterns: patterns.length,
+    };
+  }
+
+  /**
+   * Generate few-shot examples from synthesized patterns
+   *
+   * Few-shots are LLM-synthesized teaching examples, NOT raw move data
+   * Uses LLM to select diverse strategies (Spec 11 - LLM-Driven Diversity)
+   */
+  private async generateFewShotsFromPatterns(
+    patterns: SynthesizedPattern[]
+  ): Promise<FewShotExample[]> {
+    if (patterns.length === 0) return [];
+
+    // If only 1-2 patterns, no need for diversity selection
+    if (patterns.length <= 2) {
+      return patterns.map((pattern) => ({
+        strategy: pattern.strategyName,
+        abstractionLevel: pattern.abstractionLevel.level,
+        situation: pattern.whenToUse,
+        analysis: pattern.reasoningSteps.join('\n'),
+        move: { row: 0, col: 0, value: 0 },
+        outcome: 'CORRECT' as const,
+        gridContext: pattern.example,
+      }));
+    }
+
+    // Use LLM to select diverse strategies
+    console.log(`🎯 Asking LLM to select diverse strategies from ${patterns.length} patterns...`);
+
+    const prompt = `You have synthesized ${patterns.length} Sudoku strategies from your experiences.
+
+Your strategies:
+${patterns.map((p, i) => `${i + 1}. ${p.strategyName}: ${p.whenToUse}`).join('\n')}
+
+Now select 3-5 DIVERSE strategies to remember as few-shot examples.
+
+CRITICAL: Ensure diversity!
+- Do NOT select strategies that use the same underlying technique
+- If multiple strategies are variations of "last digit in row/column/box", pick only ONE
+- Aim for variety: completion strategies, elimination strategies, constraint checking, etc.
+- Identify and reject duplicates explicitly
+
+For each selected strategy, respond with ONLY the strategy numbers you selected, one per line:
+SELECTED: [number]
+WHY_DIVERSE: [brief explanation of why this is different from others]
+
+Example response:
+SELECTED: 1
+WHY_DIVERSE: Focuses on row completion
+SELECTED: 4
+WHY_DIVERSE: Uses box constraint checking, different from row-based strategies
+SELECTED: 7
+WHY_DIVERSE: Elimination approach rather than completion`;
+
+    try {
+      const response = await this.llmClient.chat([
+        {
+          role: 'system',
+          content: 'You are selecting diverse Sudoku strategies. Be strict about avoiding duplicates.',
+        },
+        { role: 'user', content: prompt },
+      ]);
+
+      // Parse selected indices from LLM response
+      const selectedIndices = this.parseSelectedStrategies(response, patterns.length);
+      console.log(`   LLM selected ${selectedIndices.length} diverse strategies: ${selectedIndices.join(', ')}`);
+
+      // Map selected indices to patterns
+      const selectedPatterns = selectedIndices
+        .filter(i => i >= 0 && i < patterns.length)
+        .map(i => patterns[i]);
+
+      // Fallback if parsing failed
+      if (selectedPatterns.length === 0) {
+        console.log(`   ⚠️ LLM selection parsing failed, using first 3 patterns`);
+        return patterns.slice(0, 3).map((pattern) => ({
+          strategy: pattern.strategyName,
+          abstractionLevel: pattern.abstractionLevel.level,
+          situation: pattern.whenToUse,
+          analysis: pattern.reasoningSteps.join('\n'),
+          move: { row: 0, col: 0, value: 0 },
+          outcome: 'CORRECT' as const,
+          gridContext: pattern.example,
+        }));
+      }
+
+      return selectedPatterns.map((pattern) => ({
+        strategy: pattern.strategyName,
+        abstractionLevel: pattern.abstractionLevel.level,
+        situation: pattern.whenToUse,
+        analysis: pattern.reasoningSteps.join('\n'),
+        move: { row: 0, col: 0, value: 0 },
+        outcome: 'CORRECT' as const,
+        gridContext: pattern.example,
+      }));
+
+    } catch (error) {
+      console.warn(`   ⚠️ LLM diversity selection failed:`, error);
+      // Fallback to first 3 patterns
+      return patterns.slice(0, 3).map((pattern) => ({
+        strategy: pattern.strategyName,
+        abstractionLevel: pattern.abstractionLevel.level,
+        situation: pattern.whenToUse,
+        analysis: pattern.reasoningSteps.join('\n'),
+        move: { row: 0, col: 0, value: 0 },
+        outcome: 'CORRECT' as const,
+        gridContext: pattern.example,
+      }));
+    }
+  }
+
+  /**
+   * Parse selected strategy indices from LLM response
+   */
+  private parseSelectedStrategies(response: string, maxIndex: number): number[] {
+    const indices: number[] = [];
+    const lines = response.split('\n');
+
+    for (const line of lines) {
+      const match = line.match(/SELECTED:\s*(\d+)/i);
+      if (match) {
+        const index = parseInt(match[1], 10) - 1; // Convert 1-indexed to 0-indexed
+        if (index >= 0 && index < maxIndex && !indices.includes(index)) {
+          indices.push(index);
+        }
+      }
+    }
+
+    return indices.slice(0, 5); // Max 5 strategies
+  }
+
+  /**
+   * LLM-driven anti-pattern synthesis from invalid moves
+   *
+   * Spec 11: Negative Example Learning (2026-01-09)
+   * The LLM analyzes its mistakes and synthesizes anti-patterns.
+   * Returns free-text summary that can be included in insights.
+   */
+  async synthesizeAntiPatterns(invalid: LLMExperience[]): Promise<string> {
+    if (invalid.length < 3) {
+      return ''; // Need at least 3 errors to be meaningful
+    }
+
+    console.log(`🔍 Asking LLM to analyze ${invalid.length} mistakes and identify anti-patterns...`);
+
+    const mistakesList = invalid.slice(0, 20).map((exp, i) => `
+${i + 1}. Move (${exp.move.row},${exp.move.col})=${exp.move.value}
+   Error: ${exp.validation.error}
+   Your reasoning: ${exp.move.reasoning.substring(0, 200)}...`).join('\n');
+
+    const prompt = `You made ${invalid.length} invalid moves during Sudoku solving.
+
+Your mistakes:
+${mistakesList}
+
+Analyze your mistakes and identify ANTI-PATTERNS - things you should NOT do.
+
+For each anti-pattern you identify, explain:
+1. MISTAKE: What you did wrong (the pattern of error)
+2. WHY_WRONG: Why this approach fails
+3. INSTEAD: What to do instead
+
+Focus on the most common/impactful mistakes. Synthesize patterns, don't just list individual errors.
+Identify at most 3 anti-patterns.`;
+
+    try {
+      const response = await this.llmClient.chat([
+        {
+          role: 'system',
+          content: 'You are analyzing your Sudoku solving mistakes to identify patterns of errors.',
+        },
+        { role: 'user', content: prompt },
+      ]);
+
+      console.log(`   ✅ LLM synthesized anti-patterns`);
+      return response;
+    } catch (error) {
+      console.warn(`   ⚠️ LLM anti-pattern synthesis failed:`, error);
+      return '';
+    }
+  }
+
+  /**
+   * Synthesize an insights summary from patterns and hierarchy
+   */
+  private async synthesizeInsightsSummary(
+    patterns: SynthesizedPattern[],
+    hierarchy?: AbstractionHierarchy
+  ): Promise<string> {
+    let summary = '## LLM Dream Consolidation Summary\n\n';
+
+    summary += `### Synthesized Strategies (${patterns.length})\n`;
+    patterns.forEach((p, i) => {
+      summary += `${i + 1}. **${p.strategyName}**\n`;
+      summary += `   - When: ${p.whenToUse}\n`;
+      summary += `   - Confidence: ${(p.confidence * 100).toFixed(0)}%\n`;
     });
 
-    // Sort by weighted success rate and return top patterns
-    return patterns.sort((a, b) => b.successRate - a.successRate).slice(0, 10);
+    if (hierarchy && hierarchy.levels.length > 0) {
+      summary += `\n### Abstraction Hierarchy\n`;
+      hierarchy.levels.forEach(level => {
+        summary += `\n**Level ${level.level}: ${level.name}**\n`;
+        level.items.forEach(item => {
+          summary += `- ${item}\n`;
+        });
+      });
+    }
+
+    return summary;
+  }
+
+  // ============================================================================
+  // Legacy methods (kept for error/wrong path analysis)
+  // ============================================================================
+
+  /**
+   * Extract reasoning signature for clustering
+   */
+  private extractReasoningSignature(reasoning: string): string {
+    const keywords = [
+      'only candidate',
+      'missing from row',
+      'missing from column',
+      'missing from box',
+      'last remaining',
+      'process of elimination',
+      'constraint',
+      'elimination',
+      'naked single',
+      'hidden single',
+      'only option',
+      'must be',
+    ];
+
+    const lower = reasoning.toLowerCase();
+    const found = keywords.filter((kw) => lower.includes(kw));
+
+    return found.length > 0 ? found.slice(0, 2).join('_') : 'general_reasoning';
+  }
+
+  /**
+   * Describe grid context around a move
+   */
+  private describeGridContext(
+    gridState: number[][],
+    move: { row: number; col: number; value: number }
+  ): string {
+    const row = move.row - 1;
+    const col = move.col - 1;
+
+    // Handle edge cases
+    if (row < 0 || row >= gridState.length || col < 0 || col >= (gridState[0]?.length || 0)) {
+      return `Cell (${move.row},${move.col})`;
+    }
+
+    const filledInRow = gridState[row]?.filter((v) => v !== 0).length || 0;
+    const filledInCol = gridState.map((r) => r[col]).filter((v) => v !== 0).length;
+
+    // Calculate box for variable grid sizes
+    const boxSize = Math.sqrt(gridState.length);
+    const boxRow = Math.floor(row / boxSize) * boxSize;
+    const boxCol = Math.floor(col / boxSize) * boxSize;
+    let filledInBox = 0;
+    for (let r = boxRow; r < boxRow + boxSize && r < gridState.length; r++) {
+      for (let c = boxCol; c < boxCol + boxSize && c < (gridState[r]?.length || 0); c++) {
+        if (gridState[r][c] !== 0) filledInBox++;
+      }
+    }
+
+    const gridSize = gridState.length;
+    return `Cell (${move.row},${move.col}): row ${filledInRow}/${gridSize} filled, col ${filledInCol}/${gridSize} filled, box ${filledInBox}/${gridSize} filled`;
   }
 
   /**
@@ -180,7 +727,6 @@ export class DreamingConsolidator {
       const pattern = errorMap.get(errorType)!;
       pattern.frequency += 1;
 
-      // Keep up to 3 examples per error type
       if (pattern.examples.length < 3) {
         pattern.examples.push({
           move: exp.move,
@@ -195,7 +741,7 @@ export class DreamingConsolidator {
   }
 
   /**
-   * Analyze wrong path patterns (valid but incorrect moves)
+   * Analyze wrong path patterns
    */
   private analyzeWrongPaths(wrong: LLMExperience[]): LLMWrongPath[] {
     const wrongMap = new Map<string, LLMWrongPath>();
@@ -211,7 +757,7 @@ export class DreamingConsolidator {
           correctMove: {
             row: exp.move.row,
             col: exp.move.col,
-            value: 0, // We don't know the correct value here
+            value: 0,
           },
           frequency: 0,
         });
@@ -226,135 +772,7 @@ export class DreamingConsolidator {
   }
 
   /**
-   * Use LLM to synthesize high-level insights
-   */
-  private async synthesizeInsights(patterns: {
-    successStrategies: LLMPattern[];
-    commonErrors: LLMErrorPattern[];
-    wrongPathPatterns: LLMWrongPath[];
-  }): Promise<string> {
-    const prompt = `Analyze these Sudoku solving experiences and extract strategic insights:
-
-SUCCESSFUL PATTERNS (${patterns.successStrategies.length} patterns):
-${patterns.successStrategies
-  .slice(0, 5)
-  .map(
-    (p, i) =>
-      `${i + 1}. ${p.gridContext}
-   Reasoning: ${p.reasoning.substring(0, 200)}
-   Success rate: ${(p.successRate * 100).toFixed(1)}%`
-  )
-  .join('\n\n')}
-
-COMMON ERRORS (${patterns.commonErrors.length} error types):
-${patterns.commonErrors
-  .slice(0, 5)
-  .map(
-    (e, i) => `${i + 1}. ${e.errorType} (occurred ${e.frequency} times)
-   Example: ${e.examples[0]?.error || 'N/A'}`
-  )
-  .join('\n\n')}
-
-WRONG PATH PATTERNS (${patterns.wrongPathPatterns.length} patterns):
-${patterns.wrongPathPatterns
-  .slice(0, 3)
-  .map(
-    (w, i) => `${i + 1}. ${w.context}
-   Wrong move: (${w.wrongMove.row},${w.wrongMove.col})=${w.wrongMove.value}
-   Frequency: ${w.frequency}`
-  )
-  .join('\n\n')}
-
-Please provide:
-1. Key strategic insights (what works well)
-2. Common pitfalls to avoid
-3. Suggested improvements for reasoning approach
-
-Keep the analysis concise (3-5 bullet points per section).`;
-
-    try {
-      const response = await this.llmClient.chat([
-        {
-          role: 'system',
-          content:
-            'You are analyzing Sudoku solving patterns to help improve strategic reasoning.',
-        },
-        { role: 'user', content: prompt },
-      ]);
-
-      return response;
-    } catch (error) {
-      // If LLM synthesis fails, return a basic summary
-      return this.createBasicInsightsSummary(patterns);
-    }
-  }
-
-  /**
-   * Generate few-shot examples from top patterns
-   */
-  private generateFewShots(patterns: LLMPattern[]): FewShotExample[] {
-    return patterns
-      .slice(0, 5) // Top 5 patterns
-      .map((pattern) => ({
-        gridContext: pattern.gridContext,
-        analysis: pattern.reasoning,
-        move: pattern.move,
-        outcome: 'CORRECT' as const,
-      }));
-  }
-
-  /**
-   * Extract reasoning signature for pattern matching
-   */
-  private extractReasoningSignature(reasoning: string): string {
-    // Extract key phrases that indicate reasoning approach
-    const keywords = [
-      'only candidate',
-      'missing from row',
-      'missing from column',
-      'missing from box',
-      'constraint',
-      'elimination',
-      'naked single',
-      'hidden single',
-    ];
-
-    const found = keywords.filter((kw) =>
-      reasoning.toLowerCase().includes(kw.toLowerCase())
-    );
-
-    return found.length > 0 ? found.join(',') : 'general';
-  }
-
-  /**
-   * Describe grid context around a move
-   */
-  private describeGridContext(
-    gridState: number[][],
-    move: { row: number; col: number; value: number }
-  ): string {
-    const row = move.row - 1;
-    const col = move.col - 1;
-
-    // Count filled cells in row, col, box
-    const filledInRow = gridState[row].filter((v) => v !== 0).length;
-    const filledInCol = gridState.map((r) => r[col]).filter((v) => v !== 0)
-      .length;
-
-    const boxRow = Math.floor(row / 3) * 3;
-    const boxCol = Math.floor(col / 3) * 3;
-    let filledInBox = 0;
-    for (let r = boxRow; r < boxRow + 3; r++) {
-      for (let c = boxCol; c < boxCol + 3; c++) {
-        if (gridState[r][c] !== 0) filledInBox++;
-      }
-    }
-
-    return `Cell (${move.row},${move.col}): row ${filledInRow}/9 filled, col ${filledInCol}/9 filled, box ${filledInBox}/9 filled`;
-  }
-
-  /**
-   * Categorize error type from error message
+   * Categorize error type
    */
   private categorizeError(error: string): string {
     const lower = error.toLowerCase();
@@ -368,34 +786,7 @@ Keep the analysis concise (3-5 bullet points per section).`;
   }
 
   /**
-   * Create basic insights summary when LLM synthesis fails
-   */
-  private createBasicInsightsSummary(patterns: {
-    successStrategies: LLMPattern[];
-    commonErrors: LLMErrorPattern[];
-    wrongPathPatterns: LLMWrongPath[];
-  }): string {
-    let summary = '## Consolidation Summary\n\n';
-
-    summary += `### Successful Strategies\n`;
-    summary += `- ${patterns.successStrategies.length} unique successful patterns identified\n`;
-    if (patterns.successStrategies.length > 0) {
-      summary += `- Top pattern: ${patterns.successStrategies[0].gridContext}\n`;
-    }
-
-    summary += `\n### Common Errors\n`;
-    patterns.commonErrors.slice(0, 3).forEach((e) => {
-      summary += `- ${e.errorType}: ${e.frequency} occurrences\n`;
-    });
-
-    summary += `\n### Wrong Paths\n`;
-    summary += `- ${patterns.wrongPathPatterns.length} valid-but-wrong patterns identified\n`;
-
-    return summary;
-  }
-
-  /**
-   * Create empty report when no experiences to consolidate
+   * Create empty report
    */
   private createEmptyReport(): ConsolidationReport {
     return {
@@ -404,7 +795,7 @@ Keep the analysis concise (3-5 bullet points per section).`;
         commonErrors: [],
         wrongPathPatterns: [],
       },
-      insights: 'No new experiences to consolidate',
+      insights: 'No new experiences to consolidate (need at least 5 high-importance experiences)',
       fewShotsUpdated: 0,
       experiencesConsolidated: 0,
     };

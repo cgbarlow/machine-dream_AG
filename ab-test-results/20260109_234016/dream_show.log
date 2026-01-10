@@ -1,0 +1,54 @@
+Initializing AgentDB at /home/chris/.machine-dream/agentdb...
+AgentDB (Local SQLite) initialized successfully.
+
+🧠 Dream Storage: qwen3-coder
+
+══════════════════════════════════════════════════════════════════════
+
+📊 Statistics:
+   Total experiences: 291
+   Consolidated: 291
+   Unconsolidated: 0
+   Learned strategies: 2
+
+📚 Learned Strategies (2):
+
+   1. ""Last Digit in Row""
+      Level: 1 (Technique)
+      When: When a row has only one empty cell and you can identify which digit from the set {1-9} is missing from that row, column, and box constraints.
+      Reasoning:
+         Examine all cells in a specific row to count how many digits are already present
+         Identify which of the numbers 1 through 9 are still needed in that row
+         For the single empty cell in that row, check if any of those missing numbers would violate column or box constraints when placed there
+         If only one number can possibly fit without violating Sudoku rules, place it in that cell
+
+   2. ""Last Digit in Unit""
+      Level: 1 (Technique)
+      When: When a cell is the only remaining position in a row, column, or box where a specific digit can legally go, or when all other positions in that unit have been eliminated for a particular number.
+      Reasoning:
+         Identify which row, column, or box contains the target cell
+         Check what digits are already present in that same row/column/box
+         Eliminate those numbers from the possible candidates for the target cell
+         If only one digit remains as valid, place it in the cell
+
+
+🧠 Abstraction Hierarchy:
+
+   Level 0: Specific Instances
+      - Filling the last empty cell in row 5 with digit 7 because columns 1,2,3 and box 4,5,6 already contain {1,2,3,4,5,6,8,9}
+      - Placing digit 9 in the only remaining position in column 8 where it can legally go
+      - Identifying that cell (3,7) is the last place in box 3 where digit 5 can be placed
+   Level 1: Named Techniques
+      - Last Digit in Row
+      - Last Digit in Unit
+      - Single Position Placement
+   Level 2: Strategy Categories
+      - Completion Strategies
+      - Elimination Techniques
+   Level 3: General Principles
+      - Fill available spaces when constraints eliminate all other possibilities
+      - Identify unique placement opportunities within constrained units
+
+──────────────────────────────────────────────────────────────────────
+💡 These strategies are injected into prompts during 'llm play'
+

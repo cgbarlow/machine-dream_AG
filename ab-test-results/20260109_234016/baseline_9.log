@@ -1,0 +1,32 @@
+🤖 Starting LLM Sudoku Player...
+Using profile: qwen3-coder
+Timeout override: 120000ms
+Initializing AgentDB at /home/chris/.machine-dream/agentdb...
+AgentDB (Local SQLite) initialized successfully.
+Checking LM Studio connection at http://127.0.0.1:1234/v1...
+✓ Connected to LM Studio (model: qwen3-coder-30b-a3b-instruct)
+Memory: ✓ ENABLED
+
+🎮 Starting puzzle solve...
+Progress: 
+📚 Learning: DISABLED (baseline mode - experiences saved but not using learned strategies)
+
+..............
+
+📊 Session Results:
+  Solved: ✓ YES
+  Total moves: 14
+  Correct moves: 9
+  Invalid moves: 5
+  Valid but wrong: 0
+  Accuracy: 64.3%
+
+💾 Memory:
+  Experiences saved: 14
+  💡 Run 'llm dream run' to consolidate and improve learning
+
+──────────────────────────────────────────────────
+Session ended: SOLVED
+Reason: Puzzle solved successfully
+Exit code: 0
+──────────────────────────────────────────────────

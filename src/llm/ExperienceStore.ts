@@ -7,6 +7,8 @@ import type {
   LLMExperience,
   FewShotExample,
   LLMConfig,
+  AbstractionHierarchy,
+  PlaySession,
 } from './types.js';
 import type { AgentMemory } from '../memory/AgentMemory.js';
 import { createHash } from 'crypto';
@@ -167,6 +169,40 @@ export class ExperienceStore {
   }
 
   /**
+   * Save abstraction hierarchy from consolidation
+   * Stores per-profile using namespaced key: llm_hierarchy:${profileName}
+   */
+  async saveAbstractionHierarchy(hierarchy: AbstractionHierarchy, profileName?: string): Promise<void> {
+    const profile = profileName || this.profileName;
+    await this.agentMemory.reasoningBank.storeMetadata(
+      `llm_hierarchy:${profile}`,
+      'abstraction_hierarchy',
+      {
+        ...hierarchy,
+        profileName: profile,
+      }
+    );
+  }
+
+  /**
+   * Get abstraction hierarchy for a profile
+   * Loads from profile-specific storage: llm_hierarchy:${profileName}
+   */
+  async getAbstractionHierarchy(profileName?: string): Promise<AbstractionHierarchy | null> {
+    const profile = profileName || this.profileName;
+    const data = await this.agentMemory.reasoningBank.getMetadata(
+      `llm_hierarchy:${profile}`,
+      'abstraction_hierarchy'
+    );
+
+    if (!data) {
+      return null;
+    }
+
+    return data as AbstractionHierarchy;
+  }
+
+  /**
    * Generate puzzle hash for similarity detection
    */
   generatePuzzleHash(gridState: number[][]): string {
@@ -212,5 +248,54 @@ export class ExperienceStore {
       invalidMoves: invalid,
       validButWrongMoves: validButWrong,
     };
+  }
+
+  /**
+   * Save session metadata (solved status, abandon reason, etc.)
+   * This complements experience storage with session-level information
+   */
+  async saveSession(session: PlaySession): Promise<void> {
+    await this.agentMemory.reasoningBank.storeMetadata(
+      `llm_session:${session.id}`,
+      'llm_session',
+      {
+        id: session.id,
+        puzzleId: session.puzzleId,
+        profileName: session.profileName || this.profileName,
+        startTime: session.startTime,
+        endTime: session.endTime,
+        solved: session.solved,
+        abandoned: session.abandoned,
+        abandonReason: session.abandonReason,
+        totalMoves: session.totalMoves,
+        correctMoves: session.correctMoves,
+        invalidMoves: session.invalidMoves,
+        validButWrongMoves: session.validButWrongMoves,
+        memoryWasEnabled: session.memoryWasEnabled,
+        learningContext: session.learningContext,
+      }
+    );
+  }
+
+  /**
+   * Get session metadata by ID
+   */
+  async getSession(sessionId: string): Promise<Partial<PlaySession> | null> {
+    const data = await this.agentMemory.reasoningBank.getMetadata(
+      `llm_session:${sessionId}`,
+      'llm_session'
+    );
+    return data as Partial<PlaySession> | null;
+  }
+
+  /**
+   * Get all session metadata
+   */
+  async getAllSessions(): Promise<Partial<PlaySession>[]> {
+    const sessions = await this.agentMemory.reasoningBank.queryMetadata(
+      'llm_session',
+      {}
+    ) as Partial<PlaySession>[];
+    return sessions;
   }
 }

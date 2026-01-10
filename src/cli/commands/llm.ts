@@ -651,9 +651,28 @@ export function registerLLMCommand(program: Command): void {
           validButWrongMoves: 0
         };
 
-        let session;
+        let session: any;
         let exitReason = 'COMPLETED';
         let exitCode = 0;
+
+        // Handle Ctrl-C gracefully - save session before exit
+        const sigintHandler = async () => {
+          if (session && config.memoryEnabled) {
+            session.abandoned = true;
+            session.abandonReason = 'user_interrupt: Ctrl-C pressed';
+            session.endTime = new Date();
+            try {
+              const { ExperienceStore } = await import('../../llm/ExperienceStore.js');
+              const experienceStore = new ExperienceStore(memory, config, profileName);
+              await experienceStore.saveSession(session);
+              logger.info('\n\n💾 Session saved (interrupted by user)');
+            } catch {
+              // Ignore save errors on interrupt
+            }
+          }
+          process.exit(130); // Standard exit code for SIGINT
+        };
+        process.on('SIGINT', sigintHandler);
 
         try {
           // Determine learning mode (--no-learning sets learning to false)
@@ -665,10 +684,23 @@ export function registerLLMCommand(program: Command): void {
               const { ExperienceStore } = await import('../../llm/ExperienceStore.js');
               const experienceStore = new ExperienceStore(memory, config, profileName);
               const fewShots = await experienceStore.getFewShots(profileName);
-              logger.info(`📚 Learning: ${fewShots.length} few-shots loaded for profile: ${profileName}`);
+
+              if (fewShots.length > 0) {
+                logger.info(`\n📚 Memory Learning: ACTIVE`);
+                logger.info(`   Strategies loaded: ${fewShots.length}`);
+                const strategyNames = fewShots
+                  .map((fs: any) => fs.strategy || 'Unnamed')
+                  .slice(0, 5);
+                logger.info(`   Injecting: ${strategyNames.join(', ')}`);
+                logger.info(`   Profile: ${profileName}\n`);
+              } else {
+                logger.info(`📚 Memory: ON (no learned strategies yet - run 'llm dream run' after playing)\n`);
+              }
             } else {
-              logger.info(`📚 Learning: DISABLED (baseline mode)`);
+              logger.info(`📚 Learning: DISABLED (baseline mode - experiences saved but not using learned strategies)\n`);
             }
+          } else {
+            logger.info(`📚 Memory: OFF (no learning, no experience storage)\n`);
           }
 
           session = await player.playPuzzle(
@@ -697,6 +729,18 @@ export function registerLLMCommand(program: Command): void {
               : '0.0';
           logger.info(`  Accuracy: ${accuracy}%`);
 
+          // Memory/learning stats
+          if (config.memoryEnabled) {
+            logger.info(`\n💾 Memory:`);
+            logger.info(`  Experiences saved: ${session.totalMoves}`);
+            if (session.learningContext?.fewShotsUsed) {
+              logger.info(`  Strategies used: ${session.learningContext.fewShotCount}`);
+            }
+            if (session.correctMoves > 0) {
+              logger.info(`  💡 Run 'llm dream run' to consolidate and improve learning`);
+            }
+          }
+
           // Set exit reason
           if (session.solved) {
             exitReason = 'SOLVED';
@@ -704,6 +748,16 @@ export function registerLLMCommand(program: Command): void {
             exitReason = 'ABANDONED';
             exitCode = 1;
           }
+
+          // Save session metadata to memory (includes abandonReason)
+          if (config.memoryEnabled) {
+            const { ExperienceStore } = await import('../../llm/ExperienceStore.js');
+            const experienceStore = new ExperienceStore(memory, config, profileName);
+            await experienceStore.saveSession(session);
+          }
+
+          // Remove SIGINT handler now that session is saved
+          process.removeListener('SIGINT', sigintHandler);
         } catch (error) {
           // Determine exit reason from error
           const errorMsg = error instanceof Error ? error.message : String(error);
@@ -746,6 +800,9 @@ export function registerLLMCommand(program: Command): void {
           }
           logger.info(`Exit code: ${exitCode}`);
           logger.info('─'.repeat(50));
+
+          // Remove SIGINT handler
+          process.removeListener('SIGINT', sigintHandler);
 
           // Re-throw for CLI error handler
           if (error instanceof CLIError) {
@@ -1443,6 +1500,7 @@ export function registerLLMCommand(program: Command): void {
     .description('Run dreaming consolidation for a profile')
     .option('--profile <name>', 'LLM profile to consolidate (default: active profile)')
     .option('--all', 'Consolidate all profiles separately')
+    .option('--reset', 'Reset consolidated status and reprocess all experiences')
     .option('--output <file>', 'Save consolidation report')
     .action(async (options) => {
       try {
@@ -1479,6 +1537,25 @@ export function registerLLMCommand(program: Command): void {
           // Create store and consolidator
           const experienceStore = new ExperienceStore(agentMemory, config, profileName);
           const consolidator = new DreamingConsolidator(experienceStore, config);
+
+          // Reset consolidated status if requested
+          if (options.reset) {
+            logger.info(`🔄 Resetting consolidated status for all experiences...`);
+            const allExperiences = await agentMemory.reasoningBank.queryMetadata('llm_experience', {}) as LLMExperience[];
+            const profileExperiences = allExperiences.filter((exp: any) => exp.profileName === profileName);
+            let resetCount = 0;
+            for (const exp of profileExperiences) {
+              if ((exp as any).consolidated === true) {
+                await agentMemory.reasoningBank.storeMetadata(
+                  exp.id,
+                  'llm_experience',
+                  { ...exp, consolidated: false }
+                );
+                resetCount++;
+              }
+            }
+            logger.info(`   Reset ${resetCount} experiences to unconsolidated`);
+          }
 
           // Get unconsolidated count before
           const before = await experienceStore.getUnconsolidated(profileName);
@@ -1610,6 +1687,7 @@ export function registerLLMCommand(program: Command): void {
         // Get data
         const fewShots = await experienceStore.getFewShots(profileName, parseInt(options.limit, 10));
         const unconsolidated = await experienceStore.getUnconsolidated(profileName);
+        const hierarchy = await experienceStore.getAbstractionHierarchy(profileName);
 
         // Get consolidated count
         const allExperiences = await agentMemory.reasoningBank.queryMetadata('llm_experience', {}) as LLMExperience[];
@@ -1626,6 +1704,7 @@ export function registerLLMCommand(program: Command): void {
               fewShotCount: fewShots.length,
             },
             fewShots: fewShots,
+            hierarchy: hierarchy,
           }, null, 2));
         } else {
           logger.info(`\n🧠 Dream Storage: ${profileName}\n`);
@@ -1636,34 +1715,192 @@ export function registerLLMCommand(program: Command): void {
           logger.info(`   Total experiences: ${profileExperiences.length}`);
           logger.info(`   Consolidated: ${consolidated.length}`);
           logger.info(`   Unconsolidated: ${unconsolidated.length}`);
-          logger.info(`   Few-shot examples: ${fewShots.length}`);
+          logger.info(`   Learned strategies: ${fewShots.length}`);
 
-          // Few-shots
+          // Learned strategies (new format)
           if (fewShots.length === 0) {
-            logger.info(`\n📚 Few-Shot Examples: None`);
-            logger.info(`   Run 'llm dream run' to generate few-shots from experiences`);
+            logger.info(`\n📚 Learned Strategies: None`);
+            logger.info(`   Run 'llm dream run' to generate strategies from experiences`);
           } else {
-            logger.info(`\n📚 Few-Shot Examples (${fewShots.length}):\n`);
+            logger.info(`\n📚 Learned Strategies (${fewShots.length}):\n`);
 
             fewShots.forEach((fs: any, i: number) => {
-              logger.info(`   ${i + 1}. ${fs.gridContext || 'No context'}`);
-              logger.info(`      Move: (${fs.move?.row}, ${fs.move?.col}) = ${fs.move?.value}`);
-              logger.info(`      Outcome: ${fs.outcome || 'CORRECT'}`);
-              if (fs.analysis) {
-                const shortAnalysis = fs.analysis.length > 100
-                  ? fs.analysis.substring(0, 100) + '...'
-                  : fs.analysis;
-                logger.info(`      Reasoning: ${shortAnalysis}`);
+              // Display synthesized strategy format
+              const strategyName = fs.strategy || `Strategy ${i + 1}`;
+              const level = fs.abstractionLevel;
+              const levelNames = ['Instance', 'Technique', 'Category', 'Principle'];
+              const levelName = level !== undefined && levelNames[level] ? levelNames[level] : 'Technique';
+
+              logger.info(`   ${i + 1}. "${strategyName}"`);
+              logger.info(`      Level: ${level ?? 1} (${levelName})`);
+
+              if (fs.situation) {
+                logger.info(`      When: ${fs.situation}`);
+              } else if (fs.gridContext) {
+                logger.info(`      Context: ${fs.gridContext}`);
               }
+
+              if (fs.analysis) {
+                logger.info(`      Reasoning:`);
+                // Show all reasoning steps, indented
+                const steps = fs.analysis.split('\n').filter((s: string) => s.trim());
+                steps.forEach((step: string) => {
+                  logger.info(`         ${step.trim()}`);
+                });
+              }
+
+              if (fs.move?.row > 0 && fs.move?.col > 0) {
+                logger.info(`      Example: (${fs.move.row},${fs.move.col}) = ${fs.move.value}`);
+              }
+
               logger.info('');
             });
           }
 
+          // Abstraction Hierarchy
+          if (hierarchy && hierarchy.levels && hierarchy.levels.length > 0) {
+            logger.info(`\n🧠 Abstraction Hierarchy:\n`);
+
+            hierarchy.levels.forEach((level: any) => {
+              logger.info(`   Level ${level.level}: ${level.name}`);
+              if (level.items && level.items.length > 0) {
+                level.items.forEach((item: string) => {
+                  logger.info(`      - ${item}`);
+                });
+              }
+            });
+
+            logger.info('');
+          }
+
           logger.info('─'.repeat(70));
-          logger.info(`💡 These few-shots are injected into prompts during 'llm play'\n`);
+          logger.info(`💡 These strategies are injected into prompts during 'llm play'\n`);
         }
       } catch (error) {
         throw new CLIError('Failed to show dream data', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm dream clear
+  dream
+    .command('clear')
+    .description('Clear learned strategies and/or abstraction hierarchy')
+    .option('--profile <name>', 'LLM profile to clear (default: active profile)')
+    .option('--strategies', 'Clear learned strategies (few-shots) only')
+    .option('--hierarchy', 'Clear abstraction hierarchy only')
+    .option('--confirm', 'Skip confirmation prompt')
+    .action(async (options) => {
+      try {
+        const manager = new LLMProfileManager();
+        const agentMemory = new AgentMemory(createDefaultMemoryConfig());
+
+        // Determine profile
+        let profileName: string;
+        if (options.profile) {
+          profileName = options.profile;
+        } else {
+          const activeProfile = manager.getActive();
+          if (!activeProfile) {
+            throw new CLIError('No active profile. Use --profile or set an active profile.', 1);
+          }
+          profileName = activeProfile.name;
+        }
+
+        // Determine what to clear
+        const clearStrategies = options.strategies || (!options.strategies && !options.hierarchy);
+        const clearHierarchy = options.hierarchy || (!options.strategies && !options.hierarchy);
+
+        // Load current data to show counts
+        const config = getLLMConfig(profileName);
+        const { ExperienceStore } = await import('../../llm/ExperienceStore.js');
+        const experienceStore = new ExperienceStore(agentMemory, config, profileName);
+
+        const fewShots = await experienceStore.getFewShots(profileName, 100);
+        const hierarchy = await experienceStore.getAbstractionHierarchy(profileName);
+
+        // Count what will be deleted
+        const strategyCount = fewShots.length;
+        const hierarchyLevelCount = hierarchy?.levels?.length || 0;
+
+        // Check if there's anything to delete
+        if ((clearStrategies && strategyCount === 0) && (clearHierarchy && hierarchyLevelCount === 0)) {
+          logger.info(`\n📭 No dream data found for profile: ${profileName}\n`);
+          return;
+        }
+
+        // Show what will be cleared with counts
+        logger.warn(`\n⚠️  This will delete the following for profile: ${profileName}\n`);
+
+        if (clearStrategies) {
+          if (strategyCount > 0) {
+            logger.warn(`   • ${strategyCount} learned strateg${strategyCount === 1 ? 'y' : 'ies'} (few-shots)`);
+          } else {
+            logger.info(`   • No strategies to delete`);
+          }
+        }
+
+        if (clearHierarchy) {
+          if (hierarchyLevelCount > 0) {
+            logger.warn(`   • Abstraction hierarchy with ${hierarchyLevelCount} level${hierarchyLevelCount === 1 ? '' : 's'}`);
+          } else {
+            logger.info(`   • No hierarchy to delete`);
+          }
+        }
+
+        logger.warn('\n   This action cannot be undone!\n');
+
+        // Confirmation
+        if (!options.confirm) {
+          const readline = await import('readline');
+          const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+          const answer = await new Promise<string>((resolve) => {
+            rl.question('Type "yes" to confirm deletion: ', resolve);
+          });
+          rl.close();
+
+          if (answer.trim().toLowerCase() !== 'yes') {
+            logger.info('Deletion cancelled.');
+            return;
+          }
+        }
+
+        // Clear data
+        let clearedCount = 0;
+
+        if (clearStrategies) {
+          const deleted = await agentMemory.reasoningBank.deleteMetadata(
+            `llm_fewshots:${profileName}`,
+            'fewshot_examples'
+          );
+          if (deleted) {
+            clearedCount++;
+            logger.info(`✓ Cleared learned strategies for ${profileName}`);
+          } else {
+            logger.info(`  No strategies found for ${profileName}`);
+          }
+        }
+
+        if (clearHierarchy) {
+          const deleted = await agentMemory.reasoningBank.deleteMetadata(
+            `llm_hierarchy:${profileName}`,
+            'abstraction_hierarchy'
+          );
+          if (deleted) {
+            clearedCount++;
+            logger.info(`✓ Cleared abstraction hierarchy for ${profileName}`);
+          } else {
+            logger.info(`  No hierarchy found for ${profileName}`);
+          }
+        }
+
+        if (clearedCount > 0) {
+          logger.info(`\n✅ Dream data cleared for profile: ${profileName}`);
+          logger.info(`💡 Run 'llm dream run' to regenerate from experiences\n`);
+        } else {
+          logger.info(`\n📭 No dream data found for profile: ${profileName}\n`);
+        }
+      } catch (error) {
+        throw new CLIError('Failed to clear dream data', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -1688,6 +1925,11 @@ export function registerLLMCommand(program: Command): void {
 
         // Query all experiences
         const allExperiences = await agentMemory.reasoningBank.queryMetadata('llm_experience', {}) as LLMExperience[];
+
+        // Query stored session metadata (contains abandonReason, etc.)
+        const storedSessions = await agentMemory.reasoningBank.queryMetadata('llm_session', {}) as any[];
+        const sessionMetadataMap = new Map<string, any>();
+        storedSessions.forEach(s => sessionMetadataMap.set(s.id, s));
 
         // Group by session ID
         const sessionMap = new Map<string, {
@@ -1720,7 +1962,8 @@ export function registerLLMCommand(program: Command): void {
 
         // Convert to array and calculate stats
         let sessions = Array.from(sessionMap.values()).map(sessionData => {
-          const exps = sessionData.experiences;
+          // Sort experiences by moveNumber to ensure first move is actually first
+          const exps = sessionData.experiences.sort((a, b) => a.moveNumber - b.moveNumber);
           const totalMoves = exps.length;
           const correctMoves = exps.filter(e => e.validation.isCorrect).length;
           const invalidMoves = exps.filter(e => !e.validation.isValid).length;
@@ -1728,38 +1971,37 @@ export function registerLLMCommand(program: Command): void {
           const accuracy = totalMoves > 0 ? (correctMoves / totalMoves) * 100 : 0;
 
           // Check if solved and calculate completion percentage
-          // gridState is recorded BEFORE the move, so adjust for last correct move
+          // Simple approach: completion = correctMoves / originalEmptyCells
           const firstExp = exps[0];
-          const lastExp = exps[exps.length - 1];
           let solved = false;
           let completionPct = 0;
 
-          if (firstExp?.gridState && lastExp?.gridState) {
+          if (firstExp?.gridState) {
             const originalEmpty = firstExp.gridState.flat().filter(cell => cell === 0).length;
-            let remainingEmpty = lastExp.gridState.flat().filter(cell => cell === 0).length;
 
-            // If last move was correct, one more cell was filled
-            if (lastExp.validation?.isCorrect) {
-              remainingEmpty = Math.max(0, remainingEmpty - 1);
-            }
-
-            // Solved if no remaining empty cells
-            solved = remainingEmpty === 0;
-
-            // Completion percentage
+            // Completion = how many cells we correctly filled / how many were empty
             if (originalEmpty > 0) {
-              completionPct = ((originalEmpty - remainingEmpty) / originalEmpty) * 100;
+              completionPct = (correctMoves / originalEmpty) * 100;
+              // Solved if we filled all empty cells
+              solved = correctMoves >= originalEmpty;
             }
           }
 
           // Learning flags from first experience
           const learningContext = firstExp.learningContext;
 
+          // Get stored session metadata for abandonReason
+          const storedMeta = sessionMetadataMap.get(sessionData.sessionId);
+          const abandoned = storedMeta?.abandoned || false;
+          const abandonReason = storedMeta?.abandonReason || null;
+
           return {
             sessionId: sessionData.sessionId,
             puzzleId: sessionData.puzzleId,
             profileName: sessionData.profileName,
             solved,
+            abandoned,
+            abandonReason,
             completionPct,
             totalMoves,
             correctMoves,
@@ -1800,17 +2042,32 @@ export function registerLLMCommand(program: Command): void {
         }
 
         // Header
-        logger.info('ID                                    Profile           Puzzle            Solved  Done%  Moves   Acc%    Learning    Date');
-        logger.info('─'.repeat(130));
+        logger.info('ID                                    Profile           Puzzle            Done%  Moves   Acc%   Exit        Learning    Date');
+        logger.info('─'.repeat(140));
 
         sessionsToShow.forEach(s => {
           const sessionIdShort = s.sessionId.substring(0, 36).padEnd(36);
           const profile = s.profileName.substring(0, 16).padEnd(16);
           const puzzle = s.puzzleId.substring(0, 16).padEnd(16);
-          const solvedMark = s.solved ? '✓ YES' : '✗ NO ';
           const donePct = `${s.completionPct.toFixed(0)}%`.padStart(5);
           const moves = s.totalMoves.toString().padStart(5);
           const acc = `${s.accuracy.toFixed(1)}%`.padStart(6);
+
+          // Exit status - show why session ended
+          let exitStatus = 'ok';
+          if (s.solved) {
+            exitStatus = 'SOLVED';
+          } else if (s.abandoned && s.abandonReason) {
+            // Shorten common abandon reasons
+            if (s.abandonReason.includes('max_moves')) exitStatus = 'max_moves';
+            else if (s.abandonReason.includes('llm_error')) exitStatus = 'llm_error';
+            else if (s.abandonReason.includes('consecutive_forbidden')) exitStatus = 'stuck';
+            else if (s.abandonReason.includes('timeout')) exitStatus = 'timeout';
+            else exitStatus = 'abandoned';
+          } else if (s.abandoned) {
+            exitStatus = 'abandoned';
+          }
+          const exitStr = exitStatus.padEnd(10);
 
           // Learning flags - only show actually useful ones
           const flags = [];
@@ -1828,12 +2085,12 @@ export function registerLLMCommand(program: Command): void {
             minute: '2-digit'
           });
 
-          logger.info(`${sessionIdShort}  ${profile}  ${puzzle}  ${solvedMark}  ${donePct}  ${moves}  ${acc}  ${learningStr}  ${date}`);
+          logger.info(`${sessionIdShort}  ${profile}  ${puzzle}  ${donePct}  ${moves}  ${acc}   ${exitStr}  ${learningStr}  ${date}`);
         });
 
         logger.info('');
         logger.info(`Showing ${sessionsToShow.length} of ${sessions.length} sessions`);
-        logger.info('Legend: [F#]=Few-shots used (#=count), [C]=Consolidated experiences, Done%=Puzzle completion, Acc%=Move accuracy');
+        logger.info('Legend: [F#]=Few-shots used, [C]=Consolidated, Exit: SOLVED/max_moves/llm_error/stuck/timeout/abandoned');
         logger.info(`\n💡 Tip: Use 'llm session show <id>' to view detailed breakdown`);
 
       } catch (error) {
@@ -1870,6 +2127,12 @@ export function registerLLMCommand(program: Command): void {
         // Sort by move number
         sessionExperiences.sort((a, b) => a.moveNumber - b.moveNumber);
 
+        // Query stored session metadata for abandonReason
+        const storedSession = await agentMemory.reasoningBank.getMetadata(
+          `llm_session:${sessionId}`,
+          'llm_session'
+        ) as any;
+
         // Extract metadata from experiences
         const firstExp = sessionExperiences[0];
         const puzzleId = firstExp.puzzleId;
@@ -1903,6 +2166,8 @@ export function registerLLMCommand(program: Command): void {
             puzzleId,
             profileName,
             solved,
+            abandoned: storedSession?.abandoned || false,
+            abandonReason: storedSession?.abandonReason || null,
             totalMoves,
             correctMoves,
             invalidMoves,
@@ -1926,6 +2191,9 @@ export function registerLLMCommand(program: Command): void {
         logger.info(`  Profile: ${profileName}`);
         logger.info(`  Puzzle: ${puzzleId}`);
         logger.info(`  Outcome: ${solved ? '✓ SOLVED' : '✗ UNSOLVED'}`);
+        if (storedSession?.abandoned && storedSession?.abandonReason) {
+          logger.info(`  Exit reason: ${storedSession.abandonReason}`);
+        }
         logger.info(`  Duration: ${durationMin} minutes`);
         logger.info('');
 

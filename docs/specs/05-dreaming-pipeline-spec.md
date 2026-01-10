@@ -1374,48 +1374,116 @@ interface FewShotExample {
 
 ### 8.2 LLM Consolidation Process
 
+**Key Principle**: The LLM is the "brain" that performs consolidation. Like human sleep cycles,
+the LLM must analyze its experiences and **synthesize** what it learned - not just copy raw data.
+
+#### CRITICAL: Full Reasoning Required
+
+**NEVER truncate reasoning.** Each experience stores the LLM's complete thought process
+(`exp.move.reasoning`). This full chain must be fed to the LLM during dreaming:
+
+```typescript
+// WRONG - destroys learning signal
+`Reasoning: ${exp.move.reasoning.substring(0, 200)}`
+
+// CORRECT - preserves complete thought process
+`YOUR FULL REASONING:\n${exp.move.reasoning}`
+```
+
+#### 5-Phase Consolidation
+
 ```typescript
 async function consolidateLLMExperiences(
-  experiences: LLMExperience[]
+  experiences: LLMExperience[],
+  profileName?: string
 ): Promise<LLMExperienceConsolidation> {
-  // 1. Group by outcome
-  const successful = experiences.filter(e => e.validation.isCorrect);
-  const invalid = experiences.filter(e => !e.validation.isValid);
-  const wrong = experiences.filter(e =>
-    e.validation.isValid && !e.validation.isCorrect
-  );
+  // Phase 1: CAPTURE (already done during play)
+  // Experiences are stored with full reasoning chain
 
-  // 2. Extract patterns using LLM synthesis
-  const patterns = await this.llmClient.chat([
-    { role: 'system', content: 'Analyze these Sudoku solving experiences and extract patterns...' },
-    { role: 'user', content: JSON.stringify({
-      successful: successful.slice(0, 20),  // Best examples
-      invalid: invalid.slice(0, 10),        // Common errors
-      wrong: wrong.slice(0, 10)             // Wrong paths
-    })}
-  ]);
+  // Phase 2: TRIAGE - Filter by importance
+  const triaged = experiences
+    .sort((a, b) => b.importance - a.importance)
+    .filter(e => e.importance >= 0.6);
 
-  // 3. Generate few-shot examples from best successes
-  const fewShots = successful
-    .sort((a, b) => b.validation.isCorrect ? 1 : -1)
-    .slice(0, 5)
-    .map(exp => ({
-      puzzleState: formatGrid(exp.gridState),
-      analysis: exp.move.reasoning,
-      move: exp.move,
-      outcome: 'CORRECT' as const
-    }));
+  // Phase 3: COMPRESSION - Cluster similar experiences
+  const successful = triaged.filter(e => e.validation.isCorrect);
+  const clusters = clusterByReasoningApproach(successful);
 
-  // 4. Store consolidated knowledge
+  // Phase 3b: LLM SYNTHESIZES pattern from each cluster
+  const synthesizedPatterns: SynthesizedPattern[] = [];
+  for (const [clusterName, cluster] of clusters) {
+    if (cluster.length >= 2) {
+      // LLM analyzes cluster and extracts reusable strategy
+      const pattern = await synthesizePatternFromCluster(cluster, clusterName);
+      synthesizedPatterns.push(pattern);
+    }
+  }
+
+  // Phase 4: ABSTRACTION - LLM builds hierarchy
+  const hierarchy = await buildAbstractionHierarchy(synthesizedPatterns);
+
+  // Phase 5: INTEGRATION - Generate few-shots from synthesized patterns
+  // IMPORTANT: Few-shots are LLM-generated, NOT raw move data
+  const fewShots = await generateFewShotsFromPatterns(synthesizedPatterns);
+
+  // Store results per-profile
+  await saveFewShots(fewShots, profileName);
+  await saveAbstractionHierarchy(hierarchy, profileName);
+
   return {
     llmExperiences: experiences,
-    successfulPatterns: patterns.strategies,
-    commonErrors: patterns.errors,
-    wrongPathPatterns: patterns.wrongPaths,
-    fewShotExamples: fewShots
+    synthesizedPatterns,
+    hierarchy,
+    fewShotExamples: fewShots,
+    compressionRatio: experiences.length / synthesizedPatterns.length
   };
 }
+
+/**
+ * LLM synthesizes a reusable pattern from a cluster of similar experiences.
+ * This is the "dreaming brain" analyzing what worked.
+ */
+async function synthesizePatternFromCluster(
+  cluster: LLMExperience[],
+  clusterName: string
+): Promise<SynthesizedPattern> {
+  const prompt = `You are reviewing ${cluster.length} successful Sudoku moves you made.
+Analyze them and extract a REUSABLE STRATEGY.
+
+Your successful moves:
+${cluster.map((exp, i) => `
+${i + 1}. Grid context: ${describeGridContext(exp.gridState, exp.move)}
+   Your move: (${exp.move.row},${exp.move.col}) = ${exp.move.value}
+
+   YOUR FULL REASONING:
+   ${exp.move.reasoning}
+`).join('\n\n')}
+
+Synthesize a reusable strategy:
+STRATEGY_NAME: [Short name]
+WHEN_TO_USE: [Conditions]
+REASONING_STEPS: [Numbered steps]
+EXAMPLE: [One clear example]
+SUCCESS_INSIGHT: [Why this works]`;
+
+  const response = await llmClient.chat([
+    { role: 'system', content: 'Reflect on your Sudoku solving to extract reusable strategies.' },
+    { role: 'user', content: prompt }
+  ]);
+
+  return parsePatternResponse(response, cluster);
+}
 ```
+
+#### Few-Shot Quality Requirements
+
+Few-shots must be **LLM-synthesized strategies**, not raw move data:
+
+| Bad (Raw Copy) | Good (LLM Synthesized) |
+|---------------|----------------------|
+| `Move: (1,3) = 3` | `Strategy: Last Digit in Row` |
+| `Reasoning: Column 3 has...` | `When: A row has 8 of 9 cells filled` |
+| No context or teachability | Explicit reasoning steps to follow |
 
 ### 8.3 Memory Toggle Impact
 

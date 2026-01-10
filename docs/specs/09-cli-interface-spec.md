@@ -888,7 +888,7 @@ machine-dream llm memory list --profile lm-studio-qwen3 --format json > qwen3.js
 
 #### 3.8.7 `llm session list` - List Play Sessions
 
-List play sessions with aggregate statistics and learning flags for A/B testing analysis.
+List play sessions with aggregate statistics, exit status, and learning flags for A/B testing analysis.
 
 ```bash
 machine-dream llm session list [options]
@@ -901,26 +901,27 @@ Options:
 ```
 
 **Output columns:**
-- Session ID
+- Session ID (GUID)
 - Profile name
 - Puzzle ID
-- Solved (Yes/No)
-- Total moves / Correct / Invalid / Wrong
-- Accuracy %
-- Learning flags: [F]=Few-shots, [P]=Patterns, [C]=Consolidated
-- Timestamp
+- Done% (completion percentage based on correct moves / empty cells)
+- Moves (total moves attempted)
+- Acc% (accuracy: correct / total)
+- Exit (why session ended: SOLVED, max_moves, llm_error, stuck, timeout, user_interrupt, abandoned, ok)
+- Learning flags: [F#]=Few-shots used (#=count), [C]=Consolidated experiences
+- Date/time
 
 **Example output:**
 ```
 📋 Play Sessions
 
-ID          Profile           Puzzle    Solved  Moves  Accuracy  Learning   Date
-────────────────────────────────────────────────────────────────────────────────────
-sess-abc1   lm-studio-qwen3   easy-01   ✓ YES   93     54.8%     [F][P]     Jan 9
-sess-def2   lm-studio-qwen3   easy-01   ✗ NO    200    21.0%     [  ]       Jan 8
-sess-ghi3   openai-gpt4       med-02    ✓ YES   65     78.5%     [F][P][C]  Jan 8
+ID                                    Profile           Puzzle            Done%  Moves   Acc%   Exit        Learning    Date
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+be1171ea-1b0d-47a9-b28e-3826134424e2  qwen3-coder       4x4-expert         78%      9   77.8%   SOLVED      [F3][C]     Jan 9, 10:45 PM
+bec4f33f-a057-46da-b34a-ba2274f5f591  qwen3-coder       4x4-expert         11%     12    8.3%   llm_error   [F3][C]     Jan 9, 10:30 PM
+11c18f5d-60c7-4f65-b1c3-2cada7b718ae  qwen3-coder       4x4-expert        100%     19   47.4%   SOLVED      [ ]         Jan 9, 09:39 PM
 
-Legend: [F]=Few-shots used, [P]=Patterns available, [C]=Consolidated data used
+Legend: [F#]=Few-shots used, [C]=Consolidated, Exit: SOLVED/max_moves/llm_error/stuck/timeout/abandoned
 ```
 
 **Examples:**
@@ -953,7 +954,7 @@ Options:
 ```
 
 **Output includes:**
-- Session summary (profile, puzzle, outcome, duration)
+- Session summary (profile, puzzle, outcome, exit reason, duration)
 - Learning context at session start
 - Move-by-move breakdown with outcomes
 - Aggregate statistics
@@ -963,28 +964,29 @@ Options:
 **Example:**
 ```bash
 # Show session details
-machine-dream llm session show sess-abc123
+machine-dream llm session show be1171ea-1b0d-47a9-b28e-3826134424e2
 
 # Export as JSON
-machine-dream llm session show sess-abc123 --format json
+machine-dream llm session show be1171ea-1b0d-47a9-b28e-3826134424e2 --format json
 ```
 
 **Example output:**
 ```
-📋 Session: sess-abc1
+📋 Session: be1171ea-1b0d-47a9-b28e-3826134424e2
 ============================================================
 
 📊 Summary:
-  Profile: lm-studio-qwen3
-  Puzzle: easy-01
-  Outcome: ✓ SOLVED
-  Duration: 27 minutes
+  Profile: qwen3-coder
+  Puzzle: 4x4-expert
+  Outcome: ✗ UNSOLVED
+  Exit reason: llm_error: LLM response incomplete: finish_reason=length
+  Duration: 2 minutes
 
 🎯 Move Statistics:
-  Total moves: 93
-  Correct: 51 (54.8%)
-  Invalid: 32 (34.4%)
-  Valid but wrong: 10 (10.8%)
+  Total moves: 12
+  Correct: 1 (8.3%)
+  Invalid: 10 (83.3%)
+  Valid but wrong: 1 (8.3%)
 
 📚 Learning Context (at session start):
   Memory enabled: Yes

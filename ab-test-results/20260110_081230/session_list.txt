@@ -1,0 +1,37 @@
+Initializing AgentDB at /home/chris/.machine-dream/agentdb...
+AgentDB (Local SQLite) initialized successfully.
+
+📋 Play Sessions
+
+ID                                    Profile           Puzzle            Done%  Moves   Acc%   Exit        Learning    Date
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+826e6766-0f54-4842-8cb0-5a0ff3570ef2  qwen3-coder       9x9-easy            78%    100   28.0%   max_moves   [F3][C]     Jan 10, 11:37 AM
+40be2802-7b05-4f4f-b83e-bd9f9ede18d5  qwen3-coder       9x9-easy            44%     92   17.4%   stuck       [F3][C]     Jan 10, 11:19 AM
+8bc8cf9a-427b-412d-8239-59b50563b689  qwen3-coder       9x9-easy            25%     38   23.7%   stuck       [F3][C]     Jan 10, 11:09 AM
+a601aad2-0eff-45c2-855e-24ed266e7017  qwen3-coder       9x9-easy            39%     71   19.7%   stuck       [F3][C]     Jan 10, 11:00 AM
+82bb56da-0cef-4ec6-8b18-76502c624ae3  qwen3-coder       9x9-easy            86%    100   31.0%   max_moves   [F3][C]     Jan 10, 10:45 AM
+133cfc51-6dd3-4604-97ed-40354f51c77d  qwen3-coder       9x9-easy            97%    100   35.0%   max_moves   [F3][C]     Jan 10, 10:27 AM
+4ef7ca2a-8334-4c73-8c19-af5ef0850e17  qwen3-coder       9x9-easy            92%    100   33.0%   max_moves   [F3][C]     Jan 10, 10:10 AM
+79e2bfd4-8b8c-4d33-a6ac-b9c264f5c2f6  qwen3-coder       9x9-easy            56%    100   20.0%   max_moves   [F3][C]     Jan 10, 09:52 AM
+5244dd5c-8489-412d-9e9a-92286d70cc29  qwen3-coder       9x9-easy           100%     92   39.1%   SOLVED      [F3][C]     Jan 10, 09:33 AM
+cd0f75a1-0d32-4e7e-b371-371cbc9a0d98  qwen3-coder       9x9-easy            56%    100   20.0%   max_moves   [F3][C]     Jan 10, 09:18 AM
+b928dab7-a7bd-4ba4-a08d-3e8d990c146c  qwen3-coder       9x9-easy           100%     98   36.7%   SOLVED      [ ]         Jan 10, 09:07 AM
+53f3c166-8e1a-4d2b-bcf3-0ac24a88bed5  qwen3-coder       9x9-easy            22%     48   16.7%   stuck       [ ]         Jan 10, 09:03 AM
+75b94444-bc6d-49ab-97ed-0265cd5d0c43  qwen3-coder       9x9-easy            69%    100   25.0%   max_moves   [ ]         Jan 10, 08:56 AM
+97481d5c-7392-4fb4-813f-767f4e984ffc  qwen3-coder       9x9-easy            78%    100   28.0%   max_moves   [ ]         Jan 10, 08:51 AM
+25a505ba-3cc8-4502-a346-d54efc3476f9  qwen3-coder       9x9-easy            64%    100   23.0%   max_moves   [ ]         Jan 10, 08:43 AM
+fd1188c7-7d39-440e-8986-601bab5bae62  qwen3-coder       9x9-easy            31%     48   22.9%   stuck       [ ]         Jan 10, 08:40 AM
+bf8b2bf4-2b2d-42f2-baf0-004bee767453  qwen3-coder       9x9-easy            64%    100   23.0%   max_moves   [ ]         Jan 10, 08:29 AM
+8a5e0662-0f7d-4136-b92c-36181a2270c0  qwen3-coder       9x9-easy            89%    100   32.0%   max_moves   [ ]         Jan 10, 08:21 AM
+297ca3c0-191d-413a-80f0-b3170bdfadd3  qwen3-coder       9x9-easy            36%     50   26.0%   stuck       [ ]         Jan 10, 08:17 AM
+3f4eee55-1247-43f6-86d3-3a47d58620b3  qwen3-coder       9x9-easy            83%    100   30.0%   max_moves   [ ]         Jan 10, 08:12 AM
+58df7822-10b6-4e29-8890-3d84adecc7f7  qwen3-coder       9x9-hard             4%     18   11.1%   ok          [F4][C]     Jan 10, 08:03 AM
+aeba2968-910e-4a0a-9fd9-356db205b288  qwen3-coder       9x9-hard             8%     20   20.0%   stuck       [F4][C]     Jan 10, 07:59 AM
+4d3fe284-cd51-4455-830a-6395cd503eff  qwen3-coder       9x9-hard            39%     84   23.8%   stuck       [ ]         Jan 10, 07:54 AM
+490fd2ab-06a9-4caf-a0d2-d5f2dcc88c32  qwen3-coder       9x9-hard            12%     30   20.0%   stuck       [ ]         Jan 10, 07:53 AM
+7d09c981-3354-46f9-8bd1-866ea26105dd  qwen3-coder       9x9-hard            47%    100   24.0%   max_moves   [ ]         Jan 10, 07:45 AM
+
+Showing 25 of 80 sessions
+Legend: [F#]=Few-shots used, [C]=Consolidated, Exit: SOLVED/max_moves/llm_error/stuck/timeout/abandoned
+
+💡 Tip: Use 'llm session show <id>' to view detailed breakdown

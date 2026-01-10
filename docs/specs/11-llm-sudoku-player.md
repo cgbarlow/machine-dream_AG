@@ -260,6 +260,7 @@ interface LearningContext {
 
 ```typescript
 interface PlaySession {
+  id: string;                       // Unique session identifier (GUID)
   puzzleId: string;
   startTime: Date;
   endTime?: Date;
@@ -267,6 +268,11 @@ interface PlaySession {
   // Outcome
   solved: boolean;
   abandoned: boolean;
+  abandonReason?: string;           // Why session was abandoned:
+                                    // - 'max_moves': Hit move limit
+                                    // - 'llm_error: <msg>': LLM response error
+                                    // - 'consecutive_forbidden: <msg>': Stuck on forbidden moves
+                                    // - 'user_interrupt: Ctrl-C pressed': User cancelled
 
   // Statistics
   totalMoves: number;
@@ -283,6 +289,22 @@ interface PlaySession {
   learningContext: LearningContext; // Learning features available at session start
 }
 ```
+
+### Session Metadata Persistence
+
+Session metadata (including `abandonReason`) is stored separately from individual experiences to enable session-level analysis:
+
+```typescript
+// ExperienceStore methods for session metadata
+async saveSession(session: PlaySession): Promise<void>
+async getSession(sessionId: string): Promise<Partial<PlaySession> | null>
+async getAllSessions(): Promise<Partial<PlaySession>[]>
+```
+
+This allows:
+- Tracking why sessions failed (for debugging and learning improvement)
+- Filtering sessions by exit status in `llm session list`
+- Analyzing patterns in session failures during dreaming
 
 ### Experience Importance Calculation
 
@@ -356,7 +378,13 @@ REASONING: <brief analysis>
 
 ### Puzzle State Prompt (with history)
 
-**Updated 2026-01-08 Evening**: Simplified grid format, added constraint and forbidden move tracking
+**Updated 2026-01-09**: Optimized prompt to reduce noise and improve signal-to-noise ratio.
+
+**Prompt Optimization Principles**:
+1. **No redundant information** - Grid already shows filled cells, don't repeat them
+2. **Capped forbidden moves** - Maximum 15 entries to prevent prompt bloat
+3. **Clear, simple language** - No emoji, no ALL-CAPS threats, just facts
+4. **Compact formatting** - Every token counts
 
 ```
 CURRENT PUZZLE STATE:
@@ -370,30 +398,26 @@ R7: _,6,_,_,_,_,2,8,_
 R8: _,_,_,4,1,9,_,_,5
 R9: _,_,_,_,8,_,_,7,9
 
-FILLED CELLS (cannot be changed):
-(1,1)=5, (1,2)=3, (1,5)=7, (2,1)=6, (2,4)=1, (2,5)=9, (2,6)=5, (3,2)=9, (3,3)=8, (3,8)=6
-(4,1)=8, (4,5)=6, (4,9)=3, (5,1)=4, (5,4)=8, (5,6)=3, (5,9)=1, (6,1)=7, (6,5)=2, (6,9)=6
-(7,2)=6, (7,7)=2, (7,8)=8, (8,4)=4, (8,5)=1, (8,6)=9, (8,9)=5, (9,5)=8, (9,8)=7, (9,9)=9
-
 YOUR PREVIOUS ATTEMPTS ON THIS PUZZLE:
 Move 1: (2,2)=7 → INVALID (Value 7 already exists in column 2)
 Move 2: (3,4)=5 → INVALID (Value 5 already exists in box 2)
 Move 3: (2,2)=4 → CORRECT
 Move 4: (1,3)=2 → VALID_BUT_WRONG
 
-FORBIDDEN MOVES (do not attempt again):
-(2,2)=7, (3,4)=5
-
-(Optional: If --include-reasoning flag is set, each move shows reasoning snippet)
-Move 1: (2,2)=7 → INVALID (Value 7 already exists in column 2)
-  Your reasoning: "Looking at row 2, I need to find where the digit 7 can go. The digits alr..."
-Move 2: (2,2)=4 → CORRECT
-  Your reasoning: "After analyzing all constraints for cell (2,2): Row 2 needs digits 1,2,4,6..."
+FORBIDDEN MOVES (do not repeat):
+(2,2)=7, (3,4)=5, (1,3)=2
+(Note: List capped at 15 most recent to avoid prompt bloat)
 
 Empty cells remaining: 48
 
 What is your next move?
 ```
+
+**Removed from prompt** (2026-01-09):
+- "FILLED CELLS" section - redundant with grid display
+- Emoji warnings (⚠️) - adds noise without value
+- ALL-CAPS threat language - doesn't improve compliance
+- Unlimited forbidden moves - now capped at 15
 
 ### Few-Shot Examples (from memory)
 
@@ -499,45 +523,167 @@ To verify learning is working:
 3. Compare: Memory ON should show improvement over time
 4. After dreaming consolidation, repeat test
 
-## Dreaming Consolidation
+## Dreaming Consolidation (LLM-Driven)
 
-The dreaming phase synthesizes patterns from accumulated experiences:
+The dreaming phase is where the LLM "brain" consolidates experiences during a "sleep cycle" -
+analogous to how human memory consolidation works during sleep. The LLM itself analyzes its
+experiences and synthesizes reusable strategies.
+
+### Key Principle: LLM Performs the Synthesis
+
+The LLM must **analyze and synthesize** patterns from its experiences - NOT just copy raw move data.
+This is the critical difference from simple replay or keyword matching.
+
+### CRITICAL: Full Reasoning Must Be Used
+
+**NEVER truncate reasoning.** The complete thought process for each move must be fed to the LLM
+during dreaming. Truncating to 200 characters (like `.substring(0, 200)`) destroys the learning signal.
+
+The LLM produces detailed reasoning like:
+> "Looking at row 3, cells 1,2,4,5,6,7,9 are filled with 1,4,7,2,5,8,9. The only missing values
+> are 3 and 6. Cell (3,3) is in box 1 which already has 3 in position (1,1). Therefore, cell
+> (3,3) must be 6. Cell (3,8) must be 3."
+
+The complete chain is essential for extracting the underlying strategy.
+
+### LLM Pattern Synthesis
+
+The LLM analyzes clusters of similar experiences and synthesizes WHAT worked and WHY:
 
 ```typescript
-async consolidate(): Promise<ConsolidationReport> {
-  // 1. Load experiences since last consolidation
-  const experiences = await this.store.getUnconsolidated();
+// Example LLM synthesis prompt for a cluster of experiences
+const synthesisPrompt = `You are reviewing ${cluster.length} successful Sudoku moves you made.
+Analyze them and extract a REUSABLE STRATEGY.
 
-  // 2. Group by outcome
+Your successful moves:
+${cluster.map((exp, i) => `
+${i + 1}. Grid context: ${describeGridContext(exp.gridState, exp.move)}
+   Your move: (${exp.move.row},${exp.move.col}) = ${exp.move.value}
+
+   YOUR FULL REASONING:
+   ${exp.move.reasoning}  // ← FULL reasoning, never truncated!
+`).join('\n\n')}
+
+Synthesize a reusable strategy in this format:
+STRATEGY_NAME: [Short name, e.g., "Last Digit in Row"]
+WHEN_TO_USE: [Conditions that signal this strategy applies]
+REASONING_STEPS:
+1. [First step]
+2. [Second step]
+HOW_TO_EXECUTE: [Step-by-step approach]
+EXAMPLE: [One clear example from your experiences]
+`;
+```
+
+### 4-Level Abstraction Hierarchy
+
+Few-shots should represent different abstraction levels, built by the LLM:
+
+| Level | Name | Example | Purpose |
+|-------|------|---------|---------|
+| 0 | Instance | "Cell (3,5) had only 7 missing from row" | Specific example |
+| 1 | Technique | "When a row has 8 cells filled, the empty cell must contain the missing digit" | Named technique |
+| 2 | Category | "Row/Column/Box completion strategies" | Group related techniques |
+| 3 | Principle | "Constraint satisfaction: find cells with minimum options" | General principle |
+
+### Few-Shot Quality Requirements
+
+- Each few-shot must be **LLM-synthesized**, not raw move data
+- Must include: strategy name, conditions, reasoning pattern, example
+- No duplicates (same strategy at same abstraction level)
+- Aim for 5-7 few-shots covering different strategies
+- Target compression ratio: 10:1 (e.g., 91 experiences → 9 patterns)
+
+### Strategy Diversity Enforcement (Added 2026-01-09)
+
+Few-shot selection must ensure **diverse strategies**, not variations of the same technique:
+
+**Problem**: Without diversity enforcement, all few-shots may teach the same strategy (e.g., 5 variations of "naked singles"), providing no learning value.
+
+**Solution**: LLM-driven diversity selection. The LLM itself evaluates strategies and selects diverse ones:
+
+```typescript
+// The LLM is prompted to select diverse strategies
+const prompt = `You have synthesized ${patterns.length} strategies.
+
+Your strategies:
+${patterns.map((p, i) => `${i + 1}. ${p.strategyName}: ${p.whenToUse}`).join('\n')}
+
+Select 3-5 DIVERSE strategies. Do NOT select strategies that use the same technique.
+For each, explain WHY it's different from others you selected.`;
+
+// The LLM returns which strategies to keep, with justification
+```
+
+**Key Principle**: The LLM does the diversity evaluation, not programmatic keyword matching.
+
+### Negative Example Learning (Added 2026-01-09)
+
+During dreaming, the LLM analyzes its invalid moves and synthesizes **anti-patterns**:
+
+```typescript
+// The LLM is prompted to analyze its mistakes
+const prompt = `You made ${invalid.length} invalid moves.
+
+Your mistakes:
+${mistakes.map(m => `Move (${m.row},${m.col})=${m.value}: ${m.error}`)}
+
+Analyze and identify ANTI-PATTERNS - things you should NOT do.
+For each: MISTAKE, WHY_WRONG, INSTEAD.`;
+
+// The LLM synthesizes patterns of errors, not a hardcoded mapping
+```
+
+**Key Principle**: The LLM synthesizes what it learned from mistakes as free text.
+Anti-patterns are stored as part of the consolidation insights, not as structured data.
+
+### Consolidation Algorithm
+
+```typescript
+async consolidate(profileName?: string): Promise<ConsolidationReport> {
+  // Phase 1: CAPTURE (already done during play)
+  let experiences = await this.store.getUnconsolidated(profileName);
+
+  if (experiences.length < 10) {
+    return this.createEmptyReport(); // Need minimum experiences
+  }
+
+  // Phase 2: TRIAGE - Filter by importance
+  experiences = experiences
+    .sort((a, b) => b.importance - a.importance)
+    .filter(e => e.importance >= 0.6);
+
+  // Phase 3: COMPRESSION - Cluster and LLM synthesizes patterns
   const successful = experiences.filter(e => e.validation.isCorrect);
-  const invalid = experiences.filter(e => !e.validation.isValid);
-  const wrong = experiences.filter(e =>
-    e.validation.isValid && !e.validation.isCorrect
-  );
+  const clusters = this.clusterByReasoning(successful);
 
-  // 3. Extract patterns
-  const patterns = {
-    successStrategies: this.extractStrategies(successful),
-    commonErrors: this.groupErrors(invalid),
-    wrongPathPatterns: this.analyzeWrongPaths(wrong)
+  const synthesizedPatterns: SynthesizedPattern[] = [];
+  for (const [clusterName, cluster] of clusters) {
+    if (cluster.length >= 2) {
+      // LLM synthesizes pattern from cluster (uses FULL reasoning)
+      const pattern = await this.synthesizePattern(cluster, clusterName);
+      synthesizedPatterns.push(pattern);
+    }
+  }
+
+  // Phase 4: ABSTRACTION - LLM builds hierarchy
+  const hierarchy = await this.buildAbstractionHierarchy(synthesizedPatterns);
+
+  // Phase 5: INTEGRATION - Generate few-shots from synthesized patterns
+  const fewShots = await this.generateFewShotsFromPatterns(synthesizedPatterns);
+
+  // Store results
+  await this.store.saveFewShots(fewShots, profileName);
+  await this.store.saveAbstractionHierarchy(hierarchy, profileName);
+  await this.store.markConsolidated(experiences.map(e => e.id));
+
+  return {
+    patterns: synthesizedPatterns,
+    hierarchy,
+    fewShotsUpdated: fewShots.length,
+    experiencesConsolidated: experiences.length,
+    compressionRatio: experiences.length / synthesizedPatterns.length,
   };
-
-  // 4. Use LLM to synthesize insights
-  const insights = await this.llmClient.chat([
-    { role: 'system', content: 'Analyze these Sudoku solving experiences...' },
-    { role: 'user', content: JSON.stringify(patterns) }
-  ]);
-
-  // 5. Update few-shot examples
-  await this.updateFewShots(patterns.successStrategies);
-
-  // 6. Store insights
-  await this.store.saveInsights(insights);
-
-  // 7. Mark experiences as consolidated
-  await this.store.markConsolidated(experiences);
-
-  return { patterns, insights };
 }
 ```
 
