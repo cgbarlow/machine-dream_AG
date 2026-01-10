@@ -43,12 +43,23 @@ import { LearningUnitManager } from './LearningUnitManager.js';
  */
 export class DreamingConsolidator {
   private llmClient: LMStudioClient;
+  private generateAnonymousPatterns = false;
 
   constructor(
     private experienceStore: ExperienceStore,
     config: LLMConfig
   ) {
     this.llmClient = new LMStudioClient(config);
+  }
+
+  /**
+   * Enable/disable anonymous pattern generation mode
+   *
+   * When enabled, synthesized patterns will NOT have strategy names.
+   * Instead, they use situation-action-template format for improved accuracy.
+   */
+  setAnonymousPatternMode(enabled: boolean): void {
+    this.generateAnonymousPatterns = enabled;
   }
 
   /**
@@ -217,7 +228,36 @@ ${i + 1}. Grid context: ${this.describeGridContext(exp.gridState, exp.move)}
    ${exp.move.reasoning}
 `).join('\n');
 
-    const prompt = `You are reviewing ${cluster.length} successful Sudoku moves you made.
+    // Use different prompt based on mode
+    const prompt = this.generateAnonymousPatterns
+      ? this.buildAnonymousPatternPrompt(cluster.length, experienceDescriptions)
+      : this.buildNamedStrategyPrompt(cluster.length, experienceDescriptions);
+
+    try {
+      const response = await this.llmClient.chat([
+        {
+          role: 'system',
+          content: this.generateAnonymousPatterns
+            ? 'You are extracting reusable patterns from Sudoku moves. Focus on situation and action, NOT strategy names.'
+            : 'You are reflecting on your Sudoku solving experiences to extract reusable strategies. Be specific and practical.',
+        },
+        { role: 'user', content: prompt },
+      ]);
+
+      return this.generateAnonymousPatterns
+        ? this.parseAnonymousPatternResponse(response, clusterName, cluster.length)
+        : this.parsePatternResponse(response, clusterName, cluster.length);
+    } catch (error) {
+      console.warn(`Failed to synthesize pattern:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Build prompt for named strategy synthesis (default mode)
+   */
+  private buildNamedStrategyPrompt(count: number, experienceDescriptions: string): string {
+    return `You are reviewing ${count} successful Sudoku moves you made.
 Analyze them and extract a REUSABLE STRATEGY that you can apply in future puzzles.
 
 Your successful moves:
@@ -234,19 +274,69 @@ REASONING_STEPS:
 EXAMPLE: [One clear example showing the strategy in action from the experiences above]
 SUCCESS_INSIGHT: [Why this approach reliably works - the underlying principle]
 CONFIDENCE: [A number 0.0-1.0 indicating how reliable this strategy is]`;
+  }
 
+  /**
+   * Build prompt for anonymous pattern synthesis (--anonymous-patterns mode)
+   *
+   * Spec 11: Anonymous Pattern Mode
+   * Generates patterns without strategy names for improved accuracy.
+   */
+  private buildAnonymousPatternPrompt(count: number, experienceDescriptions: string): string {
+    return `You are reviewing ${count} successful Sudoku moves.
+Extract a REUSABLE PATTERN (without naming it as a strategy).
+
+Your successful moves:
+${experienceDescriptions}
+
+Respond in EXACTLY this format:
+
+WHEN_TO_USE: [The situation/condition when this pattern applies]
+ACTION: [What to do when you see this situation]
+REASONING_STEPS:
+1. [First step]
+2. [Second step]
+TEMPLATE: [Reasoning template, e.g., "Cell (R,C). Row missing {X}. Intersection={V}."]
+CONFIDENCE: [0.0-1.0]
+
+IMPORTANT: Do NOT give this pattern a name. Focus on situation and action.`;
+  }
+
+  /**
+   * Parse anonymous pattern response from LLM
+   */
+  private parseAnonymousPatternResponse(
+    response: string,
+    clusterName: string,
+    sourceCount: number
+  ): SynthesizedPattern | null {
     try {
-      const response = await this.llmClient.chat([
-        {
-          role: 'system',
-          content: 'You are reflecting on your Sudoku solving experiences to extract reusable strategies. Be specific and practical.',
-        },
-        { role: 'user', content: prompt },
-      ]);
+      const whenToUse = this.extractField(response, 'WHEN_TO_USE') || 'Not specified';
+      const action = this.extractField(response, 'ACTION') || 'Apply constraint reasoning';
+      const reasoningSteps = this.extractReasoningSteps(response);
+      const template = this.extractField(response, 'TEMPLATE') || '';
+      const confidenceStr = this.extractField(response, 'CONFIDENCE');
+      const confidence = confidenceStr ? parseFloat(confidenceStr) || 0.7 : 0.7;
 
-      return this.parsePatternResponse(response, clusterName, cluster.length);
+      return {
+        strategyName: undefined, // No name for anonymous patterns
+        isAnonymous: true,
+        clusterName,
+        whenToUse,
+        reasoningSteps: [action, ...reasoningSteps],
+        reasoningTemplate: template,
+        example: '',
+        successInsight: action,
+        abstractionLevel: {
+          level: 1,
+          name: 'Pattern',
+          description: 'Constraint-based pattern',
+        },
+        sourceExperienceCount: sourceCount,
+        confidence,
+      };
     } catch (error) {
-      console.warn(`Failed to synthesize pattern:`, error);
+      console.warn(`Failed to parse anonymous pattern response:`, error);
       return null;
     }
   }
@@ -428,7 +518,7 @@ Be concise. Each item should be a short phrase or sentence.`;
         {
           level: 1,
           name: 'Named Techniques',
-          items: patterns.map(p => p.strategyName),
+          items: patterns.map(p => p.strategyName || p.clusterName).filter((n): n is string => n !== undefined),
         },
       ],
       profileName: profileName || 'default',
@@ -458,6 +548,9 @@ Be concise. Each item should be a short phrase or sentence.`;
         move: { row: 0, col: 0, value: 0 },
         outcome: 'CORRECT' as const,
         gridContext: pattern.example,
+        // Include anonymous pattern fields
+        reasoningTemplate: pattern.reasoningTemplate,
+        isAnonymous: pattern.isAnonymous,
       }));
     }
 
@@ -518,6 +611,8 @@ WHY_DIVERSE: Elimination approach rather than completion`;
           move: { row: 0, col: 0, value: 0 },
           outcome: 'CORRECT' as const,
           gridContext: pattern.example,
+          reasoningTemplate: pattern.reasoningTemplate,
+          isAnonymous: pattern.isAnonymous,
         }));
       }
 
@@ -529,6 +624,8 @@ WHY_DIVERSE: Elimination approach rather than completion`;
         move: { row: 0, col: 0, value: 0 },
         outcome: 'CORRECT' as const,
         gridContext: pattern.example,
+        reasoningTemplate: pattern.reasoningTemplate,
+        isAnonymous: pattern.isAnonymous,
       }));
 
     } catch (error) {
@@ -542,6 +639,8 @@ WHY_DIVERSE: Elimination approach rather than completion`;
         move: { row: 0, col: 0, value: 0 },
         outcome: 'CORRECT' as const,
         gridContext: pattern.example,
+        reasoningTemplate: pattern.reasoningTemplate,
+        isAnonymous: pattern.isAnonymous,
       }));
     }
   }

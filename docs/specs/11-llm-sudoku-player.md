@@ -426,6 +426,43 @@ Box missing {5,6,8}. Intersection={8}.
 - When accuracy is more important than strategy diversity
 - For training runs focused on pure constraint solving
 
+### Anonymous Pattern Mode (Added 2026-01-10)
+
+An optional prompt format mode that replaces named strategies with **anonymous constraint-based patterns**. This mode has shown to significantly improve accuracy (62.5% vs 26-39% with named strategies) by:
+
+1. **Removing strategy names** - No "Strategy 1: Last Digit..." overhead
+2. **Focusing on situation detection** - Clear triggers for each pattern
+3. **Providing reasoning templates** - Exact format to follow
+4. **No YES/NO evaluation** - Direct pattern matching instead
+
+**Enable with**: `--anonymous-patterns` flag on `llm play` or `llm dream run`
+
+**Anonymous Pattern Prompt Format**:
+```
+REASONING PATTERNS (apply when situation matches):
+
+Pattern A - When you see: A row/col/box with only one empty cell
+Do this: That cell must contain the only missing digit
+Template: "Cell (R,C). Row/Col/Box has {filled}. Missing={answer}."
+
+Pattern B - When you see: A cell where only one digit is possible
+Do this: That digit must go in this cell
+Template: "Cell (R,C). Row missing {X}. Col missing {Y}. Box missing {Z}. Intersection={V}."
+
+For each empty cell, check if any pattern applies.
+Use the first matching pattern. Follow its template exactly.
+```
+
+**Compatibility**:
+- `--reasoning-template`: Changes system prompt (constraint intersection format)
+- `--anonymous-patterns`: Changes how learned strategies are formatted in the user prompt
+- Both flags can be used together for maximum structure
+
+**When to use**:
+- For larger grids (9x9+) where named strategies add cognitive overhead
+- When model tends to reference "Applying Strategy 1..." in reasoning
+- For A/B testing anonymous vs named strategy performance
+
 ### Puzzle State Prompt (with history)
 
 **Updated 2026-01-09**: Optimized prompt to reduce noise and improve signal-to-noise ratio.

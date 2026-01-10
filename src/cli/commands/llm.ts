@@ -488,6 +488,7 @@ export function registerLLMCommand(program: Command): void {
     .option('--history-limit <n>', 'Limit move history to last N moves (default: 20, 0=unlimited)', '20')
     .option('--learning-unit <id>', 'Use specific learning unit (default: "default")')
     .option('--reasoning-template', 'Use structured constraint-intersection reasoning format (improves accuracy)')
+    .option('--anonymous-patterns', 'Use anonymous pattern format for learned strategies (no strategy names)')
     .action(async (puzzleFile, options) => {
       try {
         logger.info('🤖 Starting LLM Sudoku Player...');
@@ -584,6 +585,12 @@ export function registerLLMCommand(program: Command): void {
         if (options.reasoningTemplate) {
           player.enableReasoningTemplate(true);
           logger.info('📐 Reasoning template mode enabled (constraint-intersection format)');
+        }
+
+        // Enable anonymous pattern mode if requested
+        if (options.anonymousPatterns) {
+          player.enableAnonymousPatterns(true);
+          logger.info('📋 Anonymous pattern mode enabled (no strategy names)');
         }
 
         // Health check
@@ -1599,6 +1606,7 @@ export function registerLLMCommand(program: Command): void {
     .option('--all', 'Consolidate all profiles separately')
     .option('--learning-unit <id>', 'Update specific learning unit (uses reConsolidate for iterative learning)')
     .option('--reset', 'Reset consolidated status and reprocess all experiences')
+    .option('--anonymous-patterns', 'Generate patterns in anonymous format (no strategy names)')
     .option('--output <file>', 'Save consolidation report')
     .action(async (options) => {
       try {
@@ -1635,6 +1643,12 @@ export function registerLLMCommand(program: Command): void {
           // Create store and consolidator
           const experienceStore = new ExperienceStore(agentMemory, config, profileName);
           const consolidator = new DreamingConsolidator(experienceStore, config);
+
+          // Enable anonymous pattern mode if requested
+          if (options.anonymousPatterns) {
+            consolidator.setAnonymousPatternMode(true);
+            logger.info('📋 Anonymous pattern mode enabled (no strategy names)');
+          }
 
           // Reset consolidated status if requested
           if (options.reset) {

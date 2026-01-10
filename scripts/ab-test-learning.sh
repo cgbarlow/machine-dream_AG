@@ -10,6 +10,7 @@
 #   --stream                Show live gameplay during runs (verbose mode)
 #   --skip-dream            Skip Phase 2 (dream cycle) - use existing learned strategies
 #   --reasoning-template    Use structured constraint-intersection format (improves accuracy)
+#   --anonymous-patterns    Use anonymous pattern format for learned strategies
 #   -h, --help              Show this help
 #
 # Examples:
@@ -29,6 +30,7 @@ SKIP_DREAM=false
 LEARNING_UNIT="default"
 STREAM=false
 REASONING_TEMPLATE=false
+ANONYMOUS_PATTERNS=false
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -61,6 +63,10 @@ while [[ $# -gt 0 ]]; do
       REASONING_TEMPLATE=true
       shift
       ;;
+    --anonymous-patterns)
+      ANONYMOUS_PATTERNS=true
+      shift
+      ;;
     -h|--help)
       echo "Usage: $0 [options]"
       echo "  --profile <name>        LLM profile to use (default: qwen3-coder)"
@@ -70,6 +76,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --stream                Show live gameplay during runs (verbose mode)"
       echo "  --skip-dream            Skip Phase 2 (dream cycle) - use existing learned strategies"
       echo "  --reasoning-template    Use structured constraint-intersection format"
+      echo "  --anonymous-patterns    Use anonymous pattern format for learned strategies"
       echo "  -h, --help              Show this help"
       exit 0
       ;;
@@ -104,6 +111,9 @@ if [ "$STREAM" = true ]; then
 fi
 if [ "$REASONING_TEMPLATE" = true ]; then
   EXTRA_OPTS="$EXTRA_OPTS --reasoning-template"
+fi
+if [ "$ANONYMOUS_PATTERNS" = true ]; then
+  EXTRA_OPTS="$EXTRA_OPTS --anonymous-patterns"
 fi
 
 mkdir -p "$RESULTS_DIR"

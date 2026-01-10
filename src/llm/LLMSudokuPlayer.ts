@@ -77,6 +77,20 @@ export class LLMSudokuPlayer extends EventEmitter {
   }
 
   /**
+   * Enable anonymous pattern mode
+   *
+   * When enabled, uses anonymous constraint-based patterns instead of
+   * named strategies in the prompt. This mode has shown to improve
+   * accuracy (62.5% vs 26-39% with named strategies) by:
+   * - Removing strategy name overhead
+   * - Focusing on situation-action-template format
+   * - No YES/NO evaluation instructions
+   */
+  enableAnonymousPatterns(enabled: boolean): void {
+    this.promptBuilder.setAnonymousPatternMode(enabled);
+  }
+
+  /**
    * Play a puzzle using pure LLM reasoning
    *
    * Spec 11 - Play Loop Algorithm + Profile-Specific Learning

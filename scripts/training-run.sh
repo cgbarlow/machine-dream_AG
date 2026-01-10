@@ -12,6 +12,7 @@
 #   --stream                Show live gameplay during runs
 #   --dream-after           Run dream cycle after all runs complete
 #   --reasoning-template    Use structured constraint-intersection format (improves accuracy)
+#   --anonymous-patterns    Use anonymous pattern format for learned strategies
 #   -h, --help              Show this help
 #
 # Examples:
@@ -31,6 +32,7 @@ MAX_MOVES=200
 STREAM=false
 DREAM_AFTER=false
 REASONING_TEMPLATE=false
+ANONYMOUS_PATTERNS=false
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -67,6 +69,10 @@ while [[ $# -gt 0 ]]; do
       REASONING_TEMPLATE=true
       shift
       ;;
+    --anonymous-patterns)
+      ANONYMOUS_PATTERNS=true
+      shift
+      ;;
     -h|--help)
       echo "Usage: $0 [options]"
       echo "  --profile <name>        LLM profile to use (default: qwen3-coder)"
@@ -77,6 +83,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --stream                Show live gameplay during runs"
       echo "  --dream-after           Run dream cycle after all runs complete"
       echo "  --reasoning-template    Use structured constraint-intersection format"
+      echo "  --anonymous-patterns    Use anonymous pattern format for learned strategies"
       echo "  -h, --help              Show this help"
       exit 0
       ;;
@@ -125,6 +132,9 @@ if [ "$STREAM" = true ]; then
 fi
 if [ "$REASONING_TEMPLATE" = true ]; then
   EXTRA_OPTS="$EXTRA_OPTS --reasoning-template"
+fi
+if [ "$ANONYMOUS_PATTERNS" = true ]; then
+  EXTRA_OPTS="$EXTRA_OPTS --anonymous-patterns"
 fi
 
 # Track results

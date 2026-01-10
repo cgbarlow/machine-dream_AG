@@ -142,13 +142,17 @@ export interface LLMResponse {
  * Each example teaches a strategy that can be applied to similar situations
  */
 export interface FewShotExample {
-  // Strategy identification
-  strategy: string;           // Strategy name (e.g., "Last Digit in Row")
+  // Strategy identification - OPTIONAL for anonymous patterns
+  strategy?: string;          // Strategy name (undefined for anonymous patterns)
   abstractionLevel: number;   // 0=Instance, 1=Technique, 2=Category, 3=Principle
 
-  // Teaching content
+  // Teaching content (REQUIRED for both formats)
   situation: string;          // When this strategy applies
   analysis: string;           // Step-by-step reasoning to follow
+
+  // Anonymous pattern format support
+  reasoningTemplate?: string; // Template: "Cell (R,C). Row missing {X}..."
+  isAnonymous?: boolean;      // True if pattern has no named strategy
 
   // Example move
   move: {
@@ -239,8 +243,8 @@ export interface AbstractionLevel {
  * IMPORTANT: The LLM must analyze FULL reasoning chains, never truncated.
  */
 export interface SynthesizedPattern {
-  // Strategy identification
-  strategyName: string;           // e.g., "Last Digit in Row"
+  // Strategy identification - OPTIONAL for anonymous patterns
+  strategyName?: string;          // e.g., "Last Digit in Row" (undefined for anonymous)
   clusterName: string;            // The cluster this was extracted from
 
   // Teaching content
@@ -248,6 +252,10 @@ export interface SynthesizedPattern {
   reasoningSteps: string[];       // Step-by-step reasoning to follow
   example: string;                // One clear example from the experiences
   successInsight: string;         // Why this approach reliably works
+
+  // Anonymous pattern format support
+  reasoningTemplate?: string;     // Template: "Cell (R,C). Row missing {X}..."
+  isAnonymous?: boolean;          // True if generated without strategy name
 
   // Metadata
   abstractionLevel: AbstractionLevel;

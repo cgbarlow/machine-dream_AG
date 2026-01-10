@@ -666,6 +666,9 @@ Options:
   --visualize                  # Show live solving visualization
   --no-learning                # Disable few-shot learning injection (baseline mode)
   --learning                   # Enable few-shot learning injection (default when available)
+  --learning-unit <id>         # Use specific learning unit (default: "default")
+  --reasoning-template         # Use structured constraint-intersection system prompt
+  --anonymous-patterns         # Use anonymous pattern format for learned strategies
 ```
 
 **Learning Modes:**
@@ -722,6 +725,8 @@ Options:
   --profile <name>             # LLM profile to consolidate (default: active profile)
   --all                        # Consolidate all profiles separately
   --output <file>              # Save consolidation report
+  --learning-unit <id>         # Update specific learning unit (default: "default")
+  --anonymous-patterns         # Generate patterns in anonymous format (no strategy names)
 ```
 
 **Output:**
