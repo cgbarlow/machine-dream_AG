@@ -286,3 +286,69 @@ export interface AntiPattern {
   whyWrong: string;           // Why this approach fails
   instead: string;            // What to do instead
 }
+
+// ============================================================================
+// Learning Units (Spec 11 - Learning Units section)
+// ============================================================================
+
+/**
+ * Learning Unit - A discrete package of consolidated knowledge
+ *
+ * Spec 11: Learning Units section
+ * Learning units provide a higher-level abstraction for managing consolidated
+ * knowledge. While profiles define the LLM connection, learning units define
+ * discrete packages of learned strategies.
+ *
+ * Key features:
+ * - Multiple units per profile (e.g., "easy-puzzles", "advanced-techniques")
+ * - Iterative learning - units absorb new experiences over time
+ * - Merge & distill - combine units via LLM-driven synthesis
+ * - Export/import - share learned knowledge between installations
+ */
+export interface LearningUnit {
+  id: string;                           // Unique ID within profile
+  profileName: string;                  // Parent profile
+  name: string;                         // Display name (e.g., "Easy Puzzles")
+  description?: string;                 // Optional description
+  createdAt: Date;
+  lastUpdatedAt: Date;
+
+  // Content
+  fewShots: FewShotExample[];           // Consolidated strategies
+  hierarchy?: AbstractionHierarchy;     // Abstraction levels (optional)
+
+  // Tracking
+  absorbedExperienceIds: string[];      // Experiences already absorbed into this unit
+  metadata: LearningUnitMetadata;
+}
+
+/**
+ * Learning Unit Metadata - Statistics and tracking info
+ */
+export interface LearningUnitMetadata {
+  totalExperiences: number;             // Total experiences absorbed
+  puzzleBreakdown: Record<string, number>; // e.g., {"4x4:easy": 50, "9x9:hard": 20}
+  lastConsolidationAt?: Date;           // When last consolidation occurred
+  mergedFromUnits?: string[];           // If this unit was created by merging
+  version: number;                      // Increments on each update
+}
+
+/**
+ * Default learning unit ID
+ * Used when no --learning-unit is specified for backwards compatibility
+ */
+export const DEFAULT_LEARNING_UNIT_ID = 'default';
+
+/**
+ * Learning Unit Summary - Lightweight version for listings
+ */
+export interface LearningUnitSummary {
+  id: string;
+  profileName: string;
+  name: string;
+  description?: string;
+  createdAt: Date;
+  lastUpdatedAt: Date;
+  strategyCount: number;
+  experienceCount: number;
+}

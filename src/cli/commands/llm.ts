@@ -14,8 +14,11 @@ import type { LLMConfig, LLMExperience } from '../../llm/types.js';
 import { AgentMemory } from '../../memory/AgentMemory.js';
 import type { AgentDBConfig } from '../../types.js';
 import { LLMProfileManager, ProfileValidator } from '../../llm/profiles/index.js';
-import type { CreateProfileOptions, LLMProvider } from '../../llm/profiles/index.js';
-import { readFileSync, writeFileSync } from 'fs';
+import type { CreateProfileOptions, UpdateProfileOptions, LLMProvider } from '../../llm/profiles/index.js';
+import { LearningUnitManager } from '../../llm/LearningUnitManager.js';
+import type { LearningUnitExport } from '../../llm/LearningUnitManager.js';
+import { DEFAULT_LEARNING_UNIT_ID } from '../../llm/types.js';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { resolve, join, basename } from 'path';
 import * as readline from 'readline/promises';
 import { homedir } from 'os';
@@ -276,6 +279,87 @@ export function registerLLMCommand(program: Command): void {
       }
     });
 
+  // llm profile update
+  profile
+    .command('update')
+    .description('Update an existing profile')
+    .argument('<name>', 'Profile name')
+    .option('--provider <provider>', 'Provider (lmstudio|openai|anthropic|ollama|openrouter|custom)')
+    .option('--base-url <url>', 'API endpoint URL')
+    .option('--api-key <key>', 'API key or ${ENV_VAR} reference')
+    .option('--model <model>', 'Model name')
+    .option('--temperature <n>', 'Temperature (0.0-2.0)')
+    .option('--max-tokens <n>', 'Max response tokens')
+    .option('--timeout <ms>', 'Request timeout (ms)')
+    .option('--tags <tags>', 'Comma-separated tags')
+    .option('--color <color>', 'Display color for TUI')
+    .option('--description <desc>', 'Profile description')
+    .option('--set-default', 'Set as active profile after update')
+    .action(async (name, options) => {
+      try {
+        const manager = new LLMProfileManager();
+
+        if (!manager.exists(name)) {
+          throw new CLIError(`Profile not found: ${name}`, 1);
+        }
+
+        // Build update options from provided flags
+        const updates: UpdateProfileOptions = {};
+
+        if (options.provider) updates.provider = options.provider as LLMProvider;
+        if (options.baseUrl) updates.baseUrl = options.baseUrl;
+        if (options.apiKey) updates.apiKey = options.apiKey;
+        if (options.model) updates.model = options.model;
+        if (options.description) updates.description = options.description;
+        if (options.timeout) updates.timeout = parseInt(options.timeout, 10);
+        if (options.tags) updates.tags = options.tags.split(',').map((t: string) => t.trim());
+        if (options.color) updates.color = options.color;
+        if (options.setDefault) updates.setDefault = true;
+
+        // Handle parameters separately
+        if (options.temperature || options.maxTokens) {
+          updates.parameters = {};
+          if (options.temperature) updates.parameters.temperature = parseFloat(options.temperature);
+          if (options.maxTokens) updates.parameters.maxTokens = parseInt(options.maxTokens, 10);
+        }
+
+        // Check if any updates provided
+        if (Object.keys(updates).length === 0) {
+          throw new CLIError('No update options provided. Use --help for available options.', 1);
+        }
+
+        const { profile, validation } = manager.update(name, updates);
+
+        logger.info(`\n✅ Profile updated: ${name}`);
+
+        // Show what was changed
+        const changes: string[] = [];
+        if (options.provider) changes.push(`Provider: ${profile.provider}`);
+        if (options.baseUrl) changes.push(`Base URL: ${profile.baseUrl}`);
+        if (options.model) changes.push(`Model: ${profile.model}`);
+        if (options.temperature) changes.push(`Temperature: ${profile.parameters.temperature}`);
+        if (options.maxTokens) changes.push(`Max Tokens: ${profile.parameters.maxTokens}`);
+        if (options.timeout) changes.push(`Timeout: ${profile.timeout}ms`);
+        if (options.description) changes.push(`Description: ${profile.description}`);
+
+        if (changes.length > 0) {
+          logger.info('\nUpdated settings:');
+          changes.forEach(c => logger.info(`  ${c}`));
+        }
+
+        if (validation.warnings.length > 0) {
+          logger.warn('\n⚠️  Warnings:');
+          validation.warnings.forEach(w => logger.warn(`  - ${w}`));
+        }
+
+        if (options.setDefault) {
+          logger.info(`\n▶ Active profile set to: ${name}`);
+        }
+      } catch (error) {
+        throw new CLIError('Failed to update profile', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
   // llm profile set
   profile
     .command('set')
@@ -402,6 +486,8 @@ export function registerLLMCommand(program: Command): void {
     .option('--debug', 'Show detailed debug output including prompts')
     .option('--include-reasoning', 'Include reasoning snippets in move history (default: off)')
     .option('--history-limit <n>', 'Limit move history to last N moves (default: 20, 0=unlimited)', '20')
+    .option('--learning-unit <id>', 'Use specific learning unit (default: "default")')
+    .option('--reasoning-template', 'Use structured constraint-intersection reasoning format (improves accuracy)')
     .action(async (puzzleFile, options) => {
       try {
         logger.info('🤖 Starting LLM Sudoku Player...');
@@ -485,11 +571,19 @@ export function registerLLMCommand(program: Command): void {
         const memory = new AgentMemory(createDefaultMemoryConfig());
         // Get profile name from options or active profile
         const profileName = options.profile || (new LLMProfileManager().getActive()?.name) || 'default';
-        const player = new LLMSudokuPlayer(config, memory, profileName);
+        // Get learning unit ID from options (default: 'default')
+        const learningUnitId = options.learningUnit || DEFAULT_LEARNING_UNIT_ID;
+        const player = new LLMSudokuPlayer(config, memory, profileName, learningUnitId);
 
         // Enable streaming if debug or visualize enabled
         if (options.debug || options.visualize) {
           player.enableStreaming(true);
+        }
+
+        // Enable reasoning template mode if requested
+        if (options.reasoningTemplate) {
+          player.enableReasoningTemplate(true);
+          logger.info('📐 Reasoning template mode enabled (constraint-intersection format)');
         }
 
         // Health check
@@ -511,6 +605,9 @@ export function registerLLMCommand(program: Command): void {
         logger.info(
           `Memory: ${config.memoryEnabled ? '✓ ENABLED' : '✗ DISABLED (baseline)'}`
         );
+        if (config.memoryEnabled && options.learning !== false) {
+          logger.info(`Learning unit: ${learningUnitId}`);
+        }
 
         // Set up event listeners for debugging
         let moveCounter = 0;
@@ -1500,6 +1597,7 @@ export function registerLLMCommand(program: Command): void {
     .description('Run dreaming consolidation for a profile')
     .option('--profile <name>', 'LLM profile to consolidate (default: active profile)')
     .option('--all', 'Consolidate all profiles separately')
+    .option('--learning-unit <id>', 'Update specific learning unit (uses reConsolidate for iterative learning)')
     .option('--reset', 'Reset consolidated status and reprocess all experiences')
     .option('--output <file>', 'Save consolidation report')
     .action(async (options) => {
@@ -1557,17 +1655,29 @@ export function registerLLMCommand(program: Command): void {
             logger.info(`   Reset ${resetCount} experiences to unconsolidated`);
           }
 
+          // Get learning unit ID
+          const learningUnitId = options.learningUnit || DEFAULT_LEARNING_UNIT_ID;
+
           // Get unconsolidated count before
           const before = await experienceStore.getUnconsolidated(profileName);
           logger.info(`📦 Found ${before.length} unconsolidated experiences`);
+          logger.info(`📚 Learning unit: ${learningUnitId}`);
 
           if (before.length === 0) {
             logger.info('💤 No experiences to consolidate');
             continue;
           }
 
-          // Run consolidation
-          const report = await consolidator.consolidate(profileName);
+          // Run consolidation - use reConsolidate for specific learning units (iterative learning)
+          let report;
+          if (options.learningUnit) {
+            // Use reConsolidate for iterative learning on a specific unit
+            const unitManager = new LearningUnitManager(agentMemory, profileName);
+            report = await consolidator.reConsolidate(unitManager, learningUnitId, profileName);
+          } else {
+            // Use standard consolidation for default unit
+            report = await consolidator.consolidate(profileName);
+          }
 
           // Show results
           logger.info(`\n✅ Dream Cycle Complete`);
@@ -1576,8 +1686,8 @@ export function registerLLMCommand(program: Command): void {
           logger.info(`   Patterns extracted: ${report.patterns.successStrategies.length}`);
 
           // Verify few-shots exist
-          const fewShots = await experienceStore.getFewShots(profileName);
-          logger.info(`\n📚 Profile now has ${fewShots.length} few-shot examples for learning\n`);
+          const fewShots = await experienceStore.getFewShots(profileName, learningUnitId);
+          logger.info(`\n📚 Learning unit '${learningUnitId}' now has ${fewShots.length} few-shot examples\n`);
 
           // Save report if requested
           if (options.output) {
@@ -1661,6 +1771,7 @@ export function registerLLMCommand(program: Command): void {
     .command('show')
     .description('Show few-shot examples and learning data')
     .option('--profile <name>', 'LLM profile to show (default: active profile)')
+    .option('--learning-unit <id>', 'Show strategies from specific learning unit (default: "default")')
     .option('--limit <n>', 'Maximum few-shots to display', '10')
     .option('--format <format>', 'Output format (text|json)', 'text')
     .action(async (options) => {
@@ -1680,12 +1791,18 @@ export function registerLLMCommand(program: Command): void {
           profileName = activeProfile.name;
         }
 
+        // Get learning unit ID
+        const learningUnitId = options.learningUnit || DEFAULT_LEARNING_UNIT_ID;
+
         const config = getLLMConfig(profileName);
         const { ExperienceStore } = await import('../../llm/ExperienceStore.js');
         const experienceStore = new ExperienceStore(agentMemory, config, profileName);
 
-        // Get data
-        const fewShots = await experienceStore.getFewShots(profileName, parseInt(options.limit, 10));
+        // Get strategies from learning unit (supports new format)
+        const unitManager = new LearningUnitManager(agentMemory, profileName);
+        const unit = await unitManager.get(learningUnitId);
+        const fewShots = unit ? unit.fewShots.slice(0, parseInt(options.limit, 10))
+          : await experienceStore.getFewShots(profileName, learningUnitId, parseInt(options.limit, 10));
         const unconsolidated = await experienceStore.getUnconsolidated(profileName);
         const hierarchy = await experienceStore.getAbstractionHierarchy(profileName);
 
@@ -1710,12 +1827,24 @@ export function registerLLMCommand(program: Command): void {
           logger.info(`\n🧠 Dream Storage: ${profileName}\n`);
           logger.info('═'.repeat(70));
 
+          // Learning unit info
+          if (unit) {
+            logger.info(`\n📚 Learning Unit: ${learningUnitId}`);
+            logger.info(`   Name: ${unit.name}`);
+            if (unit.description) {
+              logger.info(`   Description: ${unit.description}`);
+            }
+          }
+
           // Statistics
           logger.info(`\n📊 Statistics:`);
           logger.info(`   Total experiences: ${profileExperiences.length}`);
           logger.info(`   Consolidated: ${consolidated.length}`);
           logger.info(`   Unconsolidated: ${unconsolidated.length}`);
           logger.info(`   Learned strategies: ${fewShots.length}`);
+          if (unit) {
+            logger.info(`   Absorbed by unit: ${unit.absorbedExperienceIds.length}`);
+          }
 
           // Learned strategies (new format)
           if (fewShots.length === 0) {
@@ -1774,7 +1903,8 @@ export function registerLLMCommand(program: Command): void {
           }
 
           logger.info('─'.repeat(70));
-          logger.info(`💡 These strategies are injected into prompts during 'llm play'\n`);
+          logger.info(`💡 These strategies are injected into prompts during 'llm play --learning-unit ${learningUnitId}'`);
+          logger.info(`📋 Manage units with: llm learning list, llm learning show ${learningUnitId}\n`);
         }
       } catch (error) {
         throw new CLIError('Failed to show dream data', 1, error instanceof Error ? error.message : String(error));
@@ -1815,7 +1945,7 @@ export function registerLLMCommand(program: Command): void {
         const { ExperienceStore } = await import('../../llm/ExperienceStore.js');
         const experienceStore = new ExperienceStore(agentMemory, config, profileName);
 
-        const fewShots = await experienceStore.getFewShots(profileName, 100);
+        const fewShots = await experienceStore.getFewShots(profileName, undefined, 100);
         const hierarchy = await experienceStore.getAbstractionHierarchy(profileName);
 
         // Count what will be deleted
@@ -1901,6 +2031,441 @@ export function registerLLMCommand(program: Command): void {
         }
       } catch (error) {
         throw new CLIError('Failed to clear dream data', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // ===================================================================
+  // llm learning - Learning unit management commands (Spec 11)
+  // ===================================================================
+
+  const learning = llm.command('learning').description('Manage learning units for LLM training');
+
+  // llm learning list
+  learning
+    .command('list')
+    .description('List all learning units')
+    .option('--profile <name>', 'LLM profile to list units for (default: active profile)')
+    .option('--format <format>', 'Output format (table|json)', 'table')
+    .action(async (options) => {
+      try {
+        const profileManager = new LLMProfileManager();
+        const agentMemory = new AgentMemory(createDefaultMemoryConfig());
+
+        // Get profile name
+        const profileName = options.profile || profileManager.getActive()?.name;
+        if (!profileName) {
+          throw new CLIError('No active profile. Use --profile or set an active profile.', 1);
+        }
+
+        const unitManager = new LearningUnitManager(agentMemory, profileName);
+        const units = await unitManager.list();
+
+        if (options.format === 'json') {
+          console.log(JSON.stringify(units, null, 2));
+        } else {
+          logger.info(`\n📚 Learning Units for Profile: ${profileName}\n`);
+
+          if (units.length === 0) {
+            logger.info('  No learning units found.');
+            logger.info('  Create one with: machine-dream llm learning create <id>');
+            return;
+          }
+
+          for (const unit of units) {
+            logger.info(`  ${unit.id === DEFAULT_LEARNING_UNIT_ID ? '▶' : ' '} ${unit.id}`);
+            logger.info(`     Name: ${unit.name}`);
+            if (unit.description) {
+              logger.info(`     Description: ${unit.description}`);
+            }
+            logger.info(`     Strategies: ${unit.strategyCount} | Experiences: ${unit.experienceCount}`);
+            logger.info(`     Last updated: ${formatTimestamp(unit.lastUpdatedAt.getTime())}`);
+            logger.info('');
+          }
+        }
+      } catch (error) {
+        throw new CLIError('Failed to list learning units', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm learning create
+  learning
+    .command('create')
+    .description('Create a new learning unit')
+    .argument('<id>', 'Unique identifier for the learning unit')
+    .option('--profile <name>', 'LLM profile (default: active profile)')
+    .option('--name <name>', 'Display name (defaults to id)')
+    .option('--description <text>', 'Description of the learning unit')
+    .action(async (id, options) => {
+      try {
+        const profileManager = new LLMProfileManager();
+        const agentMemory = new AgentMemory(createDefaultMemoryConfig());
+
+        const profileName = options.profile || profileManager.getActive()?.name;
+        if (!profileName) {
+          throw new CLIError('No active profile. Use --profile or set an active profile.', 1);
+        }
+
+        const unitManager = new LearningUnitManager(agentMemory, profileName);
+        const name = options.name || id;
+        const unit = await unitManager.create(id, name, options.description);
+
+        logger.info(`\n✅ Learning unit created: ${unit.id}`);
+        logger.info(`   Profile: ${profileName}`);
+        logger.info(`   Name: ${unit.name}`);
+        if (unit.description) {
+          logger.info(`   Description: ${unit.description}`);
+        }
+        logger.info('\n💡 Use with: machine-dream llm play --learning-unit ' + id);
+      } catch (error) {
+        throw new CLIError('Failed to create learning unit', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm learning show
+  learning
+    .command('show')
+    .description('Show details of a learning unit')
+    .argument('<id>', 'Learning unit ID')
+    .option('--profile <name>', 'LLM profile (default: active profile)')
+    .option('--compact', 'Show compact summary instead of full details')
+    .option('--format <format>', 'Output format (table|json)', 'table')
+    .action(async (id, options) => {
+      try {
+        const profileManager = new LLMProfileManager();
+        const agentMemory = new AgentMemory(createDefaultMemoryConfig());
+
+        const profileName = options.profile || profileManager.getActive()?.name;
+        if (!profileName) {
+          throw new CLIError('No active profile. Use --profile or set an active profile.', 1);
+        }
+
+        const unitManager = new LearningUnitManager(agentMemory, profileName);
+        const unit = await unitManager.get(id);
+
+        if (!unit) {
+          throw new CLIError(`Learning unit not found: ${id}`, 1);
+        }
+
+        // Get experience counts for full view
+        const { ExperienceStore } = await import('../../llm/ExperienceStore.js');
+        const config = getLLMConfig(profileName);
+        const experienceStore = new ExperienceStore(agentMemory, config, profileName);
+        const unconsolidated = await experienceStore.getUnconsolidated(profileName);
+        const allExperiences = await agentMemory.reasoningBank.queryMetadata('llm_experience', {}) as LLMExperience[];
+        const profileExperiences = allExperiences.filter((exp: any) => exp.profileName === profileName);
+        const consolidated = profileExperiences.filter((exp: any) => exp.consolidated === true);
+
+        if (options.format === 'json') {
+          console.log(JSON.stringify({
+            ...unit,
+            createdAt: unit.createdAt.toISOString(),
+            lastUpdatedAt: unit.lastUpdatedAt.toISOString(),
+          }, null, 2));
+        } else if (options.compact) {
+          // Compact view - just summary
+          logger.info(`\n📚 Learning Unit: ${unit.id}\n`);
+          logger.info(`Profile:        ${unit.profileName}`);
+          logger.info(`Name:           ${unit.name}`);
+          logger.info(`Description:    ${unit.description || '(none)'}`);
+          logger.info(`Created:        ${unit.createdAt.toLocaleString()}`);
+          logger.info(`Last Updated:   ${unit.lastUpdatedAt.toLocaleString()}`);
+          logger.info('');
+          logger.info('Metadata:');
+          logger.info(`  Strategies:           ${unit.fewShots.length}`);
+          logger.info(`  Total Experiences:    ${unit.metadata.totalExperiences}`);
+          logger.info(`  Absorbed Experiences: ${unit.absorbedExperienceIds.length}`);
+          logger.info(`  Version:              ${unit.metadata.version}`);
+
+          if (unit.fewShots.length > 0) {
+            logger.info('');
+            logger.info('Strategies:');
+            unit.fewShots.slice(0, 5).forEach((fs, i) => {
+              const stratName = fs.strategy || `Strategy ${i + 1}`;
+              logger.info(`  ${i + 1}. ${stratName}`);
+            });
+            if (unit.fewShots.length > 5) {
+              logger.info(`  ... and ${unit.fewShots.length - 5} more`);
+            }
+          }
+        } else {
+          // Full detailed view (default)
+          logger.info(`\n📚 Learning Unit: ${unit.id}\n`);
+          logger.info('═'.repeat(70));
+
+          // Unit info
+          logger.info(`\nProfile:        ${unit.profileName}`);
+          logger.info(`Name:           ${unit.name}`);
+          logger.info(`Description:    ${unit.description || '(none)'}`);
+          logger.info(`Created:        ${unit.createdAt.toLocaleString()}`);
+          logger.info(`Last Updated:   ${unit.lastUpdatedAt.toLocaleString()}`);
+
+          // Statistics
+          logger.info(`\n📊 Statistics:`);
+          logger.info(`   Total experiences: ${profileExperiences.length}`);
+          logger.info(`   Consolidated: ${consolidated.length}`);
+          logger.info(`   Unconsolidated: ${unconsolidated.length}`);
+          logger.info(`   Learned strategies: ${unit.fewShots.length}`);
+          logger.info(`   Absorbed by unit: ${unit.absorbedExperienceIds.length}`);
+          logger.info(`   Version: ${unit.metadata.version}`);
+
+          if (Object.keys(unit.metadata.puzzleBreakdown).length > 0) {
+            logger.info('');
+            logger.info('Puzzle Breakdown:');
+            for (const [type, count] of Object.entries(unit.metadata.puzzleBreakdown)) {
+              logger.info(`   ${type}: ${count}`);
+            }
+          }
+
+          if (unit.metadata.mergedFromUnits && unit.metadata.mergedFromUnits.length > 0) {
+            logger.info('');
+            logger.info(`Merged From: ${unit.metadata.mergedFromUnits.join(', ')}`);
+          }
+
+          // Full strategy details
+          if (unit.fewShots.length === 0) {
+            logger.info(`\n📚 Learned Strategies: None`);
+            logger.info(`   Run 'llm dream run --learning-unit ${id}' to generate strategies`);
+          } else {
+            logger.info(`\n📚 Learned Strategies (${unit.fewShots.length}):\n`);
+
+            unit.fewShots.forEach((fs, i) => {
+              const strategyName = fs.strategy || `Strategy ${i + 1}`;
+              const level = fs.abstractionLevel;
+              const levelNames = ['Instance', 'Technique', 'Category', 'Principle'];
+              const levelName = level !== undefined && levelNames[level] ? levelNames[level] : 'Technique';
+
+              logger.info(`   ${i + 1}. "${strategyName}"`);
+              logger.info(`      Level: ${level ?? 1} (${levelName})`);
+
+              if (fs.situation) {
+                logger.info(`      When: ${fs.situation}`);
+              } else if (fs.gridContext) {
+                logger.info(`      Context: ${fs.gridContext}`);
+              }
+
+              if (fs.analysis) {
+                logger.info(`      Reasoning:`);
+                const steps = fs.analysis.split('\n').filter((s: string) => s.trim());
+                steps.forEach((step: string) => {
+                  logger.info(`         ${step.trim()}`);
+                });
+              }
+
+              if (fs.move?.row > 0 && fs.move?.col > 0) {
+                logger.info(`      Example: (${fs.move.row},${fs.move.col}) = ${fs.move.value}`);
+              }
+
+              logger.info('');
+            });
+          }
+
+          // Abstraction Hierarchy (if present)
+          if (unit.hierarchy && unit.hierarchy.levels && unit.hierarchy.levels.length > 0) {
+            logger.info(`\n🧠 Abstraction Hierarchy:\n`);
+
+            unit.hierarchy.levels.forEach((level: any) => {
+              logger.info(`   Level ${level.level}: ${level.name}`);
+              if (level.items && level.items.length > 0) {
+                level.items.forEach((item: string) => {
+                  logger.info(`      - ${item}`);
+                });
+              }
+            });
+
+            logger.info('');
+          }
+
+          logger.info('─'.repeat(70));
+          logger.info(`💡 Use with: llm play --learning-unit ${id}`);
+          logger.info(`🔄 Update with: llm dream run --learning-unit ${id}\n`);
+        }
+      } catch (error) {
+        throw new CLIError('Failed to show learning unit', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm learning delete
+  learning
+    .command('delete')
+    .description('Delete a learning unit')
+    .argument('<id>', 'Learning unit ID')
+    .option('--profile <name>', 'LLM profile (default: active profile)')
+    .option('--yes', 'Skip confirmation')
+    .action(async (id, options) => {
+      try {
+        const profileManager = new LLMProfileManager();
+        const agentMemory = new AgentMemory(createDefaultMemoryConfig());
+
+        const profileName = options.profile || profileManager.getActive()?.name;
+        if (!profileName) {
+          throw new CLIError('No active profile. Use --profile or set an active profile.', 1);
+        }
+
+        const unitManager = new LearningUnitManager(agentMemory, profileName);
+        const unit = await unitManager.get(id);
+
+        if (!unit) {
+          throw new CLIError(`Learning unit not found: ${id}`, 1);
+        }
+
+        // Confirmation
+        if (!options.yes) {
+          const rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout,
+          });
+
+          const info = `(${unit.fewShots.length} strategies, ${unit.metadata.totalExperiences} experiences)`;
+          const answer = await rl.question(`\n⚠️  Delete learning unit "${id}" ${info}? (y/N): `);
+          rl.close();
+
+          if (answer.toLowerCase() !== 'y' && answer.toLowerCase() !== 'yes') {
+            logger.info('Cancelled.');
+            return;
+          }
+        }
+
+        const deleted = await unitManager.delete(id);
+        if (deleted) {
+          logger.info(`\n✅ Learning unit deleted: ${id}`);
+        } else {
+          throw new CLIError(`Failed to delete learning unit: ${id}`, 1);
+        }
+      } catch (error) {
+        throw new CLIError('Failed to delete learning unit', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm learning merge
+  learning
+    .command('merge')
+    .description('Merge two learning units into a new one')
+    .argument('<unit1>', 'First source learning unit ID')
+    .argument('<unit2>', 'Second source learning unit ID')
+    .option('--profile <name>', 'LLM profile (default: active profile)')
+    .option('--output <id>', 'Output learning unit ID (default: merged-<timestamp>)')
+    .option('--name <name>', 'Display name for merged unit')
+    .option('--description <text>', 'Description for merged unit')
+    .action(async (unit1, unit2, options) => {
+      try {
+        const profileManager = new LLMProfileManager();
+        const agentMemory = new AgentMemory(createDefaultMemoryConfig());
+
+        const profileName = options.profile || profileManager.getActive()?.name;
+        if (!profileName) {
+          throw new CLIError('No active profile. Use --profile or set an active profile.', 1);
+        }
+
+        const unitManager = new LearningUnitManager(agentMemory, profileName);
+
+        // Verify source units exist
+        const source1 = await unitManager.get(unit1);
+        const source2 = await unitManager.get(unit2);
+
+        if (!source1) {
+          throw new CLIError(`Source learning unit not found: ${unit1}`, 1);
+        }
+        if (!source2) {
+          throw new CLIError(`Source learning unit not found: ${unit2}`, 1);
+        }
+
+        // Generate output ID if not provided
+        const outputId = options.output || `merged-${Date.now()}`;
+        const name = options.name || `Merged: ${source1.name} + ${source2.name}`;
+        const description = options.description || `Merged from ${unit1} and ${unit2}`;
+
+        logger.info(`\n🔀 Merging learning units...`);
+        logger.info(`   Source 1: ${unit1} (${source1.fewShots.length} strategies)`);
+        logger.info(`   Source 2: ${unit2} (${source2.fewShots.length} strategies)`);
+        logger.info(`   Output: ${outputId}`);
+
+        // Create merged unit structure
+        const mergedUnit = await unitManager.createMergedUnit(
+          [unit1, unit2],
+          outputId,
+          name,
+          description
+        );
+
+        // Combine strategies (simple concatenation - LLM-driven dedup is in reConsolidate)
+        const combinedStrategies = [...source1.fewShots, ...source2.fewShots];
+        await unitManager.saveFewShots(outputId, combinedStrategies);
+
+        logger.info(`\n✅ Learning units merged successfully!`);
+        logger.info(`   Output unit: ${mergedUnit.id}`);
+        logger.info(`   Combined strategies: ${combinedStrategies.length}`);
+        logger.info(`   Combined experiences: ${mergedUnit.absorbedExperienceIds.length}`);
+        logger.info('\n💡 Run `llm dream run --learning-unit ' + outputId + '` to deduplicate strategies via LLM');
+      } catch (error) {
+        throw new CLIError('Failed to merge learning units', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm learning export
+  learning
+    .command('export')
+    .description('Export a learning unit to JSON file')
+    .argument('<id>', 'Learning unit ID')
+    .argument('<file>', 'Output file path')
+    .option('--profile <name>', 'LLM profile (default: active profile)')
+    .action(async (id, file, options) => {
+      try {
+        const profileManager = new LLMProfileManager();
+        const agentMemory = new AgentMemory(createDefaultMemoryConfig());
+
+        const profileName = options.profile || profileManager.getActive()?.name;
+        if (!profileName) {
+          throw new CLIError('No active profile. Use --profile or set an active profile.', 1);
+        }
+
+        const unitManager = new LearningUnitManager(agentMemory, profileName);
+        const exportData = await unitManager.export(id);
+
+        const outputPath = resolve(file);
+        writeFileSync(outputPath, JSON.stringify(exportData, null, 2));
+
+        logger.info(`\n✅ Learning unit exported: ${id}`);
+        logger.info(`   File: ${outputPath}`);
+        logger.info(`   Strategies: ${exportData.unit.fewShots.length}`);
+      } catch (error) {
+        throw new CLIError('Failed to export learning unit', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm learning import
+  learning
+    .command('import')
+    .description('Import a learning unit from JSON file')
+    .argument('<file>', 'Input file path')
+    .option('--profile <name>', 'LLM profile (default: active profile)')
+    .option('--id <id>', 'Override the learning unit ID')
+    .action(async (file, options) => {
+      try {
+        const profileManager = new LLMProfileManager();
+        const agentMemory = new AgentMemory(createDefaultMemoryConfig());
+
+        const profileName = options.profile || profileManager.getActive()?.name;
+        if (!profileName) {
+          throw new CLIError('No active profile. Use --profile or set an active profile.', 1);
+        }
+
+        const inputPath = resolve(file);
+        if (!existsSync(inputPath)) {
+          throw new CLIError(`File not found: ${inputPath}`, 1);
+        }
+
+        const data = JSON.parse(readFileSync(inputPath, 'utf-8')) as LearningUnitExport;
+
+        const unitManager = new LearningUnitManager(agentMemory, profileName);
+        const unit = await unitManager.import(data, options.id);
+
+        logger.info(`\n✅ Learning unit imported: ${unit.id}`);
+        logger.info(`   Profile: ${profileName}`);
+        logger.info(`   Name: ${unit.name}`);
+        logger.info(`   Strategies: ${unit.fewShots.length}`);
+        logger.info('\n💡 Use with: machine-dream llm play --learning-unit ' + unit.id);
+      } catch (error) {
+        throw new CLIError('Failed to import learning unit', 1, error instanceof Error ? error.message : String(error));
       }
     });
 

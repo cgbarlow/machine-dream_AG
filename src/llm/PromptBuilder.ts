@@ -3,7 +3,7 @@
  * Specification: docs/specs/11-llm-sudoku-player.md
  */
 
-import type { LLMExperience, FewShotExample } from './types.js';
+import type { LLMExperience, FewShotExample, SynthesizedPattern } from './types.js';
 import { BoardFormatter } from './BoardFormatter.js';
 
 /**
@@ -13,9 +13,17 @@ import { BoardFormatter } from './BoardFormatter.js';
  * - Current puzzle state (formatted grid)
  * - Move history for this puzzle
  * - Few-shot examples (when memory enabled)
+ * - Enhanced strategy evaluation format (Spec 11 - Enhanced Prompt Format)
  */
 export class PromptBuilder {
-  constructor(private includeReasoning: boolean = false) {}
+  /**
+   * @param includeReasoning - Include reasoning snippets in move history
+   * @param useEnhancedStrategies - Use new evaluation-based strategy format (default: true)
+   */
+  constructor(
+    private includeReasoning: boolean = false,
+    private useEnhancedStrategies: boolean = true
+  ) {}
 
   /**
    * Build complete prompt for LLM
@@ -46,7 +54,11 @@ export class PromptBuilder {
 
     // Add few-shot examples if memory enabled
     if (fewShots.length > 0) {
-      prompt += this.formatFewShots(fewShots);
+      if (this.useEnhancedStrategies) {
+        prompt += this.formatStrategiesWithEvaluation(fewShots);
+      } else {
+        prompt += this.formatFewShots(fewShots);
+      }
       prompt += '\n\n';
     }
 
@@ -152,6 +164,8 @@ export class PromptBuilder {
    *
    * Few-shots are now LLM-synthesized teaching examples, not raw move data.
    * Each teaches a strategy that can be applied to similar situations.
+   *
+   * @deprecated Use formatStrategiesWithEvaluation() for enhanced prompt format
    */
   private formatFewShots(fewShots: FewShotExample[]): string {
     if (fewShots.length === 0) return '';
@@ -181,4 +195,87 @@ export class PromptBuilder {
     return result.trim();
   }
 
+  /**
+   * Format strategies with explicit evaluation requirements
+   *
+   * Spec 11 - Enhanced Prompt Format:
+   * Forces the LLM to explicitly evaluate each strategy before making a move.
+   * Includes confidence ratings to ensure thoughtful application.
+   *
+   * Design principles:
+   * - Explicit YES/NO evaluation required for each strategy
+   * - Confidence rating (1-10) when applicable
+   * - Threshold guidance (7+ to use a strategy)
+   * - Clear fallback for when no strategy applies
+   * - Concise language (under 100 words per strategy)
+   */
+  formatStrategiesWithEvaluation(fewShots: FewShotExample[]): string {
+    if (fewShots.length === 0) return '';
+
+    // Build strategy descriptions
+    const strategies = fewShots.map((fs, i) => {
+      const name = fs.strategy || `Strategy ${i + 1}`;
+      const situation = fs.situation || fs.gridContext || 'When applicable';
+
+      // Extract reasoning steps - either from analysis or construct from content
+      let steps: string[];
+      if (fs.analysis) {
+        // Split analysis into numbered steps if possible
+        const lines = fs.analysis.split(/\n|;|\.\s+/).filter(s => s.trim().length > 5);
+        steps = lines.slice(0, 4).map(s => s.trim()); // Cap at 4 steps
+      } else {
+        steps = ['Analyze the current board state', 'Apply the strategy logic', 'Make the move'];
+      }
+
+      const stepsFormatted = steps.map((s, j) => `  ${j + 1}. ${s}`).join('\n');
+
+      return `Strategy ${i + 1}: "${name}"
+Situation: ${situation}
+Steps:
+${stepsFormatted}`;
+    }).join('\n\n');
+
+    return `LEARNED STRATEGIES - EVALUATE EACH BEFORE MOVING:
+
+${strategies}
+
+Before moving, for EACH strategy above:
+1. Does this situation match the current board? (YES/NO)
+2. If YES, what is your confidence (1-10)?
+
+Use the highest-confidence applicable strategy (7+).
+If none apply confidently, use your own reasoning.`;
+  }
+
+  /**
+   * Format synthesized patterns with evaluation requirements
+   *
+   * Similar to formatStrategiesWithEvaluation but works with SynthesizedPattern objects
+   * which have more structured data from the dreaming consolidation.
+   */
+  formatPatternsWithEvaluation(patterns: SynthesizedPattern[]): string {
+    if (patterns.length === 0) return '';
+
+    const strategies = patterns.map((p, i) => {
+      const stepsFormatted = p.reasoningSteps.slice(0, 4).map((s, j) => `  ${j + 1}. ${s}`).join('\n');
+
+      return `Strategy ${i + 1}: "${p.strategyName}"
+Situation: ${p.whenToUse}
+Steps:
+${stepsFormatted}`;
+    }).join('\n\n');
+
+    return `LEARNED STRATEGIES - EVALUATE EACH BEFORE MOVING:
+
+${strategies}
+
+Before moving, for EACH strategy above:
+1. Does this situation match the current board? (YES/NO)
+2. If YES, what is your confidence (1-10)?
+
+Use the highest-confidence applicable strategy (7+).
+If none apply confidently, use your own reasoning.`;
+  }
+
 }
+

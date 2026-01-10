@@ -19,7 +19,7 @@ import { PromptBuilder } from './PromptBuilder.js';
 import { ResponseParser } from './ResponseParser.js';
 import { MoveValidator } from './MoveValidator.js';
 import { ExperienceStore } from './ExperienceStore.js';
-import { buildSystemPrompt } from './config.js';
+import { buildSystemPrompt, type SystemPromptOptions } from './config.js';
 import type { AgentMemory } from '../memory/AgentMemory.js';
 import { calculateImportance, calculateContext } from './ImportanceCalculator.js';
 
@@ -41,11 +41,13 @@ export class LLMSudokuPlayer extends EventEmitter {
   private agentMemory: AgentMemory;
 
   private streamingEnabled = false;
+  private useReasoningTemplate = false;
 
   constructor(
     private config: LLMConfig,
     _agentMemory: AgentMemory,
-    private profileName: string = 'default'
+    private profileName: string = 'default',
+    private learningUnitId: string = 'default'
   ) {
     super();
     this.client = new LMStudioClient(config);
@@ -64,6 +66,17 @@ export class LLMSudokuPlayer extends EventEmitter {
   }
 
   /**
+   * Enable reasoning template mode
+   *
+   * When enabled, uses a structured constraint-intersection format
+   * that enforces mathematical set notation instead of prose.
+   * This has shown to improve accuracy by focusing on pure constraint math.
+   */
+  enableReasoningTemplate(enabled: boolean): void {
+    this.useReasoningTemplate = enabled;
+  }
+
+  /**
    * Play a puzzle using pure LLM reasoning
    *
    * Spec 11 - Play Loop Algorithm + Profile-Specific Learning
@@ -77,7 +90,7 @@ export class LLMSudokuPlayer extends EventEmitter {
   ): Promise<PlaySession> {
     // Load few-shot examples only if memory enabled AND learning enabled
     const fewShots = (this.config.memoryEnabled && useLearning)
-      ? await this.experienceStore.getFewShots(this.profileName)
+      ? await this.experienceStore.getFewShots(this.profileName, this.learningUnitId)
       : [];
 
     // Capture learning context at session start
@@ -116,8 +129,11 @@ export class LLMSudokuPlayer extends EventEmitter {
 
       // 2. Call LLM (use dynamic system prompt based on grid size)
       const gridSize = gridState.length;
+      const promptOptions: SystemPromptOptions = {
+        useReasoningTemplate: this.useReasoningTemplate,
+      };
       const messages: ChatMessage[] = [
-        { role: 'system', content: buildSystemPrompt(gridSize) },
+        { role: 'system', content: buildSystemPrompt(gridSize, promptOptions) },
         { role: 'user', content: prompt },
       ];
 

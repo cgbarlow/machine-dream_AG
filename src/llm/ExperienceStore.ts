@@ -10,6 +10,8 @@ import type {
   AbstractionHierarchy,
   PlaySession,
 } from './types.js';
+import { DEFAULT_LEARNING_UNIT_ID } from './types.js';
+import { LLM_STORAGE_KEYS } from './storage-keys.js';
 import type { AgentMemory } from '../memory/AgentMemory.js';
 import { createHash } from 'crypto';
 
@@ -152,17 +154,32 @@ export class ExperienceStore {
 
   /**
    * Get few-shot examples for prompts
-   * Loads from profile-specific storage: llm_fewshots:${profileName}
+   * Loads from profile+unit storage: llm_fewshots:${profileName}:${learningUnitId}
+   *
+   * @param profileName - Profile name (defaults to constructor profile)
+   * @param learningUnitId - Learning unit ID (defaults to 'default')
+   * @param limit - Maximum examples to return
    */
-  async getFewShots(profileName?: string, limit = 5): Promise<FewShotExample[]> {
+  async getFewShots(profileName?: string, learningUnitId?: string, limit = 5): Promise<FewShotExample[]> {
     const profile = profileName || this.profileName;
+    const unitId = learningUnitId || DEFAULT_LEARNING_UNIT_ID;
+    const key = LLM_STORAGE_KEYS.getFewShotsKey(profile, unitId);
+
     const data = await this.agentMemory.reasoningBank.getMetadata(
-      `llm_fewshots:${profile}`,
+      key,
       'fewshot_examples'
     );
 
     if (!data || !Array.isArray((data as any).examples)) {
-      return [];
+      // Fall back to legacy key format for backward compatibility
+      const legacyData = await this.agentMemory.reasoningBank.getMetadata(
+        `llm_fewshots:${profile}`,
+        'fewshot_examples'
+      );
+      if (!legacyData || !Array.isArray((legacyData as any).examples)) {
+        return [];
+      }
+      return (legacyData as any).examples.slice(0, limit);
     }
 
     return (data as any).examples.slice(0, limit);

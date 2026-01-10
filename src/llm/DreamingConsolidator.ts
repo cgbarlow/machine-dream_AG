@@ -28,6 +28,7 @@ import type {
 } from './types.js';
 import { LMStudioClient } from './LMStudioClient.js';
 import { ExperienceStore } from './ExperienceStore.js';
+import { LearningUnitManager } from './LearningUnitManager.js';
 
 /**
  * Dreaming Consolidator
@@ -783,6 +784,257 @@ Identify at most 3 anti-patterns.`;
     if (lower.includes('already filled')) return 'cell_already_filled';
 
     return 'unknown_error';
+  }
+
+  /**
+   * Re-consolidate: Absorb new experiences into an existing learning unit
+   *
+   * Spec 11 - Iterative Learning:
+   * Unlike initial consolidation (which starts fresh), re-consolidation:
+   * 1. Loads existing few-shots from the learning unit
+   * 2. Gets new unconsolidated experiences not yet absorbed
+   * 3. Synthesizes patterns from new experiences
+   * 4. Uses LLM to merge new patterns with existing (deduplicate, select best)
+   * 5. Saves merged few-shots back to the unit
+   * 6. Marks experiences as absorbed
+   * 7. Updates metadata (counts, puzzle breakdown)
+   *
+   * @param learningUnitManager - Manager for the learning unit
+   * @param learningUnitId - ID of the learning unit to update
+   * @param profileName - LLM profile name
+   */
+  async reConsolidate(
+    learningUnitManager: LearningUnitManager,
+    learningUnitId: string,
+    profileName: string
+  ): Promise<ConsolidationReport> {
+    // 1. Load existing few-shots from learning unit
+    const existingFewShots = await learningUnitManager.getFewShots(learningUnitId);
+    const absorbedIds = await learningUnitManager.getAbsorbedExperienceIds(learningUnitId);
+
+    console.log(`🔄 Re-consolidating learning unit "${learningUnitId}"`);
+    console.log(`📚 Existing strategies: ${existingFewShots.length}`);
+    console.log(`📦 Already absorbed: ${absorbedIds.length} experiences`);
+
+    // 2. Get new unconsolidated experiences not yet absorbed
+    const allUnconsolidated = await this.experienceStore.getUnconsolidated(profileName);
+    const newExperiences = allUnconsolidated.filter(
+      (exp) => !absorbedIds.includes(exp.id)
+    );
+
+    if (newExperiences.length === 0) {
+      console.log(`⚠️  No new experiences to absorb`);
+      return this.createEmptyReport();
+    }
+
+    console.log(`🆕 Found ${newExperiences.length} new experiences to absorb`);
+
+    // Filter by importance
+    const importantExperiences = newExperiences
+      .sort((a, b) => (b.importance ?? 0.5) - (a.importance ?? 0.5))
+      .filter((e) => (e.importance ?? 0.5) >= 0.5);
+
+    if (importantExperiences.length < 3) {
+      console.log(`⚠️  Only ${importantExperiences.length} important experiences - need at least 3`);
+      // Still mark them as absorbed even if not enough to synthesize
+      await learningUnitManager.markExperiencesAbsorbed(
+        learningUnitId,
+        newExperiences.map((e) => e.id),
+        this.computePuzzleBreakdown(newExperiences)
+      );
+      return this.createEmptyReport();
+    }
+
+    // 3. Synthesize patterns from new experiences
+    const successful = importantExperiences.filter((e) => e.validation.isCorrect);
+    console.log(`🔍 Clustering ${successful.length} successful experiences...`);
+
+    const clusters = this.clusterByReasoning(successful);
+    const newPatterns: SynthesizedPattern[] = [];
+
+    for (const [clusterName, cluster] of clusters.entries()) {
+      if (cluster.length >= 2) {
+        console.log(`🧠 Synthesizing pattern from "${clusterName}" (${cluster.length} experiences)...`);
+        try {
+          const pattern = await this.synthesizePattern(cluster, clusterName);
+          if (pattern) {
+            newPatterns.push(pattern);
+          }
+        } catch (error) {
+          console.warn(`⚠️  Failed to synthesize pattern:`, error);
+        }
+      }
+    }
+
+    console.log(`✅ Synthesized ${newPatterns.length} new patterns`);
+
+    // 4. Use LLM to merge new patterns with existing
+    let mergedFewShots: FewShotExample[];
+    if (existingFewShots.length > 0 && newPatterns.length > 0) {
+      console.log(`🔀 LLM merging ${existingFewShots.length} existing + ${newPatterns.length} new strategies...`);
+      mergedFewShots = await this.mergeStrategies(existingFewShots, newPatterns);
+    } else if (newPatterns.length > 0) {
+      // No existing, just convert new patterns to few-shots
+      mergedFewShots = await this.generateFewShotsFromPatterns(newPatterns);
+    } else {
+      // Keep existing
+      mergedFewShots = existingFewShots;
+    }
+
+    console.log(`💾 Saving ${mergedFewShots.length} merged strategies`);
+
+    // 5. Save merged few-shots back to the unit
+    await learningUnitManager.saveFewShots(learningUnitId, mergedFewShots);
+
+    // 6. Mark experiences as absorbed
+    const experienceIds = newExperiences.map((e) => e.id);
+    await learningUnitManager.markExperiencesAbsorbed(
+      learningUnitId,
+      experienceIds,
+      this.computePuzzleBreakdown(newExperiences)
+    );
+
+    // Also mark as consolidated in experience store
+    await this.experienceStore.markConsolidated(experienceIds);
+
+    console.log(`✅ Re-consolidation complete: absorbed ${experienceIds.length} experiences`);
+
+    return {
+      patterns: {
+        successStrategies: newPatterns,
+        commonErrors: [],
+        wrongPathPatterns: [],
+      },
+      insights: `Re-consolidated ${experienceIds.length} new experiences into learning unit "${learningUnitId}"`,
+      fewShotsUpdated: mergedFewShots.length,
+      experiencesConsolidated: experienceIds.length,
+      compressionRatio: newPatterns.length > 0 ? importantExperiences.length / newPatterns.length : 0,
+    };
+  }
+
+  /**
+   * Merge new patterns with existing few-shots using LLM
+   *
+   * The LLM evaluates all strategies and selects the best diverse set,
+   * removing duplicates and keeping the most effective ones.
+   */
+  private async mergeStrategies(
+    existingFewShots: FewShotExample[],
+    newPatterns: SynthesizedPattern[]
+  ): Promise<FewShotExample[]> {
+    // Format existing strategies
+    const existingList = existingFewShots.map((fs, i) =>
+      `E${i + 1}. "${fs.strategy}": ${fs.situation || fs.gridContext || 'General'}`
+    ).join('\n');
+
+    // Format new patterns
+    const newList = newPatterns.map((p, i) =>
+      `N${i + 1}. "${p.strategyName}": ${p.whenToUse}`
+    ).join('\n');
+
+    const prompt = `You have existing Sudoku strategies (E) and new strategies (N) to merge.
+
+EXISTING STRATEGIES (proven effective):
+${existingList}
+
+NEW STRATEGIES (from recent experiences):
+${newList}
+
+Create a UNIFIED set of 5-7 strategies by:
+1. Keep existing strategies that are still valuable
+2. Add new strategies that provide different insights
+3. Remove duplicates (same technique, different wording)
+4. Prefer more specific, actionable strategies
+
+For each strategy in your merged set, indicate:
+- Whether it's from EXISTING (E#) or NEW (N#) or a MERGE
+- A brief justification
+
+Respond in this format:
+MERGED_STRATEGIES:
+1. [E1 or N2 or MERGE] "Strategy Name": Justification
+2. [source] "Strategy Name": Justification
+...`;
+
+    try {
+      const response = await this.llmClient.chat([
+        {
+          role: 'system',
+          content: 'You are reviewing Sudoku strategies to create an optimal unified set. Be selective and prioritize diversity.',
+        },
+        { role: 'user', content: prompt },
+      ]);
+
+      // Parse the response to determine which strategies to keep
+      const mergedFewShots = this.parseMergeResponse(
+        response,
+        existingFewShots,
+        newPatterns
+      );
+
+      return mergedFewShots.length > 0 ? mergedFewShots : existingFewShots;
+    } catch (error) {
+      console.warn(`⚠️  LLM merge failed, keeping existing strategies:`, error);
+      // Fallback: keep existing + add new patterns as few-shots
+      const newFewShots = await this.generateFewShotsFromPatterns(newPatterns);
+      return [...existingFewShots, ...newFewShots].slice(0, 7);
+    }
+  }
+
+  /**
+   * Parse LLM merge response to extract selected strategies
+   */
+  private parseMergeResponse(
+    response: string,
+    existingFewShots: FewShotExample[],
+    newPatterns: SynthesizedPattern[]
+  ): FewShotExample[] {
+    const result: FewShotExample[] = [];
+    const lines = response.split('\n');
+
+    for (const line of lines) {
+      // Match patterns like: 1. [E1] "Strategy Name"
+      const existingMatch = line.match(/\[E(\d+)\]/i);
+      const newMatch = line.match(/\[N(\d+)\]/i);
+
+      if (existingMatch) {
+        const idx = parseInt(existingMatch[1]) - 1;
+        if (idx >= 0 && idx < existingFewShots.length) {
+          result.push(existingFewShots[idx]);
+        }
+      } else if (newMatch) {
+        const idx = parseInt(newMatch[1]) - 1;
+        if (idx >= 0 && idx < newPatterns.length) {
+          // Convert pattern to few-shot
+          const pattern = newPatterns[idx];
+          result.push({
+            strategy: pattern.strategyName,
+            abstractionLevel: 1,
+            situation: pattern.whenToUse,
+            analysis: pattern.reasoningSteps.join('. '),
+            move: { row: 0, col: 0, value: 0 },
+            outcome: 'CORRECT',
+          });
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Compute puzzle type breakdown from experiences
+   */
+  private computePuzzleBreakdown(experiences: LLMExperience[]): Record<string, number> {
+    const breakdown: Record<string, number> = {};
+
+    for (const exp of experiences) {
+      // Extract puzzle info from puzzleId (format: "4x4-easy" or similar)
+      const puzzleInfo = exp.puzzleId.replace('.json', '');
+      breakdown[puzzleInfo] = (breakdown[puzzleInfo] || 0) + 1;
+    }
+
+    return breakdown;
   }
 
   /**

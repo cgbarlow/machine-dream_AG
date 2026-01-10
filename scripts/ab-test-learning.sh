@@ -3,16 +3,21 @@
 # Runs baseline sessions, optionally runs dream cycle, then learning sessions
 #
 # Usage: ./scripts/ab-test-learning.sh [options]
-#   --profile <name>   LLM profile to use (default: qwen3-coder)
-#   --puzzle <path>    Puzzle file to use (default: puzzles/4x4-expert.json)
-#   --runs <n>         Number of runs per phase (default: 10)
-#   --skip-dream       Skip Phase 2 (dream cycle) - use existing learned strategies
-#   -h, --help         Show this help
+#   --profile <name>        LLM profile to use (default: qwen3-coder)
+#   --puzzle <path>         Puzzle file to use (default: puzzles/4x4-expert.json)
+#   --runs <n>              Number of runs per phase (default: 10)
+#   --learning-unit <id>    Use specific learning unit (default: "default")
+#   --stream                Show live gameplay during runs (verbose mode)
+#   --skip-dream            Skip Phase 2 (dream cycle) - use existing learned strategies
+#   --reasoning-template    Use structured constraint-intersection format (improves accuracy)
+#   -h, --help              Show this help
 #
 # Examples:
 #   ./scripts/ab-test-learning.sh --puzzle puzzles/4x4-diabolical.json
 #   ./scripts/ab-test-learning.sh --skip-dream --runs 5
-#   ./scripts/ab-test-learning.sh --profile qwen3-coder --puzzle puzzles/4x4-expert.json --runs 5
+#   ./scripts/ab-test-learning.sh --profile qwen3-coder --learning-unit training-v1
+#   ./scripts/ab-test-learning.sh --stream --runs 2
+#   ./scripts/ab-test-learning.sh --reasoning-template --runs 5
 
 set -e
 
@@ -21,6 +26,9 @@ PROFILE="qwen3-coder"
 PUZZLE="puzzles/4x4-expert.json"
 RUNS=10
 SKIP_DREAM=false
+LEARNING_UNIT="default"
+STREAM=false
+REASONING_TEMPLATE=false
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -37,17 +45,32 @@ while [[ $# -gt 0 ]]; do
       RUNS="$2"
       shift 2
       ;;
+    --learning-unit)
+      LEARNING_UNIT="$2"
+      shift 2
+      ;;
+    --stream)
+      STREAM=true
+      shift
+      ;;
     --skip-dream)
       SKIP_DREAM=true
       shift
       ;;
+    --reasoning-template)
+      REASONING_TEMPLATE=true
+      shift
+      ;;
     -h|--help)
       echo "Usage: $0 [options]"
-      echo "  --profile <name>   LLM profile to use (default: qwen3-coder)"
-      echo "  --puzzle <path>    Puzzle file to use (default: puzzles/4x4-expert.json)"
-      echo "  --runs <n>         Number of runs per phase (default: 10)"
-      echo "  --skip-dream       Skip Phase 2 (dream cycle) - use existing learned strategies"
-      echo "  -h, --help         Show this help"
+      echo "  --profile <name>        LLM profile to use (default: qwen3-coder)"
+      echo "  --puzzle <path>         Puzzle file to use (default: puzzles/4x4-expert.json)"
+      echo "  --runs <n>              Number of runs per phase (default: 10)"
+      echo "  --learning-unit <id>    Use specific learning unit (default: \"default\")"
+      echo "  --stream                Show live gameplay during runs (verbose mode)"
+      echo "  --skip-dream            Skip Phase 2 (dream cycle) - use existing learned strategies"
+      echo "  --reasoning-template    Use structured constraint-intersection format"
+      echo "  -h, --help              Show this help"
       exit 0
       ;;
     *)
@@ -66,10 +89,22 @@ echo "=============================================="
 echo "Profile: $PROFILE"
 echo "Puzzle: $PUZZLE"
 echo "Runs per phase: $RUNS"
+echo "Learning unit: $LEARNING_UNIT"
+echo "Stream mode: $STREAM"
 echo "Skip dream cycle: $SKIP_DREAM"
+echo "Reasoning template: $REASONING_TEMPLATE"
 echo "Results: $RESULTS_DIR"
 echo "=============================================="
 echo ""
+
+# Build extra options for play command
+EXTRA_OPTS=""
+if [ "$STREAM" = true ]; then
+  EXTRA_OPTS="$EXTRA_OPTS --visualize"
+fi
+if [ "$REASONING_TEMPLATE" = true ]; then
+  EXTRA_OPTS="$EXTRA_OPTS --reasoning-template"
+fi
 
 mkdir -p "$RESULTS_DIR"
 
@@ -109,6 +144,8 @@ A/B Test Results
 Profile: $PROFILE
 Puzzle: $PUZZLE
 Runs per phase: $RUNS
+Learning unit: $LEARNING_UNIT
+Stream mode: $STREAM
 Skip dream cycle: $SKIP_DREAM
 Date: $(date)
 
@@ -126,7 +163,7 @@ BASELINE_ACC_COUNT=0
 
 for i in $(seq 1 $RUNS); do
   echo "Baseline run $i/$RUNS..."
-  OUTPUT=$(npx machine-dream llm play "$PUZZLE" --profile "$PROFILE" --no-learning --max-moves 100 2>&1) || true
+  OUTPUT=$(npx machine-dream llm play "$PUZZLE" --profile "$PROFILE" --no-learning --max-moves 100 $EXTRA_OPTS 2>&1) || true
   echo "$OUTPUT" > "$RESULTS_DIR/baseline_$i.log"
 
   # Extract metrics
@@ -182,10 +219,10 @@ if [ "$SKIP_DREAM" = false ]; then
   echo "--- Dream Cycle ---" >> "$RESULTS_DIR/summary.txt"
 
   echo "Running dream cycle..."
-  npx machine-dream llm dream run --profile "$PROFILE" 2>&1 | tee "$RESULTS_DIR/dream.log" || true
+  npx machine-dream llm dream run --profile "$PROFILE" --learning-unit "$LEARNING_UNIT" 2>&1 | tee "$RESULTS_DIR/dream.log" || true
 
   echo "Showing learned strategies..."
-  npx machine-dream llm dream show 2>&1 | tee "$RESULTS_DIR/dream_show.log" || true
+  npx machine-dream llm learning show "$LEARNING_UNIT" --profile "$PROFILE" 2>&1 | tee "$RESULTS_DIR/learning_unit.log" || true
 
   echo "Dream cycle complete" >> "$RESULTS_DIR/summary.txt"
 else
@@ -209,7 +246,7 @@ LEARNING_ACC_COUNT=0
 
 for i in $(seq 1 $RUNS); do
   echo "Learning run $i/$RUNS..."
-  OUTPUT=$(npx machine-dream llm play "$PUZZLE" --profile "$PROFILE" --max-moves 100 2>&1) || true
+  OUTPUT=$(npx machine-dream llm play "$PUZZLE" --profile "$PROFILE" --learning-unit "$LEARNING_UNIT" --max-moves 100 $EXTRA_OPTS 2>&1) || true
   echo "$OUTPUT" > "$RESULTS_DIR/learning_$i.log"
 
   # Extract metrics

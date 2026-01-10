@@ -379,6 +379,7 @@ Never save working files, text/mds and tests to the root folder.
    | 12 | [Puzzle Generation](docs/specs/12-randomized-puzzle-generation.md) | Seeded random puzzles |
    | 13 | [Profile Management](docs/specs/13-llm-profile-management.md) | AI model connection profiles |
    | 14 | [Console Menu](docs/specs/14-console-menu-interface-spec.md) | TUI console & help system |
+   | 15 | [Batch Testing](docs/specs/15-batch-testing-spec.md) | A/B testing & iterative learning scripts |
 
 3. **When specs conflict with implementation ideas**:
    - Specs are authoritative

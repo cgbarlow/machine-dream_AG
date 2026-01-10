@@ -376,6 +376,56 @@ REASONING: <brief analysis>
 - Added "CRITICAL CONSTRAINT" section explicitly forbidding moves in FORBIDDEN MOVES list
 - This prevents LLM from ignoring the forbidden moves section in the prompt
 
+### Reasoning Template Mode (Added 2026-01-10)
+
+An optional system prompt mode that enforces **structured constraint-intersection reasoning** using mathematical set notation. This mode has been shown to significantly improve accuracy (62.5% vs 26-39% with default mode) by:
+
+1. **Removing strategy name references** - No "Applying Strategy 1..." overhead
+2. **Enforcing set notation** - `{1,3,8}` instead of prose
+3. **Requiring explicit constraint enumeration** - Row → Column → Box → Intersection
+4. **Shorter reasoning limit** - 150 characters (vs 200 in default mode)
+
+**Enable with**: `--reasoning-template` flag on `llm play` or batch scripts
+
+**Reasoning Template System Prompt**:
+```
+SOLVING METHOD (follow exactly):
+1. Pick an empty cell
+2. List digits MISSING from its ROW as a set {x,y,z}
+3. List digits MISSING from its COLUMN as a set {a,b,c}
+4. List digits MISSING from its BOX as a set {p,q,r}
+5. Find the INTERSECTION of all three sets
+6. If intersection has exactly ONE digit, that's your answer
+7. If multiple digits possible, pick the most constrained cell instead
+
+OUTPUT FORMAT:
+ROW: <1-9>
+COL: <1-9>
+VALUE: <1-9>
+REASONING: <use template below>
+
+REASONING TEMPLATE (follow exactly):
+"Cell (R,C). Row missing {X,Y,Z}. Col missing {A,B,C}. Box missing {P,Q,R}. Intersection={V}."
+
+CRITICAL:
+- Use set notation {1,2,3} not prose
+- Keep reasoning under 150 characters
+- Do NOT reference strategy names
+- Do NOT say "Applying Strategy" or "Using technique"
+- Pure constraint math only
+```
+
+**Example high-accuracy reasoning** (from session bfa9a98a with 62.5% accuracy):
+```
+Cell (5,5). Row missing {1,3,8}. Col missing {1,2,4,5,7,8,9}.
+Box missing {5,6,8}. Intersection={8}.
+```
+
+**When to use**:
+- For larger grids (9x9+) where token budget is constrained
+- When accuracy is more important than strategy diversity
+- For training runs focused on pure constraint solving
+
 ### Puzzle State Prompt (with history)
 
 **Updated 2026-01-09**: Optimized prompt to reduce noise and improve signal-to-noise ratio.
@@ -779,6 +829,305 @@ This enables rigorous A/B testing:
 - **Control group**: `--no-learning` flag (no few-shots injected)
 - **Treatment group**: Default behavior (few-shots loaded if available)
 - **Comparison**: Measure performance difference to verify learning works
+
+## Learning Units
+
+Learning Units provide a higher-level abstraction for managing consolidated knowledge. While profiles define the LLM connection, learning units define discrete packages of learned strategies that can be independently created, updated, merged, and shared.
+
+### Core Concepts
+
+| Concept | Description |
+|---------|-------------|
+| **Learning Unit** | A named package of few-shots and metadata, identified by profile + unit ID |
+| **Unit ID** | Unique identifier within a profile (e.g., "easy-puzzles", "advanced-techniques") |
+| **Absorbed Experiences** | Experiences that have been consolidated into this unit |
+| **Metadata** | Statistics about the unit's content and source |
+
+### Why Learning Units?
+
+1. **Multiple Learning Tracks** - Train on different puzzle types separately
+2. **Iterative Learning** - Absorb new experiences over time without losing prior learning
+3. **Merge & Distill** - Combine units and let LLM synthesize the best strategies
+4. **Export/Import** - Share learned knowledge between installations
+5. **Experimentation** - Compare performance of different learning approaches
+
+### Learning Unit Interface
+
+```typescript
+interface LearningUnit {
+  id: string;                           // Unique ID within profile
+  profileName: string;                  // Parent profile
+  name: string;                         // Display name (e.g., "Easy Puzzles")
+  description?: string;                 // Optional description
+  createdAt: Date;
+  lastUpdatedAt: Date;
+
+  // Content
+  fewShots: FewShotExample[];           // Consolidated strategies
+  hierarchy?: AbstractionHierarchy;     // Abstraction levels
+
+  // Tracking
+  absorbedExperienceIds: string[];      // Experiences already absorbed
+  metadata: LearningUnitMetadata;
+}
+
+interface LearningUnitMetadata {
+  totalExperiences: number;             // Total experiences absorbed
+  puzzleBreakdown: Record<string, number>; // e.g., {"4x4:easy": 50, "9x9:hard": 20}
+  lastConsolidationAt?: Date;
+  mergedFromUnits?: string[];           // If this unit was created from merging
+  version: number;                      // Increments on each update
+}
+```
+
+### Storage Keys
+
+Learning unit data is stored using namespaced keys:
+
+```typescript
+// Few-shots for a specific learning unit
+const fewShotsKey = `llm_fewshots:${profileName}:${learningUnitId}`;
+
+// Learning unit metadata
+const metadataKey = `llm_learning_unit:${profileName}:${learningUnitId}`;
+
+// Example keys:
+// - llm_fewshots:qwen3-coder:default
+// - llm_fewshots:qwen3-coder:easy-puzzles
+// - llm_learning_unit:qwen3-coder:advanced-techniques
+```
+
+### Default Learning Unit
+
+For backwards compatibility, a "default" unit exists for each profile:
+- ID: `default`
+- Created automatically if no unit specified
+- Used when `--learning-unit` option is omitted
+
+### Learning Unit CLI Commands
+
+```bash
+# List all learning units for a profile
+machine-dream llm learning list [--profile <name>]
+
+# Create new learning unit
+machine-dream llm learning create <id> [--profile <name>] [--description <text>]
+
+# Show unit details and metadata
+machine-dream llm learning show <id> [--profile <name>]
+
+# Delete a learning unit
+machine-dream llm learning delete <id> [--yes]
+
+# Merge multiple units into one
+machine-dream llm learning merge <unit1> <unit2> [--output <new-id>] [--profile <name>]
+
+# Export unit to JSON file
+machine-dream llm learning export <id> <file> [--profile <name>]
+
+# Import unit from JSON file
+machine-dream llm learning import <file> [--id <override-id>] [--profile <name>]
+```
+
+### Using Learning Units in Play
+
+```bash
+# Play using specific learning unit
+machine-dream llm play puzzle.json --learning-unit easy-puzzles
+
+# Play with default unit (backwards compatible)
+machine-dream llm play puzzle.json
+
+# Dream consolidation updates specific unit
+machine-dream llm dream run --learning-unit easy-puzzles
+```
+
+## Enhanced Prompt Format
+
+The prompt format for learned strategies has been enhanced to require explicit evaluation before each move. This ensures the LLM actively considers its learned patterns rather than ignoring them.
+
+### Strategy Evaluation Section
+
+When learning is enabled, strategies are presented in a format that requires evaluation:
+
+```
+LEARNED STRATEGIES - EVALUATE EACH BEFORE MOVING:
+
+Strategy 1: "Last Digit in Row"
+Situation: When a row has only one empty cell remaining
+Steps:
+  1. Identify which digit 1-9 is missing from the row
+  2. Place that digit in the empty cell
+
+Strategy 2: "Single Candidate"
+Situation: When a cell has only one valid digit remaining
+Steps:
+  1. Check row, column, and box constraints
+  2. Eliminate impossible digits
+  3. If only one remains, place it
+
+Before moving, for EACH strategy above:
+1. Does this situation match the current board? (YES/NO)
+2. If YES, what is your confidence (1-10)?
+
+Use the highest-confidence applicable strategy (7+).
+If none apply confidently, use your own reasoning.
+```
+
+### Design Principles
+
+| Principle | Description |
+|-----------|-------------|
+| **Explicit Evaluation** | Force LLM to state YES/NO for each strategy |
+| **Confidence Rating** | Numeric score (1-10) indicates certainty |
+| **Threshold Guidance** | Only use strategies with confidence 7+ |
+| **Fallback Path** | Clear instruction for when no strategy applies |
+| **Concise Language** | Under 100 words per strategy |
+| **No Aggressive Tone** | Calm, instructional language |
+
+### Prompt Builder Changes
+
+The `PromptBuilder.formatStrategiesWithEvaluation()` method replaces `formatFewShots()`:
+
+```typescript
+formatStrategiesWithEvaluation(fewShots: FewShotExample[]): string {
+  if (fewShots.length === 0) return '';
+
+  const strategies = fewShots.map((fs, i) => `
+Strategy ${i + 1}: "${fs.strategyName}"
+Situation: ${fs.whenToUse}
+Steps:
+${fs.reasoningSteps.map((s, j) => `  ${j + 1}. ${s}`).join('\n')}
+`).join('\n');
+
+  return `
+LEARNED STRATEGIES - EVALUATE EACH BEFORE MOVING:
+
+${strategies}
+
+Before moving, for EACH strategy above:
+1. Does this situation match the current board? (YES/NO)
+2. If YES, what is your confidence (1-10)?
+
+Use the highest-confidence applicable strategy (7+).
+If none apply confidently, use your own reasoning.
+`;
+}
+```
+
+## Iterative Learning
+
+Iterative learning allows a learning unit to absorb new experiences over time without losing prior consolidated knowledge. This is critical for continuous improvement.
+
+### Re-Consolidation Process
+
+Unlike initial consolidation (which starts fresh), re-consolidation:
+1. Loads existing few-shots from the learning unit
+2. Gets new unconsolidated experiences not yet absorbed
+3. Synthesizes patterns from new experiences
+4. Uses LLM to merge new patterns with existing (deduplicate, select best)
+5. Saves merged few-shots back to the unit
+6. Marks experiences as absorbed
+7. Updates metadata (counts, puzzle breakdown)
+
+### LLM-Driven Merging
+
+When merging new patterns with existing, the LLM evaluates and decides:
+
+```typescript
+const mergePrompt = `You have existing strategies and new strategies to integrate.
+
+EXISTING STRATEGIES (proven effective):
+${existingStrategies.map(s => `- ${s.name}: ${s.whenToUse}`).join('\n')}
+
+NEW STRATEGIES (from recent experiences):
+${newStrategies.map(s => `- ${s.name}: ${s.whenToUse}`).join('\n')}
+
+Merge these into a unified set of 5-7 strategies:
+1. Keep existing strategies that are still valuable
+2. Add new strategies that provide different insights
+3. Remove duplicates (same technique, different wording)
+4. Prefer more specific, actionable strategies
+
+For each strategy in your merged set, explain why you kept/added it.`;
+```
+
+### Absorption Tracking
+
+Experiences are tracked to prevent re-processing:
+
+```typescript
+interface ExperienceStore {
+  // Get unconsolidated experiences EXCLUDING already-absorbed ones
+  getUnconsolidatedExcluding(
+    profileName: string,
+    excludeIds: string[]
+  ): Promise<LLMExperience[]>;
+
+  // Mark experiences as absorbed by a learning unit
+  markAbsorbedByUnit(
+    experienceIds: string[],
+    learningUnitId: string
+  ): Promise<void>;
+}
+```
+
+### Iterative Learning Script
+
+See Spec 15 for the `iterative-learning.sh` script that automates:
+1. Play N puzzles with learning
+2. Dream to absorb experiences
+3. Repeat for multiple batches
+4. Track improvement over iterations
+
+## Learning Unit Merging
+
+Learning units can be merged to combine knowledge from different training runs or puzzle types.
+
+### Merge Process
+
+```bash
+# Merge two units into a new one
+machine-dream llm learning merge unit-a unit-b --output merged-unit
+```
+
+The merge process:
+1. Load few-shots from all source units
+2. Present all strategies to LLM
+3. LLM selects diverse, non-redundant strategies
+4. LLM synthesizes unified abstraction hierarchy
+5. Create new unit with merged content
+6. Metadata tracks which units were merged
+
+### LLM-Driven Distillation
+
+The LLM decides which strategies to keep:
+
+```typescript
+const distillPrompt = `You have strategies from ${units.length} different learning sessions.
+
+${units.map((u, i) => `
+=== Unit ${i + 1}: ${u.name} ===
+${u.fewShots.map(fs => `- ${fs.strategyName}: ${fs.whenToUse}`).join('\n')}
+`).join('\n')}
+
+Create a UNIFIED set of 5-7 strategies that:
+1. Covers the most important techniques from all units
+2. Eliminates redundancy (same strategy, different words)
+3. Prefers strategies that are clear and actionable
+4. Maintains abstraction hierarchy (specific → general)
+
+Return your merged strategy set with explanations.`;
+```
+
+### Merge Metadata
+
+```typescript
+interface LearningUnitMetadata {
+  // ... other fields ...
+  mergedFromUnits?: string[];  // Source unit IDs if merged
+}
+```
 
 ## Metrics
 

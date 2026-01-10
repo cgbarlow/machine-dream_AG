@@ -259,6 +259,46 @@ machine-dream llm benchmark
 - **Memory persistence** - Experiences stored in AgentDB
 - **Dreaming consolidation** - Pattern synthesis during "sleep"
 
+### Learning Units (Spec 11)
+
+Learning units are discrete packages of consolidated knowledge that enable:
+- **Multiple learning tracks** - Create separate units for different puzzle types
+- **Iterative learning** - Absorb new experiences over time
+- **Unit merging** - Combine knowledge from different training runs
+
+```bash
+# List learning units for a profile
+machine-dream llm learning list --profile qwen3-coder
+
+# Create a new learning unit
+machine-dream llm learning create my-training-v1 --profile qwen3-coder
+
+# Play using a specific learning unit
+machine-dream llm play puzzles/4x4-expert.json --learning-unit my-training-v1
+
+# Run dream cycle to consolidate into a learning unit
+machine-dream llm dream run --learning-unit my-training-v1
+
+# View learning unit details
+machine-dream llm learning show my-training-v1
+
+# Export/import for sharing
+machine-dream llm learning export my-training-v1 backup.json
+machine-dream llm learning import backup.json --id imported-training
+
+# Merge two learning units
+machine-dream llm learning merge unit1 unit2 --output merged-unit
+```
+
+**Batch Testing Scripts**:
+```bash
+# A/B test: learning vs no learning
+./scripts/ab-test-learning.sh --puzzle puzzles/4x4-expert.json --runs 5
+
+# Iterative learning: track improvement over time
+./scripts/iterative-learning.sh --batch-size 2 --total-plays 10 --learning-unit train-v1
+```
+
 ---
 
 ## 🎲 Puzzle Generation (Spec 12)

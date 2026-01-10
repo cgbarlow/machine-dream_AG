@@ -43,14 +43,26 @@ export const DEFAULT_LLM_CONFIG: LLMConfig = {
 export const SYSTEM_PROMPT = buildSystemPrompt(9);
 
 /**
+ * System prompt options
+ */
+export interface SystemPromptOptions {
+  /** Use structured reasoning template (constraint intersection format) */
+  useReasoningTemplate?: boolean;
+}
+
+/**
  * Build system prompt for specific grid size
  * Supports 4x4, 9x9, 16x16, 25x25 grids
+ *
+ * @param gridSize - Grid dimension (4, 9, 16, or 25)
+ * @param options - Optional configuration for prompt style
  */
-export function buildSystemPrompt(gridSize: number): string {
+export function buildSystemPrompt(gridSize: number, options: SystemPromptOptions = {}): string {
   const boxSize = Math.sqrt(gridSize);
   const maxValue = gridSize;
 
-  return `You are solving Sudoku puzzles through trial and error.
+  // Base rules section (shared)
+  const rulesSection = `You are solving Sudoku puzzles through trial and error.
 
 RULES:
 - ${gridSize}x${gridSize} grid, ${gridSize} ${boxSize}x${boxSize} boxes
@@ -71,7 +83,40 @@ FEEDBACK:
 CRITICAL CONSTRAINT:
 - NEVER attempt any move listed in FORBIDDEN MOVES
 - If a move appears in FORBIDDEN MOVES, it has been proven wrong
-- You MUST choose a different cell or value
+- You MUST choose a different cell or value`;
+
+  // Reasoning template mode: structured constraint intersection format
+  if (options.useReasoningTemplate) {
+    return `${rulesSection}
+
+SOLVING METHOD (follow exactly):
+1. Pick an empty cell
+2. List digits MISSING from its ROW as a set {x,y,z}
+3. List digits MISSING from its COLUMN as a set {a,b,c}
+4. List digits MISSING from its BOX as a set {p,q,r}
+5. Find the INTERSECTION of all three sets
+6. If intersection has exactly ONE digit, that's your answer
+7. If multiple digits possible, pick the most constrained cell instead
+
+OUTPUT FORMAT:
+ROW: <1-${gridSize}>
+COL: <1-${gridSize}>
+VALUE: <1-${maxValue}>
+REASONING: <use template below>
+
+REASONING TEMPLATE (follow exactly):
+"Cell (R,C). Row missing {X,Y,Z}. Col missing {A,B,C}. Box missing {P,Q,R}. Intersection={V}."
+
+CRITICAL:
+- Use set notation {1,2,3} not prose
+- Keep reasoning under 150 characters
+- Do NOT reference strategy names
+- Do NOT say "Applying Strategy" or "Using technique"
+- Pure constraint math only`;
+  }
+
+  // Default mode: general instructions
+  return `${rulesSection}
 
 OUTPUT FORMAT:
 ROW: <1-${gridSize}>
