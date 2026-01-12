@@ -312,6 +312,8 @@ machine-dream llm learning merge unit1 unit2 --output merged-unit
 
 **[AI Specification Protocol (AISP)](https://github.com/bar181/aisp-open-core)** - A formal specification language that reduces ambiguity in AI-to-AI communication from 40-65% (natural language) to under 2%.
 
+**Research Basis**: [AISP 5.1 Specification](https://github.com/bar181/aisp-open-core) - Formal protocol design and empirical validation demonstrating 97x improvement in multi-agent AI pipeline success rates.
+
 **What is AISP?**
 AISP is a proof-carrying protocol that LLMs understand natively—no training, no fine-tuning, no special interpreters required. It uses mathematical notation and formal structures to eliminate interpretation variance across AI models (Claude, GPT-4, Gemini, etc.).
 
