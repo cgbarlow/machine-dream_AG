@@ -29,9 +29,23 @@ Machine Dream implements these concepts through persistent memory (AgentDB), con
 
 ### Supporting Research
 
-**[AI Specification Protocol (AISP) 5.1](https://github.com/bar181/aisp-open-core)** by Brad Ross - A formal specification language that reduces AI-to-AI communication ambiguity from 40-65% (natural language) to under 2%. AISP research demonstrates 97x improvement in multi-agent pipeline success rates (82% vs 0.84%).
+**[AI Specification Protocol (AISP) 5.1](https://github.com/bar181/aisp-open-core)** by Brad Ross - A formal specification language designed for AI-to-AI communication. AISP reduces interpretation ambiguity from 40-65% (natural language) to under 2% through mathematically precise specifications that LLMs (Claude, GPT-4, Gemini) understand natively without training.
 
-Machine Dream integrates AISP for low-ambiguity LLM prompting, available via `--aisp` and `--aisp-full` flags. This enables experimentation with formal specifications as an alternative to natural language prompts for move generation and reasoning.
+**AISP's Demonstrated Results:**
+- **97x improvement** in 10-step multi-agent pipeline success rates (0.84% → 81.7%)
+- **121% improvement** in technical precision for specification tasks
+- **Zero execution overhead** - specification only needed at compilation, not runtime
+
+**Relevance to Machine Dream:**
+
+Machine Dream's LLM player faces similar challenges that AISP addresses: move generation prompts must be interpreted consistently, consolidation instructions need precision, and different AI models should produce comparable reasoning. AISP integration (`--aisp` and `--aisp-full` flags) enables experimentation with whether formal specifications can:
+
+- Reduce parsing errors in move generation (structured output format)
+- Improve multi-model consistency (same prompt → identical interpretation)
+- Enhance consolidation quality (precise clustering and abstraction instructions)
+- Support cross-model learning (learning units transferable between LLMs)
+
+While AISP's benefits are well-documented for multi-agent coordination, its specific impact on Machine Dream's learning pipeline is an area of active experimentation.
 
 ---
 
