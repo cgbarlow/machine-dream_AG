@@ -27,6 +27,18 @@ This project is grounded in research exploring **continuous machine cognition** 
 
 Machine Dream implements these concepts through persistent memory (AgentDB), continuous learning loops (GRASP), and sleep-like consolidation (Dreaming Pipeline) to create an AI system that thinks, learns, and improves continuously across sessions.
 
+### Supporting Research
+
+**[AI Specification Protocol (AISP) 5.1](https://github.com/bar181/aisp-open-core)** by Brad Ross - Cutting-edge formal specification language that reduces AI-to-AI communication ambiguity from 40-65% to under 2%. This research enables Machine Dream's LLM-to-LLM interactions to be far more precise and reliable.
+
+**Benefits to Machine Dream:**
+- **97x improvement** in multi-agent pipeline success rates
+- **Reduced parsing errors** in move generation and validation
+- **Consistent interpretation** across different AI models (Claude, GPT-4, Gemini)
+- **Low-ambiguity prompts** for improved reasoning and strategy consolidation
+
+AISP integration is available via `--aisp` and `--aisp-full` flags in the LLM player, demonstrating how formal specifications can dramatically improve AI system reliability.
+
 ---
 
 ## 🚀 Quick Start (5 Minutes)

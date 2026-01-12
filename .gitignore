@@ -36,3 +36,5 @@ coverage/
 test-results*.txt
 ab-test-results/
 comprehensive-results/
+logs/
+screenshots/
