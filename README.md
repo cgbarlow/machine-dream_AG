@@ -707,16 +707,3 @@ This is a research project. Contributions welcome for:
 ## 📄 License
 
 MIT
-
----
-
-## 🎯 Next Steps
-
-1. **Try the system**: `machine-dream solve puzzles/easy-01.json`
-2. **Explore the TUI**: `machine-dream tui`
-3. **Read the User Guide**: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
-4. **Set up LLM integration**: [docs/specs/11-llm-sudoku-player.md](docs/specs/11-llm-sudoku-player.md)
-5. **Review Week 2 achievements**: [docs/WEEK2-COMPLETION-REPORT.md](docs/WEEK2-COMPLETION-REPORT.md)
-
-**Welcome to the frontier of continuous machine cognition!** 🧠✨
-
