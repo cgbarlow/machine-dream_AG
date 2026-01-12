@@ -1,5 +1,0 @@
-🤖 Starting LLM Sudoku Player...
-Using profile: qwen3-coder
-Timeout override: 120000ms
-Failed to play puzzle
-Details: ENOENT: no such file or directory, open '/home/chris/projects/machine-dream_AG/puzzles/9x9-easy.json'
