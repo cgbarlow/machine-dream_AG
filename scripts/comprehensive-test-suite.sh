@@ -153,6 +153,35 @@ for PROFILE in $PROFILES; do
       if [[ "$UNCONSOLIDATED_COUNT" != "0" && -n "$UNCONSOLIDATED_COUNT" ]]; then
         echo "  Cleared $UNCONSOLIDATED_COUNT unconsolidated experiences"
       fi
+
+      # Validation runs using -2x learning unit (if dual mode enabled)
+      if [[ -z "$NO_DUAL" ]]; then
+        UNIT_2X="${UNIT_NAME}-2x"
+        echo ""
+        echo "  >>> Validation runs with -2x unit: $UNIT_2X"
+
+        for i in $(seq 1 $RUNS); do
+          echo "    Validation run $i/$RUNS..."
+          TOTAL_RUNS=$((TOTAL_RUNS + 1))
+
+          LOG_FILE="$RESULTS_DIR/${UNIT_2X}_validation${i}.log"
+
+          OUTPUT=$(npx machine-dream llm play "$PUZZLE" \
+            --profile "$PROFILE" \
+            --learning-unit "$UNIT_2X" \
+            $MODE_OPTS \
+            $NO_SAVE_REASONING \
+            2>&1 | tee "$LOG_FILE")
+
+          # Check if solved
+          if echo "$OUTPUT" | grep -q "SOLVED"; then
+            TOTAL_SOLVED=$((TOTAL_SOLVED + 1))
+            echo "      Result: SOLVED"
+          else
+            echo "      Result: Not solved"
+          fi
+        done
+      fi
     fi
   done
 
@@ -175,14 +204,15 @@ echo ""
 
 # Generate summary CSV
 SUMMARY_FILE="$RESULTS_DIR/summary.csv"
-echo "Profile,Mode,Unit,Runs,Solved,Rate" > "$SUMMARY_FILE"
+echo "Profile,Mode,Phase,Unit,Runs,Solved,Rate" > "$SUMMARY_FILE"
 
 for PROFILE in $PROFILES; do
   for MODE in "standard" "aisp" "aisp-full"; do
     UNIT_NAME="${PROFILE}_${PUZZLE_NAME}_${MODE}_${DATE_STR}"
+
+    # Training runs
     RUNS_COUNT=0
     SOLVED_COUNT=0
-
     for LOG in "$RESULTS_DIR/${UNIT_NAME}_run"*.log; do
       if [[ -f "$LOG" ]]; then
         RUNS_COUNT=$((RUNS_COUNT + 1))
@@ -191,10 +221,26 @@ for PROFILE in $PROFILES; do
         fi
       fi
     done
-
     if [[ $RUNS_COUNT -gt 0 ]]; then
       RATE=$(echo "scale=1; $SOLVED_COUNT * 100 / $RUNS_COUNT" | bc)
-      echo "$PROFILE,$MODE,$UNIT_NAME,$RUNS_COUNT,$SOLVED_COUNT,$RATE%" >> "$SUMMARY_FILE"
+      echo "$PROFILE,$MODE,training,$UNIT_NAME,$RUNS_COUNT,$SOLVED_COUNT,$RATE%" >> "$SUMMARY_FILE"
+    fi
+
+    # Validation runs (-2x unit)
+    UNIT_2X="${UNIT_NAME}-2x"
+    RUNS_COUNT=0
+    SOLVED_COUNT=0
+    for LOG in "$RESULTS_DIR/${UNIT_2X}_validation"*.log; do
+      if [[ -f "$LOG" ]]; then
+        RUNS_COUNT=$((RUNS_COUNT + 1))
+        if grep -q "SOLVED" "$LOG" 2>/dev/null; then
+          SOLVED_COUNT=$((SOLVED_COUNT + 1))
+        fi
+      fi
+    done
+    if [[ $RUNS_COUNT -gt 0 ]]; then
+      RATE=$(echo "scale=1; $SOLVED_COUNT * 100 / $RUNS_COUNT" | bc)
+      echo "$PROFILE,$MODE,validation,$UNIT_2X,$RUNS_COUNT,$SOLVED_COUNT,$RATE%" >> "$SUMMARY_FILE"
     fi
   done
 done
