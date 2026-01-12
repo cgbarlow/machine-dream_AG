@@ -29,15 +29,9 @@ Machine Dream implements these concepts through persistent memory (AgentDB), con
 
 ### Supporting Research
 
-**[AI Specification Protocol (AISP) 5.1](https://github.com/bar181/aisp-open-core)** by Brad Ross - Cutting-edge formal specification language that reduces AI-to-AI communication ambiguity from 40-65% to under 2%. This research enables Machine Dream's LLM-to-LLM interactions to be far more precise and reliable.
+**[AI Specification Protocol (AISP) 5.1](https://github.com/bar181/aisp-open-core)** by Brad Ross - A formal specification language that reduces AI-to-AI communication ambiguity from 40-65% (natural language) to under 2%. AISP research demonstrates 97x improvement in multi-agent pipeline success rates (82% vs 0.84%).
 
-**Benefits to Machine Dream:**
-- **97x improvement** in multi-agent pipeline success rates
-- **Reduced parsing errors** in move generation and validation
-- **Consistent interpretation** across different AI models (Claude, GPT-4, Gemini)
-- **Low-ambiguity prompts** for improved reasoning and strategy consolidation
-
-AISP integration is available via `--aisp` and `--aisp-full` flags in the LLM player, demonstrating how formal specifications can dramatically improve AI system reliability.
+Machine Dream integrates AISP for low-ambiguity LLM prompting, available via `--aisp` and `--aisp-full` flags. This enables experimentation with formal specifications as an alternative to natural language prompts for move generation and reasoning.
 
 ---
 
