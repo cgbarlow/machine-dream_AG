@@ -1,14 +1,17 @@
-# 🧠 Machine Dream - a Continuous Machine Cognition Research Platform
+# 🧠 Machine Dream - Continuous Machine Cognition Research Platform
 
 ## 🎯 What This System Does
 
-Machine Dream is a **research platform** exploring continuous machine cognition through Sudoku puzzle-solving. It demonstrates:
+Machine Dream is a **research platform** exploring continuous machine cognition through Sudoku puzzle-solving. The system demonstrates how AI models can learn from experience and consolidate knowledge through "dream cycles" inspired by human sleep.
 
-- **GRASP Loop**: Generate, Review, Absorb, Synthesize, Persist cognitive cycle
-- **Dreaming Pipeline**: 5-phase memory consolidation (like sleep for AI)
-- **LLM Integration**: Pure AI reasoning with no deterministic fallbacks
-- **Persistent Memory**: AgentDB-powered learning across sessions
-- **Production-Ready CLI**: 25 commands for memory, system, and puzzle management
+**Core Capabilities**:
+- **Pure LLM Reasoning** - No deterministic fallbacks, AI models learn through struggle
+- **Learning Units** - Discrete knowledge packages created through experience consolidation
+- **Dual Consolidation** - Standard (3-5 strategies) and enhanced -2x (6-10 strategies) units
+- **Batch Testing Framework** - Comprehensive testing across multiple AI models and configurations
+- **AISP Integration** - Low-ambiguity AI-to-AI communication protocol
+- **Persistent Memory** - AgentDB-powered experience storage across sessions
+- **Dreaming Pipeline** - 5-phase consolidation (Capture, Triage, Compression, Abstraction, Verification)
 
 **The Innovation**: What if an AI system "thought" continuously, learned from experience, and consolidated knowledge during "dream cycles" like humans do?
 
@@ -67,128 +70,114 @@ machine-dream tui
 
 ---
 
-## 📊 Week 2 Production Readiness Achievement
-
-### Implementation Summary (Jan 1-7, 2026)
-
-| Metric | Result | Status |
-|--------|--------|--------|
-| **Critical Commands** | 15/15 implemented | ✅ 100% |
-| **TODO Comments Removed** | 20/20 from critical files | ✅ 100% |
-| **Test Suite** | 310/310 passing | ✅ 100% |
-| **Integration Tests** | 38 new tests created | ✅ 253% of target |
-| **TypeScript Errors** | 0 errors | ✅ Clean |
-| **Mock Implementations** | 0 in critical paths | ✅ Zero |
-| **Documentation** | 2260+ lines created | ✅ Complete |
-
-### What Changed (Week 2 Focus)
-
-**Before Week 2**: CLI commands returned mock data
-**After Week 2**: All commands use real AgentDB, DreamingController, SystemOrchestrator
-
-**Files Transformed**:
-- `src/cli/commands/memory.ts` - 7 commands, real AgentDB integration
-- `src/cli/commands/system.ts` - 4 commands, real process metrics + filesystem
-- `src/cli/commands/dream.ts` - 2 commands, real DreamingController
-- `src/cli/commands/config.ts` - 2 commands, real ProfileValidator + file I/O
-
-**Documentation Created**:
-- [Week 2 Completion Report](docs/WEEK2-COMPLETION-REPORT.md) - Full implementation summary
-- [Week 2 Progress Tracker](docs/week2-progress.md) - Day-by-day breakdown
-- [Week 2 Audit](docs/week2-day5-audit.md) - Final verification
-
----
-
 ## 🎮 Component Status
 
 | Component | Implementation | Tests | Status |
 |-----------|----------------|-------|--------|
-| **Puzzle Engine** | ✅ Complete | 114/114 | Sudoku generation, validation, rules |
-| **GRASP Loop** | ✅ Complete | 83/83 | Generate, Review, Absorb, Synthesize, Persist |
-| **Dreaming Pipeline** | ✅ Complete | 41/41 | 5-phase consolidation system |
-| **AgentDB (Local)** | ✅ Complete | 72/72 | SQLite-based persistence layer |
-| **CLI Interface** | ✅ Complete | 310/310 | 25 commands (memory, system, dream, config) |
-| **TUI (Ink-based)** | ✅ Complete | Passing | Interactive terminal UI |
-| **LLM Integration** | ✅ Complete | Passing | Pure LLM player with profiles |
-| **Puzzle Generator** | ✅ Complete | Passing | Seeded random generation (4×4 to 25×25) |
-| **AI Model Profiles** | ✅ Complete | 83/83 | Multi-provider connection management |
-| **Memory Management** | ✅ Complete | 18/18 | 7 CLI commands with AgentDB backend |
-| **System Administration** | ✅ Complete | 20/20 | 5 CLI commands with real metrics |
+| **Puzzle Engine** | ✅ Stable | 114/114 | Sudoku generation, validation, rules |
+| **LLM Integration** | ✅ Stable | Passing | Pure LLM player with profiles, AISP support |
+| **AI Model Profiles** | ✅ Stable | 83/83 | Multi-provider connection management |
+| **Learning Units** | ✅ Stable | - | Discrete knowledge packages with consolidation |
+| **Dreaming Pipeline** | ✅ Stable | 41/41 | 5-phase consolidation (standard + dual -2x) |
+| **GRASP Loop** | ✅ Stable | 83/83 | Generate, Review, Absorb, Synthesize, Persist |
+| **AgentDB (Local)** | ✅ Stable | 72/72 | SQLite-based persistence layer |
+| **CLI Interface** | ✅ Stable | 310/310 | LLM commands, memory, system, dream |
+| **Batch Testing** | ✅ Stable | - | Comprehensive suite + validation scripts |
+| **Puzzle Generator** | ✅ Stable | Passing | Seeded random generation (4×4 to 25×25) |
+| **Memory Management** | ✅ Stable | 18/18 | 7 CLI commands with AgentDB backend |
+| **System Administration** | ✅ Stable | 20/20 | 5 CLI commands with real metrics |
+| **TUI (Terminal UI)** | ⚠️ Experimental | Passing | Under active development, may not work properly |
 
 **Total Tests**: 310 passing (100% pass rate)
 **TypeScript**: 0 errors
-**Production Status**: ✅ **READY**
+**Focus**: LLM learning and batch testing workflows
 
 ---
 
-## 💻 Core Commands (Production-Ready)
+## 💻 Core Workflow
 
-All commands use **real backends** (no mocks):
+The primary workflow focuses on **LLM learning through experience and consolidation**:
 
-### Memory Management
+### 1. Profile Setup
 ```bash
-# Store learning data
-machine-dream memory store session-key "puzzle strategy data"
+# Create AI model profile
+machine-dream llm profile add \
+  --name qwen3-coder \
+  --provider lmstudio \
+  --base-url http://localhost:1234/v1 \
+  --model qwen3-30b-instruct \
+  --set-default
 
-# List all memory entries
-machine-dream memory list
-
-# Search patterns
-machine-dream memory search "solving strategy"
-
-# Consolidate experiences
-machine-dream memory consolidate
-
-# Optimize database
-machine-dream memory optimize
-
-# Backup/restore
-machine-dream memory backup memory.json
-machine-dream memory restore memory.json
+# Test connection
+machine-dream llm profile test
 ```
 
-### System Administration
+### 2. Training Runs (Generate Experiences)
 ```bash
-# Real-time system status (process metrics, DB health)
+# Play puzzles and accumulate experiences
+machine-dream llm play puzzles/9x9-easy.json --profile qwen3-coder
+machine-dream llm play puzzles/9x9-easy.json --visualize-basic
+
+# Training run script (multiple plays)
+./scripts/training-run.sh --profile qwen3-coder --puzzle puzzles/9x9-easy.json --runs 10
+```
+
+### 3. Consolidation (Create Learning Units)
+```bash
+# Dream cycle: consolidate experiences into learning unit
+machine-dream llm dream --learning-unit my-training-v1
+
+# Comprehensive suite: generate learning units for all profiles
+./scripts/comprehensive-test-suite.sh --runs 3
+# Creates: profile_puzzle_standard_timestamp
+#          profile_puzzle_standard_timestamp-2x (dual consolidation)
+```
+
+### 4. Validation Testing
+```bash
+# Test with specific learning unit
+machine-dream llm play puzzles/9x9-easy.json --learning-unit my-training-v1
+
+# Batch validation: compare multiple units
+./scripts/batch-test-learning-unit.sh \
+  --profiles qwen3:unit_standard,qwen3:unit_standard-2x \
+  --runs 10
+
+# A/B testing: learning vs baseline
+./scripts/ab-test-learning.sh --profile qwen3-coder --puzzle puzzles/9x9-easy.json --runs 5
+```
+
+### 5. Analysis
+```bash
+# View session statistics
+machine-dream llm stats
+
+# List learning units
+machine-dream llm learning list
+
+# Check system health
 machine-dream system status
-
-# Initialize system
-machine-dream system init
-
-# Cleanup old sessions
-machine-dream system cleanup --age 30
-
-# Multi-component health check
-machine-dream system health
 ```
 
-### Dream Consolidation
-```bash
-# Run dream cycle (real DreamingController)
-machine-dream dream run --sessions session-1,session-2
+### Additional Commands
 
-# Check dream history (queries AgentDB metadata)
-machine-dream dream status --last 10
+**Memory Management**:
+```bash
+machine-dream memory list           # List experiences
+machine-dream memory search "text"  # Search patterns
+machine-dream memory backup backup.json
 ```
 
-### Configuration Management
+**System Administration**:
 ```bash
-# Validate config file (ProfileValidator + structure checks)
-machine-dream config validate .machine-dream.json
-
-# Export configuration (real file I/O)
-machine-dream config export my-config.json
+machine-dream system status   # System health
+machine-dream system init     # Initialize system
+machine-dream system cleanup  # Clean old sessions
 ```
 
-### Puzzle Operations
+**Puzzle Generation**:
 ```bash
-# Solve with GRASP loop
-machine-dream solve puzzles/easy-01.json
-
-# Generate random puzzle
 machine-dream puzzle generate --size 9 --difficulty medium
-
-# Generate from seed (reproducible)
 machine-dream puzzle from-seed 12345 --size 9 --difficulty hard
 ```
 
@@ -443,23 +432,9 @@ machine-dream tui --theme light
 machine-dream tui --debug-output /tmp/tui-events.jsonl
 ```
 
-**TUI Features**:
-- ✅ **React-based** (Ink framework - same as Claude Code)
-- ✅ **Component architecture** - Modular, testable design
-- ✅ **Real-time progress** - Live updates during command execution
-- ✅ **Keyboard shortcuts** - Efficient navigation
-- ✅ **Node.js v24 compatible** - Fully tested on modern Node.js
-- ✅ **CI/Docker support** - Works in non-interactive environments
+**Status**: ⚠️ **Experimental** - Under active development, may not work properly
 
-**Main Screens**:
-- 🏠 **Home Dashboard** - System status, quick actions
-- 🧩 **Solve Puzzle** - Interactive puzzle solving with GRASP
-- 🎲 **Puzzle Generator** - Create randomized puzzles with preview
-- 🤖 **LLM Play** - Pure AI solving with live visualization
-- 💾 **Memory Browser** - Explore AgentDB patterns
-- 🌙 **Dream Cycle** - Run consolidation with progress tracking
-- ⚙️ **Configuration** - View and edit system settings
-- 📊 **System Dashboard** - Monitor health and performance
+The TUI is a work-in-progress terminal interface currently being migrated between UI frameworks. For stable interactions, use the CLI commands directly as documented in the Core Workflow section above.
 
 ---
 
@@ -467,32 +442,54 @@ machine-dream tui --debug-output /tmp/tui-events.jsonl
 
 ```
 machine-dream_AG/
-├── docs/                         # 📚 Documentation & Specs
-│   ├── USER_GUIDE.md             # Comprehensive user guide
-│   ├── WEEK2-COMPLETION-REPORT.md # Week 2 achievements
-│   ├── PRODUCTION_ACTION_PLAN.md  # Full roadmap
-│   └── specs/                     # 14 formal specifications
+├── docs/                         # 📚 Documentation & Specifications
+│   ├── specs/                    # 15 formal specifications (Spec 01-15)
+│   │   ├── 11-llm-sudoku-player.md    # LLM integration
+│   │   ├── 13-llm-profile-management.md # AI model profiles
+│   │   ├── 15-batch-testing-spec.md    # Batch testing framework
+│   │   └── ...
+│   ├── adr/                      # Architecture Decision Records
+│   ├── research/                 # Research documentation
+│   └── continuous-machine-thinking-research.md
 ├── src/
-│   ├── agentdb/                  # 💾 Local SQLite Implementation
-│   │   └── LocalAgentDB.ts       # AgentDB-compatible adapter
+│   ├── llm/                      # 🤖 LLM Integration (Primary Focus)
+│   │   ├── LMStudioClient.ts     # OpenAI-compatible API client
+│   │   ├── LLMSudokuPlayer.ts    # Pure LLM Sudoku solver
+│   │   ├── ModelManager.ts       # Model lifecycle management
+│   │   ├── DreamingConsolidator.ts # Experience consolidation
+│   │   └── ProfileManager.ts     # Multi-provider profiles
 │   ├── cli/
-│   │   └── commands/             # 🎮 CLI Commands (all production-ready)
-│   │       ├── memory.ts         # 7 commands with AgentDB
-│   │       ├── system.ts         # 5 commands with real metrics
-│   │       ├── dream.ts          # 2 commands with DreamingController
-│   │       ├── config.ts         # 2 commands with validation
-│   │       └── ...
-│   ├── tui/                      # 🎯 Ink-based Terminal UI
-│   ├── cognition/                # 🧠 GRASP Loop & Strategy Engine
+│   │   └── commands/             # 🎮 CLI Commands
+│   │       ├── llm.ts            # LLM play, profiles, learning units
+│   │       ├── memory.ts         # Memory management
+│   │       ├── system.ts         # System administration
+│   │       └── dream.ts          # Dream consolidation
+│   ├── agentdb/                  # 💾 Persistence Layer
+│   │   └── LocalAgentDB.ts       # SQLite-based AgentDB adapter
+│   ├── engine/                   # 🧩 Sudoku Engine
+│   │   ├── SudokuEngine.ts       # Rules and validation
+│   │   └── PuzzleGenerator.ts    # Seeded random generation
 │   ├── consolidation/            # 🌙 Dreaming Pipeline
-│   ├── engine/                   # 🧩 Sudoku Rules & Generator
+│   │   └── DreamingController.ts # 5-phase consolidation
+│   ├── cognition/                # 🧠 GRASP Loop
 │   ├── memory/                   # 💾 AgentMemory Wrapper
-│   ├── orchestration/            # 🎼 System Lifecycle
-│   └── llm/                      # 🤖 LLM Integration & Profiles
-└── tests/                        # ✅ 310 Tests (100% passing)
-    ├── unit/                     # Unit tests (114 tests)
-    └── integration/              # Integration tests (196 tests)
-        └── commands/             # 38 new Week 2 tests
+│   ├── tui/                      # ⚠️ Terminal UI (Experimental)
+│   └── orchestration/            # 🎼 System Lifecycle
+├── scripts/                      # 🧪 Batch Testing Scripts
+│   ├── comprehensive-test-suite.sh    # Generate learning units (all profiles)
+│   ├── batch-test-learning-unit.sh    # Validate specific units
+│   ├── ab-test-learning.sh            # A/B testing (learning vs baseline)
+│   ├── iterative-learning.sh          # Iterative improvement tracking
+│   ├── training-run.sh                # Basic training runs
+│   └── SCRIPTS.md                     # Complete script documentation
+├── tests/                        # ✅ 310 Tests (100% passing)
+│   ├── unit/                     # Unit tests
+│   ├── integration/              # Integration tests
+│   └── llm/                      # LLM-specific tests
+└── puzzles/                      # 🎲 Puzzle Collection
+    ├── 4x4-expert.json           # Training puzzles
+    ├── 9x9-easy.json
+    └── 9x9-ai-escargot.json      # World's hardest puzzle
 ```
 
 ---
@@ -537,34 +534,99 @@ machine-dream_AG/
 
 ---
 
-## ✅ Production Readiness Checklist
+## 🧪 Testing Approach
 
-### Week 2 Complete (Jan 1-7, 2026) ✅
-- [x] All memory commands use real AgentDB (7/7)
-- [x] All system commands use real backends (4/5 - migrate skipped)
-- [x] All dream commands use real DreamingController (2/2)
-- [x] All config commands use real validation/I/O (2/2)
-- [x] 20/20 TODO comments removed from critical files
-- [x] 310/310 tests passing (100% pass rate)
-- [x] 0 TypeScript errors
-- [x] 38 integration tests created (253% of target)
-- [x] Complete documentation (2260+ lines)
-- [x] Production-ready CLI with zero mock implementations
+### Unit & Integration Tests
+```bash
+# All tests (310 passing)
+npm test
 
-### Remaining Work (Week 3+)
-- [ ] Export command implementation (duplicate of config export)
-- [ ] Demo command execution (presentation feature)
-- [ ] Benchmark framework (performance testing)
-- [ ] Interactive REPL (advanced feature)
-- [ ] System migrations (when needed)
-- [ ] E2E testing suite
-- [ ] CI/CD pipeline enhancements
-- [ ] Deployment documentation
-- [ ] Performance optimization
-- [ ] Security review
+# Unit tests only
+npm test -- unit
 
-**Current Status**: ✅ **Production-ready for core functionality**
-**Target**: Full production deployment (Weeks 3-11)
+# Integration tests only
+npm test -- integration
+
+# With coverage
+npm test -- --coverage
+```
+
+**Test Coverage**:
+- 310 tests passing (100% pass rate)
+- 0 TypeScript errors
+- Unit tests: Puzzle engine, GRASP loop, memory, consolidation
+- Integration tests: CLI commands, LLM player, profiles
+
+### Comprehensive Test Suite
+
+The **comprehensive-test-suite.sh** script is the primary tool for generating and testing learning units across multiple AI models:
+
+```bash
+# Generate learning units for all profiles
+./scripts/comprehensive-test-suite.sh --runs 3
+
+# Test specific profiles, exclude one
+./scripts/comprehensive-test-suite.sh \
+  --profiles gpt-oss-120b,qwq-32b \
+  --exclude deepseek-r1
+
+# Disable dual mode (only create standard units)
+./scripts/comprehensive-test-suite.sh --no-dual --skip-dream
+```
+
+**What it does**:
+1. **Tests all profiles** in size order (largest model first)
+2. **Runs multiple modes**: standard, aisp, aisp-full
+3. **Creates dual learning units**:
+   - Standard (3-5 strategies)
+   - -2x (6-10 strategies for enhanced learning)
+4. **Shows live move output** with `--visualize-basic`
+5. **Smart model loading** (detects loading state, prevents unnecessary reloads)
+
+**Output**:
+- Creates `comprehensive-results/<timestamp>/` directory
+- Generates `summary.csv` with solve rates per profile/mode
+- Saves individual run logs
+- Creates learning units with timestamp IDs
+
+### Batch Testing & Validation
+
+**Validate specific learning units** without dream cycle:
+
+```bash
+# Compare standard vs -2x units
+./scripts/batch-test-learning-unit.sh \
+  --profiles gpt-oss:unit_standard,gpt-oss:unit_standard-2x \
+  --runs 10
+
+# Test multiple profiles with their own units
+./scripts/batch-test-learning-unit.sh \
+  --profiles gpt-oss:unit1,qwq:unit2,nemotron:unit3 \
+  --runs 5 \
+  --modes standard,aisp
+```
+
+**A/B testing** (learning vs baseline):
+
+```bash
+# Compare learning ON vs OFF
+./scripts/ab-test-learning.sh \
+  --profile qwen3-coder \
+  --puzzle puzzles/4x4-expert.json \
+  --runs 10
+```
+
+**Iterative learning** (track improvement over time):
+
+```bash
+# Run batches with dream consolidation between
+./scripts/iterative-learning.sh \
+  --profile qwen3-coder \
+  --batch-size 3 \
+  --total-plays 15
+```
+
+See [scripts/SCRIPTS.md](scripts/SCRIPTS.md) for complete documentation of all testing workflows.
 
 ---
 
