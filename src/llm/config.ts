@@ -23,9 +23,11 @@ export const DEFAULT_LLM_CONFIG: LLMConfig = {
   model: process.env.LLM_MODEL || 'qwen3-30b',
 
   // Generation parameters
-  temperature: parseFloat(process.env.LLM_TEMPERATURE || '0.3'), // Lower temp for more deterministic reasoning
+  // Temperature increased from 0.3 to 0.6 (2026-01-11) to prevent model getting "stuck"
+  // on the same move when it should be trying alternatives
+  temperature: parseFloat(process.env.LLM_TEMPERATURE || '0.6'),
   maxTokens: parseInt(process.env.LLM_MAX_TOKENS || '2048', 10), // Increased to allow complete reasoning without cutoff
-  timeout: parseInt(process.env.LLM_TIMEOUT || '240000', 10), // 4 minutes for slow models (ROCm/AMD at ~12 tokens/sec)
+  timeout: parseInt(process.env.LLM_TIMEOUT || '300000', 10), // 5 minutes for slow models
 
   // Learning settings
   memoryEnabled: process.env.LLM_MEMORY_ENABLED !== 'false',
@@ -80,10 +82,12 @@ FEEDBACK:
 - INVALID: Violates rules
 - VALID_BUT_WRONG: Legal but incorrect
 
-CRITICAL CONSTRAINT:
-- NEVER attempt any move listed in FORBIDDEN MOVES
-- If a move appears in FORBIDDEN MOVES, it has been proven wrong
-- You MUST choose a different cell or value`;
+BANNED MOVES RULE:
+- The prompt may contain a "BANNED MOVES" section listing moves that WILL BE REJECTED
+- These moves have been tried before and proven WRONG
+- Attempting ANY banned move results in IMMEDIATE REJECTION - no evaluation
+- You MUST pick a DIFFERENT cell or value not in the banned list
+- This is a HARD CONSTRAINT - violations waste your turn`;
 
   // Reasoning template mode: structured constraint intersection format
   if (options.useReasoningTemplate) {
@@ -187,6 +191,7 @@ export function profileToConfig(profile: LLMProfile): LLMConfig {
     memoryEnabled: true, // Default to enabled, can be overridden
     maxHistoryMoves: 20, // Default value
     includeReasoning: false, // Default: OFF
+    profileSystemPrompt: profile.systemPrompt, // Per-profile system prompt (Spec 13)
   };
 }
 

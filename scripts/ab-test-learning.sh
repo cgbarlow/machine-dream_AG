@@ -11,6 +11,7 @@
 #   --skip-dream            Skip Phase 2 (dream cycle) - use existing learned strategies
 #   --reasoning-template    Use structured constraint-intersection format (improves accuracy)
 #   --anonymous-patterns    Use anonymous pattern format for learned strategies
+#   --debug                 Show full prompts sent to LLM
 #   -h, --help              Show this help
 #
 # Examples:
@@ -31,6 +32,7 @@ LEARNING_UNIT="default"
 STREAM=false
 REASONING_TEMPLATE=false
 ANONYMOUS_PATTERNS=false
+DEBUG=false
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -67,6 +69,10 @@ while [[ $# -gt 0 ]]; do
       ANONYMOUS_PATTERNS=true
       shift
       ;;
+    --debug)
+      DEBUG=true
+      shift
+      ;;
     -h|--help)
       echo "Usage: $0 [options]"
       echo "  --profile <name>        LLM profile to use (default: qwen3-coder)"
@@ -77,6 +83,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --skip-dream            Skip Phase 2 (dream cycle) - use existing learned strategies"
       echo "  --reasoning-template    Use structured constraint-intersection format"
       echo "  --anonymous-patterns    Use anonymous pattern format for learned strategies"
+      echo "  --debug                 Show full prompts sent to LLM"
       echo "  -h, --help              Show this help"
       exit 0
       ;;
@@ -100,6 +107,8 @@ echo "Learning unit: $LEARNING_UNIT"
 echo "Stream mode: $STREAM"
 echo "Skip dream cycle: $SKIP_DREAM"
 echo "Reasoning template: $REASONING_TEMPLATE"
+echo "Anonymous patterns: $ANONYMOUS_PATTERNS"
+echo "Debug mode: $DEBUG"
 echo "Results: $RESULTS_DIR"
 echo "=============================================="
 echo ""
@@ -114,6 +123,15 @@ if [ "$REASONING_TEMPLATE" = true ]; then
 fi
 if [ "$ANONYMOUS_PATTERNS" = true ]; then
   EXTRA_OPTS="$EXTRA_OPTS --anonymous-patterns"
+fi
+if [ "$DEBUG" = true ]; then
+  EXTRA_OPTS="$EXTRA_OPTS --debug"
+fi
+
+# Build extra options for dream command
+DREAM_OPTS=""
+if [ "$ANONYMOUS_PATTERNS" = true ]; then
+  DREAM_OPTS="$DREAM_OPTS --anonymous-patterns"
 fi
 
 mkdir -p "$RESULTS_DIR"
@@ -173,8 +191,14 @@ BASELINE_ACC_COUNT=0
 
 for i in $(seq 1 $RUNS); do
   echo "Baseline run $i/$RUNS..."
-  OUTPUT=$(npx machine-dream llm play "$PUZZLE" --profile "$PROFILE" --no-learning --max-moves 100 $EXTRA_OPTS 2>&1) || true
-  echo "$OUTPUT" > "$RESULTS_DIR/baseline_$i.log"
+  if [ "$STREAM" = true ]; then
+    # Stream to stdout AND capture to file
+    npx machine-dream llm play "$PUZZLE" --profile "$PROFILE" --no-learning --max-moves 100 $EXTRA_OPTS 2>&1 | tee "$RESULTS_DIR/baseline_$i.log" || true
+    OUTPUT=$(cat "$RESULTS_DIR/baseline_$i.log")
+  else
+    OUTPUT=$(npx machine-dream llm play "$PUZZLE" --profile "$PROFILE" --no-learning --max-moves 100 $EXTRA_OPTS 2>&1) || true
+    echo "$OUTPUT" > "$RESULTS_DIR/baseline_$i.log"
+  fi
 
   # Extract metrics
   METRICS=$(extract_metrics "$OUTPUT")
@@ -229,7 +253,7 @@ if [ "$SKIP_DREAM" = false ]; then
   echo "--- Dream Cycle ---" >> "$RESULTS_DIR/summary.txt"
 
   echo "Running dream cycle..."
-  npx machine-dream llm dream run --profile "$PROFILE" --learning-unit "$LEARNING_UNIT" 2>&1 | tee "$RESULTS_DIR/dream.log" || true
+  npx machine-dream llm dream run --profile "$PROFILE" --learning-unit "$LEARNING_UNIT" $DREAM_OPTS 2>&1 | tee "$RESULTS_DIR/dream.log" || true
 
   echo "Showing learned strategies..."
   npx machine-dream llm learning show "$LEARNING_UNIT" --profile "$PROFILE" 2>&1 | tee "$RESULTS_DIR/learning_unit.log" || true
@@ -256,8 +280,14 @@ LEARNING_ACC_COUNT=0
 
 for i in $(seq 1 $RUNS); do
   echo "Learning run $i/$RUNS..."
-  OUTPUT=$(npx machine-dream llm play "$PUZZLE" --profile "$PROFILE" --learning-unit "$LEARNING_UNIT" --max-moves 100 $EXTRA_OPTS 2>&1) || true
-  echo "$OUTPUT" > "$RESULTS_DIR/learning_$i.log"
+  if [ "$STREAM" = true ]; then
+    # Stream to stdout AND capture to file
+    npx machine-dream llm play "$PUZZLE" --profile "$PROFILE" --learning-unit "$LEARNING_UNIT" --max-moves 100 $EXTRA_OPTS 2>&1 | tee "$RESULTS_DIR/learning_$i.log" || true
+    OUTPUT=$(cat "$RESULTS_DIR/learning_$i.log")
+  else
+    OUTPUT=$(npx machine-dream llm play "$PUZZLE" --profile "$PROFILE" --learning-unit "$LEARNING_UNIT" --max-moves 100 $EXTRA_OPTS 2>&1) || true
+    echo "$OUTPUT" > "$RESULTS_DIR/learning_$i.log"
+  fi
 
   # Extract metrics
   METRICS=$(extract_metrics "$OUTPUT")

@@ -93,13 +93,23 @@ export class LearningUnitManager {
     const fewShots = await this.getFewShots(id);
     const hierarchy = await this.getHierarchy(id);
 
+    // Convert stored metadata back to proper types
+    const storedMeta = metadata as any;
+    const lastConsolidationAt = storedMeta.metadata?.lastConsolidationAt
+      ? new Date(storedMeta.metadata.lastConsolidationAt)
+      : undefined;
+
     return {
-      ...(metadata as Omit<LearningUnit, 'fewShots' | 'hierarchy'>),
+      ...storedMeta,
       fewShots,
       hierarchy,
       // Ensure dates are Date objects
-      createdAt: new Date((metadata as any).createdAt),
-      lastUpdatedAt: new Date((metadata as any).lastUpdatedAt),
+      createdAt: new Date(storedMeta.createdAt),
+      lastUpdatedAt: new Date(storedMeta.lastUpdatedAt),
+      metadata: {
+        ...storedMeta.metadata,
+        lastConsolidationAt,
+      },
     } as LearningUnit;
   }
 
@@ -283,9 +293,10 @@ export class LearningUnitManager {
     experienceIds: string[],
     puzzleBreakdown?: Record<string, number>
   ): Promise<void> {
-    const unit = await this.get(unitId);
+    let unit = await this.get(unitId);
     if (!unit) {
-      throw new Error(`Learning unit '${unitId}' not found`);
+      // Auto-create the learning unit if it doesn't exist
+      unit = await this.create(unitId, unitId, `Auto-created during dream consolidation`);
     }
 
     // Merge experience IDs (avoid duplicates)

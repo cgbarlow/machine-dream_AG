@@ -279,6 +279,7 @@ export class ExperienceStore {
         id: session.id,
         puzzleId: session.puzzleId,
         profileName: session.profileName || this.profileName,
+        learningUnitId: session.learningUnitId || 'default',
         startTime: session.startTime,
         endTime: session.endTime,
         solved: session.solved,
@@ -290,6 +291,7 @@ export class ExperienceStore {
         validButWrongMoves: session.validButWrongMoves,
         memoryWasEnabled: session.memoryWasEnabled,
         learningContext: session.learningContext,
+        notes: session.notes,
       }
     );
   }
@@ -314,5 +316,43 @@ export class ExperienceStore {
       {}
     ) as Partial<PlaySession>[];
     return sessions;
+  }
+
+  /**
+   * Update session notes
+   * Merges the new notes with existing session metadata
+   * Creates minimal session metadata if it doesn't exist (for older sessions)
+   */
+  async updateSessionNotes(sessionId: string, notes: string): Promise<boolean> {
+    let existing = await this.getSession(sessionId);
+
+    if (!existing) {
+      // Try to find experiences for this session and create minimal metadata
+      const allExperiences = await this.agentMemory.reasoningBank.queryMetadata('llm_experience', {}) as any[];
+      const sessionExperiences = allExperiences.filter((exp: any) => exp.sessionId === sessionId);
+
+      if (sessionExperiences.length === 0) {
+        return false;
+      }
+
+      // Create minimal session metadata from experiences
+      const firstExp = sessionExperiences[0];
+      existing = {
+        id: sessionId,
+        puzzleId: firstExp.puzzleId,
+        profileName: firstExp.profileName || 'default',
+      };
+    }
+
+    // Merge notes with existing metadata
+    await this.agentMemory.reasoningBank.storeMetadata(
+      `llm_session:${sessionId}`,
+      'llm_session',
+      {
+        ...existing,
+        notes,
+      }
+    );
+    return true;
   }
 }

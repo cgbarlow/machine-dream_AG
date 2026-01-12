@@ -21,6 +21,9 @@ export interface LLMConfig {
   maxHistoryMoves: number;  // How many past moves to include
   includeReasoning: boolean; // Include reasoning snippets in move history
 
+  // Per-profile customization (Spec 13)
+  profileSystemPrompt?: string; // Additional system prompt from profile
+
   // No hints, no fallback - these are NOT configurable
 }
 
@@ -64,6 +67,9 @@ export interface LLMExperience {
 
   // Learning features active at time of move
   learningContext: LearningContext;
+
+  // Prompt sent to LLM (for debugging/analysis)
+  prompt?: string;
 }
 
 /**
@@ -114,7 +120,11 @@ export interface PlaySession {
 
   // Profile and learning tracking (for A/B testing)
   profileName: string;              // LLM profile used for this session
+  learningUnitId: string;           // Learning unit used for this session
   learningContext: LearningContext; // Learning features available at session start
+
+  // User annotations
+  notes?: string;                   // User notes about this session
 }
 
 /**

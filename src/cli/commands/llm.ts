@@ -138,6 +138,7 @@ export function registerLLMCommand(program: Command): void {
     .option('--timeout <ms>', 'Request timeout (ms)', '60000')
     .option('--tags <tags>', 'Comma-separated tags')
     .option('--color <color>', 'Display color for TUI')
+    .option('--system-prompt <text>', 'Additional system prompt text (appended to base prompt)')
     .option('--set-default', 'Set as active profile after creation')
     .action(async (options) => {
       try {
@@ -173,6 +174,7 @@ export function registerLLMCommand(program: Command): void {
           timeout: parseInt(options.timeout, 10),
           tags: tags ? tags.split(',').map((t: string) => t.trim()) : [],
           color: options.color,
+          systemPrompt: options.systemPrompt,
           setDefault: options.setDefault,
         };
 
@@ -233,6 +235,11 @@ export function registerLLMCommand(program: Command): void {
         logger.info(`Tags:           ${p.tags.join(', ') || '(none)'}`);
         logger.info(`Color:          ${p.color || '(default)'}`);
         logger.info('');
+        if (p.systemPrompt) {
+          logger.info('System Prompt:');
+          logger.info(`  ${p.systemPrompt}`);
+          logger.info('');
+        }
         logger.info(`Created:        ${new Date(p.createdAt).toLocaleString()}`);
         logger.info(`Last Used:      ${formatTimestamp(p.lastUsed)}`);
         logger.info(`Usage Count:    ${p.usageCount}`);
@@ -294,6 +301,7 @@ export function registerLLMCommand(program: Command): void {
     .option('--tags <tags>', 'Comma-separated tags')
     .option('--color <color>', 'Display color for TUI')
     .option('--description <desc>', 'Profile description')
+    .option('--system-prompt <text>', 'Additional system prompt text (appended to base prompt)')
     .option('--set-default', 'Set as active profile after update')
     .action(async (name, options) => {
       try {
@@ -314,6 +322,7 @@ export function registerLLMCommand(program: Command): void {
         if (options.timeout) updates.timeout = parseInt(options.timeout, 10);
         if (options.tags) updates.tags = options.tags.split(',').map((t: string) => t.trim());
         if (options.color) updates.color = options.color;
+        if (options.systemPrompt) updates.systemPrompt = options.systemPrompt;
         if (options.setDefault) updates.setDefault = true;
 
         // Handle parameters separately
@@ -480,7 +489,7 @@ export function registerLLMCommand(program: Command): void {
     .option('--learning', 'Enable few-shot learning injection (default when available)')
     .option('--model <model>', 'Override model name')
     .option('--endpoint <url>', 'Override LLM endpoint')
-    .option('--timeout <ms>', 'Request timeout in milliseconds', '120000')
+    .option('--timeout <ms>', 'Request timeout in milliseconds', '300000')
     .option('--max-moves <n>', 'Maximum moves before abandoning', '200')
     .option('--visualize', 'Show live solving visualization')
     .option('--debug', 'Show detailed debug output including prompts')
@@ -571,7 +580,10 @@ export function registerLLMCommand(program: Command): void {
         // Initialize player
         const memory = new AgentMemory(createDefaultMemoryConfig());
         // Get profile name from options or active profile
-        const profileName = options.profile || (new LLMProfileManager().getActive()?.name) || 'default';
+        const profileManager = new LLMProfileManager();
+        const profileName = options.profile || profileManager.getActive()?.name || 'default';
+        // Record profile usage
+        profileManager.recordUsage(profileName);
         // Get learning unit ID from options (default: 'default')
         const learningUnitId = options.learningUnit || DEFAULT_LEARNING_UNIT_ID;
         const player = new LLMSudokuPlayer(config, memory, profileName, learningUnitId);
@@ -593,21 +605,28 @@ export function registerLLMCommand(program: Command): void {
           logger.info('📋 Anonymous pattern mode enabled (no strategy names)');
         }
 
-        // Health check
+        // Health check and model verification
         logger.info(`Checking LM Studio connection at ${config.baseUrl}...`);
-        const isHealthy = await player.healthCheck();
+        const modelCheck = await player.verifyModel();
 
-        if (!isHealthy) {
-          throw new CLIError('LM Studio is not running', 1, `Cannot connect to ${config.baseUrl}`, [
-            'Start LM Studio and load a model',
-            'Verify the endpoint URL',
-            `Check that the server is running on ${config.baseUrl}`,
-          ]);
+        if (!modelCheck.available) {
+          if (modelCheck.loadedModels.length === 0) {
+            throw new CLIError('LM Studio is not running or no models loaded', 1, modelCheck.error, [
+              'Start LM Studio and load a model',
+              'Verify the endpoint URL',
+              `Check that the server is running on ${config.baseUrl}`,
+            ]);
+          } else {
+            throw new CLIError('Model mismatch', 1, modelCheck.error, [
+              `Profile expects: ${modelCheck.expectedModel}`,
+              `Loaded models: ${modelCheck.loadedModels.join(', ')}`,
+              `Either load the correct model or use: --profile <profile-with-loaded-model>`,
+            ]);
+          }
         }
 
-        const modelInfo = await player.getModelInfo();
         logger.info(
-          `✓ Connected to LM Studio (model: ${modelInfo?.id || config.model})`
+          `✓ Connected to LM Studio (model: ${modelCheck.expectedModel})`
         );
         logger.info(
           `Memory: ${config.memoryEnabled ? '✓ ENABLED' : '✗ DISABLED (baseline)'}`
@@ -787,7 +806,7 @@ export function registerLLMCommand(program: Command): void {
             if (useLearning) {
               const { ExperienceStore } = await import('../../llm/ExperienceStore.js');
               const experienceStore = new ExperienceStore(memory, config, profileName);
-              const fewShots = await experienceStore.getFewShots(profileName);
+              const fewShots = await experienceStore.getFewShots(profileName, learningUnitId);
 
               if (fewShots.length > 0) {
                 logger.info(`\n📚 Memory Learning: ACTIVE`);
@@ -796,6 +815,7 @@ export function registerLLMCommand(program: Command): void {
                   .map((fs: any) => fs.strategy || 'Unnamed')
                   .slice(0, 5);
                 logger.info(`   Injecting: ${strategyNames.join(', ')}`);
+                logger.info(`   Learning unit: ${learningUnitId}`);
                 logger.info(`   Profile: ${profileName}\n`);
               } else {
                 logger.info(`📚 Memory: ON (no learned strategies yet - run 'llm dream run' after playing)\n`);
@@ -1146,6 +1166,7 @@ export function registerLLMCommand(program: Command): void {
     .option('--outcome <type>', 'Filter by outcome (correct|invalid|valid_but_wrong)')
     .option('--importance <n>', 'Filter by minimum importance (0.0-1.0)')
     .option('--with-learning', 'Only show experiences that used learning features')
+    .option('--unconsolidated', 'Only show experiences not yet consolidated (pending dreaming)')
     .option('--limit <n>', 'Maximum entries to show (0 = all)', '50')
     .option('--verbose', 'Show reasoning snippet (first 100 chars)')
     .option('--format <format>', 'Output format (text|json)', 'text')
@@ -1189,6 +1210,12 @@ export function registerLLMCommand(program: Command): void {
               exp.learningContext.patternsAvailable > 0 ||
               exp.learningContext.consolidatedExperiences > 0
             )
+          );
+        }
+
+        if (options.unconsolidated) {
+          allExperiences = allExperiences.filter(exp =>
+            (exp as any).consolidated === false || (exp as any).consolidated === undefined
           );
         }
 
@@ -1239,7 +1266,7 @@ export function registerLLMCommand(program: Command): void {
 
         logger.info(`Showing ${experiencesToShow.length} of ${allExperiences.length} experiences`);
 
-        if (options.withLearning || options.profile || options.outcome || options.importance) {
+        if (options.withLearning || options.unconsolidated || options.profile || options.outcome || options.importance) {
           logger.info('(Filters applied)');
         }
 
@@ -1411,42 +1438,40 @@ export function registerLLMCommand(program: Command): void {
   // llm memory clear
   memory
     .command('clear')
-    .description('Clear agent memory')
-    .option('--session <id>', 'Clear specific session only (deletes all experiences for that session)')
+    .description('Clear agent memory (use "llm session delete" for session-based deletion)')
+    .option('--unconsolidated', 'Only delete unconsolidated experiences (pending dreaming)')
+    .option('--profile <name>', 'Filter by profile (requires --unconsolidated)')
     .option('--confirm', 'Skip confirmation prompt (for scripts)')
     .action(async (options) => {
       try {
         const config = createDefaultMemoryConfig();
         const agentMemory = new AgentMemory(config);
 
-        // Handle session-specific deletion
-        if (options.session) {
-          // Query all experiences for this session FIRST (to show count)
-          const allExperiences = await agentMemory.reasoningBank.queryMetadata(
-            'llm_experience',
-            {}
-          ) as LLMExperience[];
+        // Handle unconsolidated-only deletion
+        if (options.unconsolidated) {
+          let allExperiences = await agentMemory.reasoningBank.queryMetadata('llm_experience', {}) as any[];
 
-          // Filter by session ID, supporting both new (GUID) and old (composite key) formats
-          const sessionExperiences = allExperiences.filter(exp => {
-            // New format: direct sessionId match
-            if (exp.sessionId === options.session) {
-              return true;
-            }
-            // Old format: composite key (puzzleId-profileName)
-            const compositeKey = `${exp.puzzleId}-${exp.profileName || 'default'}`;
-            return compositeKey === options.session;
-          });
+          // Filter to unconsolidated only
+          let toDelete = allExperiences.filter(exp =>
+            exp.consolidated === false || exp.consolidated === undefined
+          );
 
-          if (sessionExperiences.length === 0) {
-            logger.warn(`No experiences found for session: ${options.session}`);
+          // Filter by profile if specified
+          if (options.profile) {
+            toDelete = toDelete.filter(exp => exp.profileName === options.profile);
+          }
+
+          if (toDelete.length === 0) {
+            logger.info('No unconsolidated experiences found.');
             return;
           }
 
-          // Interactive confirmation if --confirm not provided
           if (!options.confirm) {
-            logger.warn(`⚠️  This will delete all memories for session: ${options.session}`);
-            logger.warn(`   ${sessionExperiences.length} experience(s) will be permanently deleted`);
+            logger.warn(`⚠️  This will delete ${toDelete.length} unconsolidated experience(s)`);
+            if (options.profile) {
+              logger.warn(`   Profile filter: ${options.profile}`);
+            }
+            logger.warn('   Consolidated experiences and few-shots will be preserved.');
             logger.warn('   This action cannot be undone!\n');
 
             const rl = readline.createInterface({
@@ -1463,15 +1488,14 @@ export function registerLLMCommand(program: Command): void {
             }
           }
 
-          logger.info(`🗑️  Deleting session: ${options.session}...`);
+          logger.info(`🗑️  Deleting ${toDelete.length} unconsolidated experiences...`);
 
-          // Delete each experience from metadata table
-          for (const exp of sessionExperiences) {
+          for (const exp of toDelete) {
             await agentMemory.reasoningBank.deleteMetadata(exp.id, 'llm_experience');
           }
 
-          logger.info(`✓ Deleted ${sessionExperiences.length} experiences for session: ${options.session}`);
-          logger.info(`💡 Few-shot examples and other sessions remain intact`);
+          logger.info(`✓ Deleted ${toDelete.length} unconsolidated experiences`);
+          logger.info('   Consolidated experiences and few-shots preserved');
           return;
         }
 
@@ -1633,8 +1657,9 @@ export function registerLLMCommand(program: Command): void {
           logger.info(`\n📊 Profile: ${profileName}`);
           logger.info('─'.repeat(50));
 
-          // Get profile config
+          // Get profile config and record usage
           const config = getLLMConfig(profileName);
+          manager.recordUsage(profileName);
 
           // Import required classes
           const { ExperienceStore } = await import('../../llm/ExperienceStore.js');
@@ -2494,6 +2519,8 @@ export function registerLLMCommand(program: Command): void {
     .command('list')
     .description('List play sessions with aggregate statistics')
     .option('--profile <name>', 'Filter by LLM profile name')
+    .option('--unit <name>', 'Filter by learning unit')
+    .option('--puzzle <name>', 'Filter by puzzle name')
     .option('--solved', 'Only show solved sessions')
     .option('--limit <n>', 'Maximum sessions to show', '20')
     .option('--format <format>', 'Output format (text|json)', 'text')
@@ -2515,6 +2542,7 @@ export function registerLLMCommand(program: Command): void {
           sessionId: string;
           puzzleId: string;
           profileName: string;
+          learningUnitId: string;
           experiences: LLMExperience[];
           firstTimestamp: Date;
         }>();
@@ -2523,10 +2551,13 @@ export function registerLLMCommand(program: Command): void {
           // Use sessionId if available, otherwise fall back to composite key for old experiences
           const key = exp.sessionId || `${exp.puzzleId}-${exp.profileName || 'default'}`;
           if (!sessionMap.has(key)) {
+            // Try to get learning unit from stored session metadata
+            const storedMeta = sessionMetadataMap.get(key);
             sessionMap.set(key, {
               sessionId: key,
               puzzleId: exp.puzzleId,
               profileName: exp.profileName || 'default',
+              learningUnitId: storedMeta?.learningUnitId || 'default',
               experiences: [],
               firstTimestamp: exp.timestamp,
             });
@@ -2578,6 +2609,7 @@ export function registerLLMCommand(program: Command): void {
             sessionId: sessionData.sessionId,
             puzzleId: sessionData.puzzleId,
             profileName: sessionData.profileName,
+            learningUnitId: sessionData.learningUnitId,
             solved,
             abandoned,
             abandonReason,
@@ -2588,6 +2620,7 @@ export function registerLLMCommand(program: Command): void {
             validButWrong,
             accuracy,
             learningContext,
+            notes: storedMeta?.notes || null,
             timestamp: sessionData.firstTimestamp,
           };
         });
@@ -2595,6 +2628,14 @@ export function registerLLMCommand(program: Command): void {
         // Apply filters
         if (options.profile) {
           sessions = sessions.filter(s => s.profileName === options.profile);
+        }
+
+        if (options.unit) {
+          sessions = sessions.filter(s => s.learningUnitId === options.unit);
+        }
+
+        if (options.puzzle) {
+          sessions = sessions.filter(s => s.puzzleId.includes(options.puzzle));
         }
 
         if (options.solved) {
@@ -2620,13 +2661,19 @@ export function registerLLMCommand(program: Command): void {
           return;
         }
 
-        // Header
-        logger.info('ID                                    Profile           Puzzle            Done%  Moves   Acc%   Exit        Learning    Date');
-        logger.info('─'.repeat(140));
+        // Header - Unit column is variable width (not truncated)
+        const maxUnitLen = Math.max(
+          4, // minimum "Unit" header width
+          ...sessionsToShow.map(s => (s.learningUnitId || 'default').length)
+        );
+        const unitHeader = 'Unit'.padEnd(maxUnitLen);
+        logger.info(`ID                                    Profile           ${unitHeader}  Puzzle            Done%  Moves   Acc%   Exit        Learning    Date`);
+        logger.info('─'.repeat(140 + maxUnitLen));
 
         sessionsToShow.forEach(s => {
           const sessionIdShort = s.sessionId.substring(0, 36).padEnd(36);
           const profile = s.profileName.substring(0, 16).padEnd(16);
+          const unit = (s.learningUnitId || 'default').padEnd(maxUnitLen);
           const puzzle = s.puzzleId.substring(0, 16).padEnd(16);
           const donePct = `${s.completionPct.toFixed(0)}%`.padStart(5);
           const moves = s.totalMoves.toString().padStart(5);
@@ -2652,6 +2699,7 @@ export function registerLLMCommand(program: Command): void {
           const flags = [];
           if (s.learningContext?.fewShotsUsed) flags.push(`F${s.learningContext.fewShotCount}`);
           if (s.learningContext?.consolidatedExperiences > 0) flags.push('C');
+          if (s.notes) flags.push('N');
 
           const learningStr = flags.length > 0
             ? `[${flags.join('][')}]`.padEnd(10)
@@ -2664,13 +2712,16 @@ export function registerLLMCommand(program: Command): void {
             minute: '2-digit'
           });
 
-          logger.info(`${sessionIdShort}  ${profile}  ${puzzle}  ${donePct}  ${moves}  ${acc}   ${exitStr}  ${learningStr}  ${date}`);
+          logger.info(`${sessionIdShort}  ${profile}  ${unit}  ${puzzle}  ${donePct}  ${moves}  ${acc}   ${exitStr}  ${learningStr}  ${date}`);
+          if (s.notes) {
+            logger.info(`    📝 ${s.notes}`);
+          }
         });
 
         logger.info('');
         logger.info(`Showing ${sessionsToShow.length} of ${sessions.length} sessions`);
-        logger.info('Legend: [F#]=Few-shots used, [C]=Consolidated, Exit: SOLVED/max_moves/llm_error/stuck/timeout/abandoned');
-        logger.info(`\n💡 Tip: Use 'llm session show <id>' to view detailed breakdown`);
+        logger.info('Legend: [F#]=Few-shots used, [C]=Consolidated, [N]=Has notes, Exit: SOLVED/max_moves/llm_error/stuck/timeout/abandoned');
+        logger.info(`\n💡 Tip: Use 'llm session show <id>' to view detailed breakdown, 'llm session edit <id> --notes "..."' to add notes`);
 
       } catch (error) {
         throw new CLIError('Failed to list sessions', 1, error instanceof Error ? error.message : String(error));
@@ -2754,6 +2805,7 @@ export function registerLLMCommand(program: Command): void {
             accuracy,
             durationMinutes: durationMin,
             learningContext: firstExp.learningContext,
+            notes: storedSession?.notes || null,
             experiences: sessionExperiences,
           };
           console.log(JSON.stringify(sessionData, null, 2));
@@ -2774,6 +2826,9 @@ export function registerLLMCommand(program: Command): void {
           logger.info(`  Exit reason: ${storedSession.abandonReason}`);
         }
         logger.info(`  Duration: ${durationMin} minutes`);
+        if (storedSession?.notes) {
+          logger.info(`  Notes: ${storedSession.notes}`);
+        }
         logger.info('');
 
         // Move statistics
@@ -2826,6 +2881,164 @@ export function registerLLMCommand(program: Command): void {
 
       } catch (error) {
         throw new CLIError('Failed to show session', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm session edit <id>
+  session
+    .command('edit')
+    .description('Edit session metadata (notes, annotations)')
+    .argument('<session-id>', 'Session ID (from session list)')
+    .option('--notes <text>', 'Set session notes')
+    .action(async (sessionId, options) => {
+      try {
+        if (!options.notes) {
+          throw new CLIError('No edits specified. Use --notes to add notes.', 1);
+        }
+
+        const agentMemory = new AgentMemory(createDefaultMemoryConfig());
+        const { ExperienceStore } = await import('../../llm/ExperienceStore.js');
+        const config = getLLMConfig();
+        const store = new ExperienceStore(agentMemory, config, 'default');
+
+        const success = await store.updateSessionNotes(sessionId, options.notes);
+
+        if (!success) {
+          throw new CLIError(`Session not found: ${sessionId}`, 1);
+        }
+
+        logger.info(`✓ Updated notes for session ${sessionId}`);
+        logger.info(`  Notes: "${options.notes}"`);
+
+      } catch (error) {
+        if (error instanceof CLIError) throw error;
+        throw new CLIError('Failed to edit session', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm session delete
+  session
+    .command('delete')
+    .description('Delete sessions and their experiences')
+    .option('--profile <name>', 'Filter by LLM profile name')
+    .option('--unit <name>', 'Filter by learning unit')
+    .option('--puzzle <name>', 'Filter by puzzle name (partial match)')
+    .option('--id <session-id>', 'Delete specific session by ID')
+    .option('--yes', 'Skip confirmation prompt')
+    .action(async (options) => {
+      try {
+        const agentMemory = new AgentMemory(createDefaultMemoryConfig());
+
+        // Query all experiences
+        const allExperiences = await agentMemory.reasoningBank.queryMetadata('llm_experience', {}) as LLMExperience[];
+
+        // Query stored session metadata
+        const storedSessions = await agentMemory.reasoningBank.queryMetadata('llm_session', {}) as any[];
+        const sessionMetadataMap = new Map<string, any>();
+        storedSessions.forEach(s => sessionMetadataMap.set(s.id, s));
+
+        // Group experiences by session
+        const sessionMap = new Map<string, {
+          sessionId: string;
+          puzzleId: string;
+          profileName: string;
+          learningUnitId: string;
+          experiences: LLMExperience[];
+        }>();
+
+        allExperiences.forEach(exp => {
+          const key = exp.sessionId || `${exp.puzzleId}-${exp.profileName || 'default'}`;
+          if (!sessionMap.has(key)) {
+            const storedMeta = sessionMetadataMap.get(key);
+            sessionMap.set(key, {
+              sessionId: key,
+              puzzleId: exp.puzzleId,
+              profileName: exp.profileName || 'default',
+              learningUnitId: storedMeta?.learningUnitId || 'default',
+              experiences: [],
+            });
+          }
+          sessionMap.get(key)!.experiences.push(exp);
+        });
+
+        let sessionsToDelete = Array.from(sessionMap.values());
+
+        // Apply filters
+        if (options.id) {
+          sessionsToDelete = sessionsToDelete.filter(s => s.sessionId === options.id);
+        }
+        if (options.profile) {
+          sessionsToDelete = sessionsToDelete.filter(s => s.profileName === options.profile);
+        }
+        if (options.unit) {
+          sessionsToDelete = sessionsToDelete.filter(s => s.learningUnitId === options.unit);
+        }
+        if (options.puzzle) {
+          sessionsToDelete = sessionsToDelete.filter(s => s.puzzleId.includes(options.puzzle));
+        }
+
+        if (sessionsToDelete.length === 0) {
+          logger.info('No sessions found matching criteria.');
+          return;
+        }
+
+        const totalExperiences = sessionsToDelete.reduce((sum, s) => sum + s.experiences.length, 0);
+
+        // Confirmation
+        if (!options.yes) {
+          logger.warn(`⚠️  This will delete ${sessionsToDelete.length} session(s) and ${totalExperiences} experience(s)`);
+          logger.warn('   This action cannot be undone!\n');
+
+          // Show what will be deleted
+          logger.info('Sessions to delete:');
+          sessionsToDelete.slice(0, 10).forEach(s => {
+            logger.info(`  ${s.sessionId.substring(0, 36)} - ${s.profileName} - ${s.puzzleId} (${s.experiences.length} exp)`);
+          });
+          if (sessionsToDelete.length > 10) {
+            logger.info(`  ... and ${sessionsToDelete.length - 10} more`);
+          }
+          logger.info('');
+
+          const rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout
+          });
+
+          const answer = await rl.question('Type "yes" to confirm deletion: ');
+          rl.close();
+
+          if (answer.trim().toLowerCase() !== 'yes') {
+            logger.info('Deletion cancelled.');
+            return;
+          }
+        }
+
+        logger.info(`🗑️  Deleting ${sessionsToDelete.length} sessions...`);
+
+        let deletedExperiences = 0;
+        let deletedSessions = 0;
+
+        for (const session of sessionsToDelete) {
+          // Delete all experiences for this session
+          for (const exp of session.experiences) {
+            await agentMemory.reasoningBank.deleteMetadata(exp.id, 'llm_experience');
+            deletedExperiences++;
+          }
+
+          // Delete session metadata if it exists
+          try {
+            await agentMemory.reasoningBank.deleteMetadata(`llm_session:${session.sessionId}`, 'llm_session');
+          } catch {
+            // Session metadata may not exist
+          }
+          deletedSessions++;
+        }
+
+        logger.info(`✓ Deleted ${deletedSessions} sessions and ${deletedExperiences} experiences`);
+
+      } catch (error) {
+        if (error instanceof CLIError) throw error;
+        throw new CLIError('Failed to delete sessions', 1, error instanceof Error ? error.message : String(error));
       }
     });
 

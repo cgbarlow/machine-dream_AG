@@ -1463,6 +1463,7 @@ Synthesize a reusable strategy:
 STRATEGY_NAME: [Short name]
 WHEN_TO_USE: [Conditions]
 REASONING_STEPS: [Numbered steps]
+ABSTRACTION_LEVEL: [0-3, where 0=specific instance, 1=named technique, 2=category, 3=principle]
 EXAMPLE: [One clear example]
 SUCCESS_INSIGHT: [Why this works]`;
 
@@ -1474,6 +1475,23 @@ SUCCESS_INSIGHT: [Why this works]`;
   return parsePatternResponse(response, cluster);
 }
 ```
+
+### LLM-Determined Abstraction Level (Added 2026-01-11)
+
+Each synthesized pattern includes an LLM-determined abstraction level:
+
+**Synthesis Output Fields**:
+- STRATEGY_NAME: Name for the pattern
+- WHEN_TO_USE: Trigger conditions
+- REASONING_STEPS: Step-by-step approach
+- ABSTRACTION_LEVEL: 0-3 (LLM-determined based on pattern specificity)
+- CONFIDENCE: Reliability score
+
+The LLM evaluates the pattern's specificity to assign the appropriate level:
+- Level 0: References specific cell positions or exact configurations
+- Level 1: Describes a repeatable technique (default for most patterns)
+- Level 2: Groups related techniques into a category
+- Level 3: Expresses universal problem-solving principle
 
 #### Few-Shot Quality Requirements
 

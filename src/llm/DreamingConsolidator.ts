@@ -271,6 +271,11 @@ REASONING_STEPS:
 1. [First step of the reasoning process]
 2. [Second step]
 3. [Continue as needed]
+ABSTRACTION_LEVEL: [0-3, where:
+  0 = Specific instance (references exact cell positions or configurations)
+  1 = Named technique (reusable pattern with clear trigger)
+  2 = Strategy category (groups related techniques)
+  3 = General principle (universal problem-solving rule)]
 EXAMPLE: [One clear example showing the strategy in action from the experiences above]
 SUCCESS_INSIGHT: [Why this approach reliably works - the underlying principle]
 CONFIDENCE: [A number 0.0-1.0 indicating how reliable this strategy is]`;
@@ -296,6 +301,11 @@ ACTION: [What to do when you see this situation]
 REASONING_STEPS:
 1. [First step]
 2. [Second step]
+ABSTRACTION_LEVEL: [0-3, where:
+  0 = Specific instance (references exact cell positions)
+  1 = Named technique (reusable pattern)
+  2 = Strategy category (groups techniques)
+  3 = General principle (universal rule)]
 TEMPLATE: [Reasoning template, e.g., "Cell (R,C). Row missing {X}. Intersection={V}."]
 CONFIDENCE: [0.0-1.0]
 
@@ -318,6 +328,12 @@ IMPORTANT: Do NOT give this pattern a name. Focus on situation and action.`;
       const confidenceStr = this.extractField(response, 'CONFIDENCE');
       const confidence = confidenceStr ? parseFloat(confidenceStr) || 0.7 : 0.7;
 
+      // Extract LLM-determined abstraction level (Spec 11 - 2026-01-11)
+      const abstractionLevelStr = this.extractField(response, 'ABSTRACTION_LEVEL');
+      const parsedLevel = abstractionLevelStr ? parseInt(abstractionLevelStr, 10) : 1;
+      const level = (parsedLevel >= 0 && parsedLevel <= 3 ? parsedLevel : 1) as 0 | 1 | 2 | 3;
+      const levelNames = ['Instance', 'Technique', 'Category', 'Principle'];
+
       return {
         strategyName: undefined, // No name for anonymous patterns
         isAnonymous: true,
@@ -328,9 +344,9 @@ IMPORTANT: Do NOT give this pattern a name. Focus on situation and action.`;
         example: '',
         successInsight: action,
         abstractionLevel: {
-          level: 1,
-          name: 'Pattern',
-          description: 'Constraint-based pattern',
+          level,
+          name: levelNames[level],
+          description: `LLM-determined level ${level}`,
         },
         sourceExperienceCount: sourceCount,
         confidence,
@@ -359,6 +375,12 @@ IMPORTANT: Do NOT give this pattern a name. Focus on situation and action.`;
       const confidenceStr = this.extractField(response, 'CONFIDENCE');
       const confidence = confidenceStr ? parseFloat(confidenceStr) || 0.7 : 0.7;
 
+      // Extract LLM-determined abstraction level (Spec 11 - 2026-01-11)
+      const abstractionLevelStr = this.extractField(response, 'ABSTRACTION_LEVEL');
+      const parsedLevel = abstractionLevelStr ? parseInt(abstractionLevelStr, 10) : 1;
+      const level = (parsedLevel >= 0 && parsedLevel <= 3 ? parsedLevel : 1) as 0 | 1 | 2 | 3;
+      const levelNames = ['Instance', 'Technique', 'Category', 'Principle'];
+
       return {
         strategyName,
         clusterName,
@@ -367,9 +389,9 @@ IMPORTANT: Do NOT give this pattern a name. Focus on situation and action.`;
         example,
         successInsight,
         abstractionLevel: {
-          level: 1, // Named technique level by default
-          name: 'Technique',
-          description: 'A named technique extracted from successful moves',
+          level,
+          name: levelNames[level],
+          description: `LLM-determined level ${level}`,
         },
         sourceExperienceCount: sourceCount,
         confidence,
@@ -450,6 +472,27 @@ Be concise. Each item should be a short phrase or sentence.`;
       // Return a basic hierarchy if LLM fails
       return this.createBasicHierarchy(patterns, profileName);
     }
+  }
+
+  /**
+   * Convert FewShotExample array to SynthesizedPattern array for reuse
+   */
+  private fewShotsToPatterns(fewShots: FewShotExample[]): SynthesizedPattern[] {
+    return fewShots.map((fs, i) => ({
+      strategyName: fs.strategy || `Strategy ${i + 1}`,
+      clusterName: 'fewshot',
+      whenToUse: fs.situation || 'General constraint reasoning',
+      reasoningSteps: fs.analysis?.split('\n').filter(s => s.trim()) || [],
+      example: fs.gridContext || '',
+      successInsight: '',
+      abstractionLevel: {
+        level: (fs.abstractionLevel || 1) as 0 | 1 | 2 | 3,
+        name: 'Technique',
+        description: 'Converted from few-shot',
+      },
+      sourceExperienceCount: 1,
+      confidence: 0.8,
+    }));
   }
 
   /**
@@ -985,6 +1028,19 @@ Identify at most 3 anti-patterns.`;
     // 5. Save merged few-shots back to the unit
     await learningUnitManager.saveFewShots(learningUnitId, mergedFewShots);
 
+    // 5.5. Build and save abstraction hierarchy for this learning unit
+    if (mergedFewShots.length >= 2) {
+      console.log(`📈 Building abstraction hierarchy for learning unit...`);
+      try {
+        const patternsForHierarchy = this.fewShotsToPatterns(mergedFewShots);
+        const hierarchy = await this.buildAbstractionHierarchy(patternsForHierarchy, profileName);
+        await learningUnitManager.saveHierarchy(learningUnitId, hierarchy);
+        console.log(`✅ Built ${hierarchy.levels.length}-level abstraction hierarchy`);
+      } catch (error) {
+        console.warn(`⚠️  Failed to build hierarchy:`, error);
+      }
+    }
+
     // 6. Mark experiences as absorbed
     const experienceIds = newExperiences.map((e) => e.id);
     await learningUnitManager.markExperiencesAbsorbed(
@@ -1104,11 +1160,11 @@ MERGED_STRATEGIES:
       } else if (newMatch) {
         const idx = parseInt(newMatch[1]) - 1;
         if (idx >= 0 && idx < newPatterns.length) {
-          // Convert pattern to few-shot
+          // Convert pattern to few-shot, preserving LLM-determined abstraction level
           const pattern = newPatterns[idx];
           result.push({
             strategy: pattern.strategyName,
-            abstractionLevel: 1,
+            abstractionLevel: pattern.abstractionLevel.level,
             situation: pattern.whenToUse,
             analysis: pattern.reasoningSteps.join('. '),
             move: { row: 0, col: 0, value: 0 },

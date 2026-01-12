@@ -60,6 +60,9 @@ interface LLMProfile {
   // Tags & Organization
   tags: string[];                    // User-defined tags
   color?: string;                    // Display color for TUI
+
+  // Custom Prompting
+  systemPrompt?: string;             // Additional system prompt text (appended to base prompt)
 }
 
 type LLMProvider =
@@ -311,6 +314,13 @@ machine-dream llm profile add my-openai --template openai-gpt4 \
 
 # With tags
 machine-dream llm profile add test-profile --tags local,testing,experimental
+
+# With custom system prompt (appended to base prompt)
+machine-dream llm profile add my-profile \
+  --provider lmstudio \
+  --url http://localhost:1234/v1 \
+  --model qwen3-30b \
+  --system-prompt "Always explain your reasoning step by step."
 ```
 
 #### `profile show`

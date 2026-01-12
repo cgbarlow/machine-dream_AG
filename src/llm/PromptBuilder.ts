@@ -41,18 +41,35 @@ export class PromptBuilder {
    * Build complete prompt for LLM
    *
    * @param gridState - Current 9x9 grid (0 = empty, 1-9 = filled)
-   * @param experiences - Past experiences on this puzzle
+   * @param experiencesToShow - Past experiences to display in move history (may be truncated)
    * @param fewShots - Few-shot examples from memory (if enabled)
+   * @param allExperiences - FULL session history for forbidden list (Spec 11 - 2026-01-11 fix)
+   *                         CRITICAL: Forbidden list must use full history to prevent old forbidden
+   *                         moves from being "forgotten" when move history is truncated
+   * @param profileSystemPrompt - Additional system prompt from profile (Spec 13)
    */
   buildPrompt(
     gridState: number[][],
-    experiences: LLMExperience[] = [],
-    fewShots: FewShotExample[] = []
+    experiencesToShow: LLMExperience[] = [],
+    fewShots: FewShotExample[] = [],
+    allExperiences?: LLMExperience[],
+    profileSystemPrompt?: string
   ): string {
     const size = gridState.length;
+    let prompt = '';
+
+    // Option C (2026-01-11): Add explicit rejection feedback at TOP of prompt
+    // This makes it immediately visible that the last move was rejected
+    const lastExp = (allExperiences || experiencesToShow).slice(-1)[0];
+    if (lastExp && (lastExp.validation.outcome === 'invalid' || lastExp.validation.outcome === 'valid_but_wrong')) {
+      const { row, col, value } = lastExp.move;
+      const reason = lastExp.validation.error || lastExp.validation.outcome.toUpperCase();
+      prompt += `>>> YOUR LAST MOVE (${row},${col})=${value} WAS REJECTED: ${reason}\n`;
+      prompt += `>>> YOU MUST CHOOSE A DIFFERENT CELL OR VALUE\n\n`;
+    }
 
     // Simplified prompt: use only row format (no visual grid)
-    let prompt = 'CURRENT PUZZLE STATE:\n';
+    prompt += 'CURRENT PUZZLE STATE:\n';
     for (let row = 0; row < size; row++) {
       const rowStr = gridState[row]
         .map(cell => cell === 0 ? '_' : cell.toString())
@@ -77,31 +94,42 @@ export class PromptBuilder {
     }
 
     // Add move history for this puzzle
-    if (experiences.length > 0) {
+    if (experiencesToShow.length > 0) {
       prompt += 'YOUR PREVIOUS ATTEMPTS ON THIS PUZZLE:\n';
-      prompt += this.formatMoveHistory(experiences);
+      prompt += this.formatMoveHistory(experiencesToShow);
       prompt += '\n\n';
-
-      // Add forbidden moves (capped at 15 to prevent prompt bloat)
-      const forbiddenMoves = this.extractForbiddenMoves(experiences);
-      if (forbiddenMoves.length > 0) {
-        const cappedMoves = forbiddenMoves.slice(0, 15);
-        prompt += 'FORBIDDEN MOVES (do not repeat):\n';
-        // Group in sets of 8 for readability
-        for (let i = 0; i < cappedMoves.length; i += 8) {
-          const group = cappedMoves.slice(i, i + 8).join(', ');
-          prompt += `${group}\n`;
-        }
-        if (forbiddenMoves.length > 15) {
-          prompt += `(${forbiddenMoves.length - 15} more omitted)\n`;
-        }
-        prompt += '\n';
-      }
     }
 
     // Add empty cell count
     const emptyCells = BoardFormatter.countEmptyCells(gridState);
     prompt += `Empty cells remaining: ${emptyCells}\n\n`;
+
+    // CRITICAL: Build forbidden list from FULL history and place PROMINENTLY before the question
+    // Strengthened positioning and language (Spec 11 - 2026-01-11)
+    const forbiddenSource = allExperiences || experiencesToShow;
+    const forbiddenMoves = this.extractForbiddenMoves(forbiddenSource);
+    if (forbiddenMoves.length > 0) {
+      const cappedMoves = forbiddenMoves.slice(0, 30);
+      // Strong visual separator and warning language
+      prompt += '════════════════════════════════════════\n';
+      prompt += `BANNED MOVES (${cappedMoves.length} total) - WILL BE REJECTED:\n`;
+      // Group in sets of 10 for readability
+      for (let i = 0; i < cappedMoves.length; i += 10) {
+        const group = cappedMoves.slice(i, i + 10).join(', ');
+        prompt += `${group}\n`;
+      }
+      if (forbiddenMoves.length > 30) {
+        prompt += `(+${forbiddenMoves.length - 30} more banned)\n`;
+      }
+      prompt += 'DO NOT attempt any move above. Choose a DIFFERENT cell or value.\n';
+      prompt += '════════════════════════════════════════\n\n';
+    }
+
+    // Add per-profile system prompt if provided (Spec 13)
+    if (profileSystemPrompt) {
+      prompt += profileSystemPrompt + '\n\n';
+    }
+
     prompt += 'What is your next move?';
 
     return prompt;

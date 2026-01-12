@@ -891,6 +891,34 @@ machine-dream llm memory list --profile openai-gpt4 --format json > gpt4.json
 machine-dream llm memory list --profile lm-studio-qwen3 --format json > qwen3.json
 ```
 
+#### 3.8.6.1 `llm memory clear` - Clear All Memory
+
+Clear ALL agent memory data. For selective deletion, use `llm session delete` instead.
+
+```bash
+machine-dream llm memory clear [options]
+
+Options:
+  --confirm                    # Skip confirmation prompt (for scripts)
+```
+
+**Behavior:**
+- Deletes the entire agent database
+- Removes ALL sessions, experiences, few-shots, and learning units
+- Cannot be undone
+- Requires typing "yes" to confirm unless `--confirm` is provided
+
+**Examples:**
+```bash
+# Clear all memory (with confirmation prompt)
+machine-dream llm memory clear
+
+# Clear all memory without prompt (for scripts)
+machine-dream llm memory clear --confirm
+```
+
+**Note:** To delete specific sessions while preserving others, use `llm session delete` with filters.
+
 #### 3.8.7 `llm session list` - List Play Sessions
 
 List play sessions with aggregate statistics, exit status, and learning flags for A/B testing analysis.
@@ -900,6 +928,8 @@ machine-dream llm session list [options]
 
 Options:
   --profile <name>             # Filter by LLM profile name
+  --unit <name>                # Filter by learning unit
+  --puzzle <name>              # Filter by puzzle name (partial match)
   --solved                     # Only show solved sessions
   --limit <n>                  # Maximum sessions to show (default: 20)
   --format <format>            # Output format (text|json), default: text
@@ -908,25 +938,27 @@ Options:
 **Output columns:**
 - Session ID (GUID)
 - Profile name
+- Unit (learning unit)
 - Puzzle ID
 - Done% (completion percentage based on correct moves / empty cells)
 - Moves (total moves attempted)
 - Acc% (accuracy: correct / total)
 - Exit (why session ended: SOLVED, max_moves, llm_error, stuck, timeout, user_interrupt, abandoned, ok)
-- Learning flags: [F#]=Few-shots used (#=count), [C]=Consolidated experiences
+- Learning flags: [F#]=Few-shots used (#=count), [C]=Consolidated experiences, [N]=Has notes
 - Date/time
+- Notes (if present, shown on second line)
 
 **Example output:**
 ```
 📋 Play Sessions
 
-ID                                    Profile           Puzzle            Done%  Moves   Acc%   Exit        Learning    Date
-──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-be1171ea-1b0d-47a9-b28e-3826134424e2  qwen3-coder       4x4-expert         78%      9   77.8%   SOLVED      [F3][C]     Jan 9, 10:45 PM
-bec4f33f-a057-46da-b34a-ba2274f5f591  qwen3-coder       4x4-expert         11%     12    8.3%   llm_error   [F3][C]     Jan 9, 10:30 PM
-11c18f5d-60c7-4f65-b1c3-2cada7b718ae  qwen3-coder       4x4-expert        100%     19   47.4%   SOLVED      [ ]         Jan 9, 09:39 PM
+ID                                    Profile           Unit           Puzzle            Done%  Moves   Acc%   Exit        Learning    Date
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+be1171ea-1b0d-47a9-b28e-3826134424e2  qwen3-coder       default        4x4-expert         78%      9   77.8%   SOLVED      [F3][C][N]  Jan 9, 10:45 PM
+    📝 A/B testing baseline run
+bec4f33f-a057-46da-b34a-ba2274f5f591  qwen3-coder       default        4x4-expert         11%     12    8.3%   llm_error   [F3][C]     Jan 9, 10:30 PM
 
-Legend: [F#]=Few-shots used, [C]=Consolidated, Exit: SOLVED/max_moves/llm_error/stuck/timeout/abandoned
+Legend: [F#]=Few-shots used, [C]=Consolidated, [N]=Has notes, Exit: SOLVED/max_moves/llm_error/stuck/timeout/abandoned
 ```
 
 **Examples:**
@@ -938,7 +970,13 @@ machine-dream llm session list
 machine-dream llm session list --solved
 
 # Filter by profile
-machine-dream llm session list --profile lm-studio-qwen3
+machine-dream llm session list --profile qwen3-coder
+
+# Filter by profile and puzzle
+machine-dream llm session list --profile qwen3-coder --puzzle 9x9-easy
+
+# Filter by learning unit
+machine-dream llm session list --unit my-learning-unit
 
 # Export as JSON
 machine-dream llm session list --format json > sessions.json
@@ -1010,6 +1048,67 @@ machine-dream llm session show be1171ea-1b0d-47a9-b28e-3826134424e2 --format jso
 
 🔍 Use 'llm memory list --session sess-abc1' to see all moves
 ```
+
+#### 3.8.9 `llm session edit` - Edit Session Metadata
+
+Edit session metadata such as notes and annotations.
+
+```bash
+machine-dream llm session edit <session-id> [options]
+
+Arguments:
+  <session-id>                 # Session ID (from `llm session list`)
+
+Options:
+  --notes <text>               # Set session notes
+```
+
+**Examples:**
+```bash
+# Add notes to a session
+machine-dream llm session edit be1171ea-1b0d-47a9-b28e-3826134424e2 --notes "A/B testing baseline run"
+
+# Update notes
+machine-dream llm session edit be1171ea-1b0d-47a9-b28e-3826134424e2 --notes "Updated notes"
+```
+
+#### 3.8.10 `llm session delete` - Delete Sessions
+
+Delete sessions and their associated experiences (memories). Supports filtering to delete multiple sessions at once.
+
+```bash
+machine-dream llm session delete [options]
+
+Options:
+  --id <session-id>            # Delete specific session by ID
+  --profile <name>             # Filter by LLM profile name
+  --unit <name>                # Filter by learning unit
+  --puzzle <name>              # Filter by puzzle name (partial match)
+  --yes                        # Skip confirmation prompt
+```
+
+**Behavior:**
+- Deletes all experiences (`llm_experience`) for matching sessions
+- Deletes session metadata (`llm_session`) if it exists
+- Requires confirmation unless `--yes` is provided
+- Shows preview of sessions to be deleted before confirmation
+
+**Examples:**
+```bash
+# Delete a specific session
+machine-dream llm session delete --id be1171ea-1b0d-47a9-b28e-3826134424e2
+
+# Delete all sessions for a profile
+machine-dream llm session delete --profile qwen3-coder --yes
+
+# Delete sessions matching profile and puzzle
+machine-dream llm session delete --profile qwen3-coder --puzzle 9x9-easy
+
+# Delete all sessions for a learning unit
+machine-dream llm session delete --unit my-test-unit --yes
+```
+
+**Note:** For clearing ALL memory data, use `llm memory clear` instead.
 
 ---
 

@@ -58,6 +58,7 @@ export class LLMProfileManager {
       retries: options.retries ?? 3,
       tags: options.tags ?? [],
       color: options.color,
+      systemPrompt: options.systemPrompt,
     };
 
     // Validate

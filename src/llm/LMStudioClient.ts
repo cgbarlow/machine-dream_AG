@@ -201,4 +201,52 @@ export class LMStudioClient {
       return null;
     }
   }
+
+  /**
+   * Verify that the expected model is loaded in LM Studio
+   * @returns Object with available status and list of loaded models
+   */
+  async verifyModel(): Promise<{
+    available: boolean;
+    expectedModel: string;
+    loadedModels: string[];
+    error?: string;
+  }> {
+    const expectedModel = this.config.model;
+
+    try {
+      const response = await fetch(`${this.config.baseUrl}/models`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (!response.ok) {
+        return {
+          available: false,
+          expectedModel,
+          loadedModels: [],
+          error: `Cannot connect to LM Studio at ${this.config.baseUrl}`,
+        };
+      }
+
+      const data = await response.json() as { data?: Array<{ id: string; object: string }> };
+      const loadedModels = data.data?.map(m => m.id) || [];
+
+      const available = loadedModels.includes(expectedModel);
+
+      return {
+        available,
+        expectedModel,
+        loadedModels,
+        error: available ? undefined : `Model "${expectedModel}" not loaded. Available: ${loadedModels.join(', ') || 'none'}`,
+      };
+    } catch (err) {
+      return {
+        available: false,
+        expectedModel,
+        loadedModels: [],
+        error: `Cannot connect to LM Studio: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+  }
 }

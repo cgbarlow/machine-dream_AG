@@ -673,6 +673,27 @@ Few-shots should represent different abstraction levels, built by the LLM:
 | 2 | Category | "Row/Column/Box completion strategies" | Group related techniques |
 | 3 | Principle | "Constraint satisfaction: find cells with minimum options" | General principle |
 
+### LLM-Determined Abstraction Levels (Added 2026-01-11)
+
+During pattern synthesis, the LLM determines the appropriate abstraction level for each pattern instead of hardcoding all patterns to Level 1.
+
+**Synthesis Prompt Addition**:
+```
+ABSTRACTION_LEVEL: [0-3, where:
+  0 = Specific instance (concrete example with exact cell/values)
+  1 = Named technique (reusable pattern with clear trigger)
+  2 = Strategy category (groups related techniques)
+  3 = General principle (universal problem-solving rule)]
+```
+
+**Level Determination Guidelines**:
+- Level 0: Pattern references specific cell positions or exact configurations
+- Level 1: Pattern describes a repeatable technique (e.g., "Last Digit in Row")
+- Level 2: Pattern groups techniques (e.g., "Elimination strategies")
+- Level 3: Pattern expresses universal principle (e.g., "Constraint propagation")
+
+**Diversity Requirement**: Few-shots SHOULD include patterns at multiple levels, not all Level 1. The LLM evaluates each pattern's specificity to assign the appropriate level during synthesis.
+
 ### Few-Shot Quality Requirements
 
 - Each few-shot must be **LLM-synthesized**, not raw move data
@@ -1275,6 +1296,28 @@ npm run llm:benchmark
    - Displays "FORBIDDEN MOVES (do not attempt again)" in prompt
    - Prevents LLM from repeatedly attempting same wrong moves
    - Added "CRITICAL CONSTRAINT" in system prompt explicitly forbidding these moves
+
+### Forbidden Move Tracking Fix (Added 2026-01-11)
+
+**Critical Implementation Requirement**: The forbidden move list MUST be built from the FULL session history, not truncated history. This ensures old forbidden moves remain forbidden even when move history display is limited to the last N moves.
+
+**Problem**: When move history is truncated (e.g., last 20 moves), building the forbidden list from truncated history causes old forbidden moves to be "forgotten", allowing the LLM to re-propose them.
+
+**Solution**:
+```typescript
+// CORRECT: Full history for forbidden list, truncated for display
+const forbiddenMoves = extractForbiddenMoves(session.experiences);  // ALL experiences
+const historyToShow = session.experiences.slice(-maxHistoryMoves);  // Truncated for display
+
+// WRONG: Truncated history loses old forbidden moves
+const historyToShow = session.experiences.slice(-maxHistoryMoves);
+const forbiddenMoves = extractForbiddenMoves(historyToShow);  // BUG: loses old forbidden
+```
+
+**Prompt Display**:
+- Show up to 30 forbidden moves (increased from 15)
+- Group in sets of 10 for readability
+- Include count of omitted moves if exceeding cap
 
 5. **Token Limit Increase** ✅
    - Raised from 768 to 2048 tokens

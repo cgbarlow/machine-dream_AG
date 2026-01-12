@@ -12,6 +12,7 @@
 #   --stream                Show live gameplay during runs
 #   --reasoning-template    Use structured constraint-intersection format (improves accuracy)
 #   --anonymous-patterns    Use anonymous pattern format for learned strategies
+#   --debug                 Show full prompts sent to LLM
 #   -h, --help              Show this help
 #
 # Examples:
@@ -31,6 +32,7 @@ LEARNING_UNIT=""
 STREAM=false
 REASONING_TEMPLATE=false
 ANONYMOUS_PATTERNS=false
+DEBUG=false
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -67,6 +69,10 @@ while [[ $# -gt 0 ]]; do
       ANONYMOUS_PATTERNS=true
       shift
       ;;
+    --debug)
+      DEBUG=true
+      shift
+      ;;
     -h|--help)
       echo "Usage: $0 [options]"
       echo "  --profile <name>        LLM profile to use (default: qwen3-coder)"
@@ -77,6 +83,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --stream                Show live gameplay during runs"
       echo "  --reasoning-template    Use structured constraint-intersection format"
       echo "  --anonymous-patterns    Use anonymous pattern format for learned strategies"
+      echo "  --debug                 Show full prompts sent to LLM"
       echo "  -h, --help              Show this help"
       exit 0
       ;;
@@ -107,6 +114,7 @@ echo "Total plays: $TOTAL_PLAYS"
 echo "Learning unit: $LEARNING_UNIT"
 echo "Stream mode: $STREAM"
 echo "Reasoning template: $REASONING_TEMPLATE"
+echo "Debug mode: $DEBUG"
 echo "Results: $RESULTS_DIR"
 echo "=============================================="
 echo ""
@@ -121,6 +129,9 @@ if [ "$REASONING_TEMPLATE" = true ]; then
 fi
 if [ "$ANONYMOUS_PATTERNS" = true ]; then
   EXTRA_OPTS="$EXTRA_OPTS --anonymous-patterns"
+fi
+if [ "$DEBUG" = true ]; then
+  EXTRA_OPTS="$EXTRA_OPTS --debug"
 fi
 
 # Function to extract metrics from output

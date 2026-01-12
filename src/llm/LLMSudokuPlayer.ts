@@ -135,10 +135,16 @@ export class LLMSudokuPlayer extends EventEmitter {
         ? session.experiences.slice(-this.config.maxHistoryMoves)
         : session.experiences;
 
+      // CRITICAL FIX (Spec 11 - 2026-01-11): Pass full session.experiences for forbidden list
+      // The forbidden list must use ALL experiences to prevent old forbidden moves from being
+      // "forgotten" when move history is truncated. Otherwise, LLM can re-propose moves that
+      // were proven wrong 20+ moves ago.
       const prompt = this.promptBuilder.buildPrompt(
         gridState,
         experiencesToShow,
-        fewShots
+        fewShots,
+        session.experiences,  // Full history for forbidden list
+        this.config.profileSystemPrompt  // Per-profile system prompt (Spec 13)
       );
 
       // 2. Call LLM (use dynamic system prompt based on grid size)
@@ -183,7 +189,7 @@ export class LLMSudokuPlayer extends EventEmitter {
           rawResponse
         });
 
-        // Record parse failure as an experience
+        // Record parse failure as an experience (include prompt for debugging)
         const failureExperience = this.recordParseFailure(
           session.id,
           puzzleId,
@@ -192,7 +198,8 @@ export class LLMSudokuPlayer extends EventEmitter {
           rawResponse,
           parsed.parseError || 'Unknown parse error',
           recentErrorCount,
-          learningContext
+          learningContext,
+          prompt
         );
 
         session.experiences.push(failureExperience);
@@ -256,7 +263,7 @@ export class LLMSudokuPlayer extends EventEmitter {
         );
       }
 
-      // 5. Record experience
+      // 5. Record experience (include prompt for debugging/analysis)
       const experience = this.createExperience(
         session.id,
         puzzleId,
@@ -265,7 +272,8 @@ export class LLMSudokuPlayer extends EventEmitter {
         parsed.move,
         validation,
         recentErrorCount,
-        learningContext
+        learningContext,
+        prompt
       );
 
       session.experiences.push(experience);
@@ -350,6 +358,7 @@ export class LLMSudokuPlayer extends EventEmitter {
       experiences: [],
       memoryWasEnabled: this.config.memoryEnabled,
       profileName: this.profileName,
+      learningUnitId: this.learningUnitId,
       learningContext,
     };
   }
@@ -365,7 +374,8 @@ export class LLMSudokuPlayer extends EventEmitter {
     move: LLMMove,
     validation: MoveValidation,
     recentErrorCount: number,
-    learningContext: LearningContext
+    learningContext: LearningContext,
+    prompt?: string
   ): LLMExperience {
     // Calculate importance and context (Spec 11, Spec 03)
     const importance = calculateImportance(move, validation, gridState, recentErrorCount);
@@ -387,6 +397,7 @@ export class LLMSudokuPlayer extends EventEmitter {
       context,
       profileName: this.profileName,
       learningContext,
+      prompt,
     };
   }
 
@@ -418,7 +429,8 @@ export class LLMSudokuPlayer extends EventEmitter {
     rawResponse: string,
     parseError: string,
     recentErrorCount: number,
-    learningContext: LearningContext
+    learningContext: LearningContext,
+    prompt?: string
   ): LLMExperience {
     const move: LLMMove = {
       row: 0,
@@ -454,6 +466,7 @@ export class LLMSudokuPlayer extends EventEmitter {
       context,
       profileName: this.profileName,
       learningContext,
+      prompt,
     };
   }
 
@@ -469,6 +482,13 @@ export class LLMSudokuPlayer extends EventEmitter {
    */
   async getModelInfo() {
     return this.client.getModelInfo();
+  }
+
+  /**
+   * Verify that the expected model is loaded
+   */
+  async verifyModel() {
+    return this.client.verifyModel();
   }
 
   /**

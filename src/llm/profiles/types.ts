@@ -59,6 +59,9 @@ export interface LLMProfile {
   // Tags & Organization
   tags: string[];                   // User-defined tags
   color?: string;                   // Display color for TUI
+
+  // Custom Prompting
+  systemPrompt?: string;            // Additional system prompt text (appended to base prompt)
 }
 
 /**
@@ -105,6 +108,7 @@ export interface CreateProfileOptions {
   retries?: number;
   tags?: string[];
   color?: string;
+  systemPrompt?: string;            // Additional system prompt text
   setDefault?: boolean;             // Set as active profile after creation
 }
 
