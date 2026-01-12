@@ -17,15 +17,15 @@ import { LLM_RETRY_CONFIG } from './config.js';
  * Model information from LM Studio API
  */
 export interface ModelInfo {
-  id: string;                          // Model identifier (e.g., "qwen3-30b-instruct")
-  object: string;                      // "model"
-  type?: string;                       // Model type (e.g., "llm")
-  publisher?: string;                  // Model publisher
-  arch?: string;                       // Architecture (e.g., "qwen2")
-  compatibilityType?: string;          // e.g., "gguf"
-  quantization?: string;               // e.g., "Q4_K_M"
-  state: 'loaded' | 'not-loaded';      // Current memory state
-  maxContextLength?: number;           // Maximum context window
+  id: string;                                      // Model identifier (e.g., "qwen3-30b-instruct")
+  object: string;                                  // "model"
+  type?: string;                                   // Model type (e.g., "llm")
+  publisher?: string;                              // Model publisher
+  arch?: string;                                   // Architecture (e.g., "qwen2")
+  compatibilityType?: string;                      // e.g., "gguf"
+  quantization?: string;                           // e.g., "Q4_K_M"
+  state: 'loaded' | 'loading' | 'not-loaded';      // Current memory state
+  maxContextLength?: number;                       // Maximum context window
 }
 
 /**

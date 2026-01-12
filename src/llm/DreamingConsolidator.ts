@@ -243,12 +243,24 @@ export class DreamingConsolidator {
   /**
    * Cluster experiences by reasoning approach
    * Uses keyword extraction to group similar reasoning patterns
+   *
+   * @param experiences - Experiences to cluster
+   * @param targetClusterCount - Optional target number of clusters (defaults to fewShotMax)
+   *                            When higher, uses finer-grained clustering
    */
-  private clusterByReasoning(experiences: LLMExperience[]): Map<string, LLMExperience[]> {
+  private clusterByReasoning(
+    experiences: LLMExperience[],
+    targetClusterCount?: number
+  ): Map<string, LLMExperience[]> {
+    const target = targetClusterCount ?? this.consolidationOptions.fewShotMax;
     const clusters = new Map<string, LLMExperience[]>();
 
+    // Determine signature granularity based on target cluster count
+    // More keywords = finer-grained clustering = more clusters
+    const keywordDepth = target >= 6 ? 4 : target >= 4 ? 3 : 2;
+
     for (const exp of experiences) {
-      const signature = this.extractReasoningSignature(exp.move.reasoning);
+      const signature = this.extractReasoningSignature(exp.move.reasoning, keywordDepth);
 
       if (!clusters.has(signature)) {
         clusters.set(signature, []);
@@ -256,7 +268,99 @@ export class DreamingConsolidator {
       clusters.get(signature)!.push(exp);
     }
 
+    // If we still don't have enough clusters, subdivide large ones
+    if (clusters.size < target && clusters.size > 0) {
+      return this.subdivideClustersByContent(clusters, target);
+    }
+
     return clusters;
+  }
+
+  /**
+   * Subdivide large clusters to meet target cluster count
+   * Uses content-based heuristics to split clusters
+   */
+  private subdivideClustersByContent(
+    clusters: Map<string, LLMExperience[]>,
+    targetCount: number
+  ): Map<string, LLMExperience[]> {
+    const result = new Map<string, LLMExperience[]>();
+
+    // Sort clusters by size (largest first) to prioritize splitting
+    const sortedClusters = Array.from(clusters.entries())
+      .sort((a, b) => b[1].length - a[1].length);
+
+    let currentCount = 0;
+
+    for (const [name, experiences] of sortedClusters) {
+      // How many more clusters do we need?
+      const needed = targetCount - currentCount;
+
+      if (needed <= 1 || experiences.length < 6) {
+        // Don't split if we've met target or cluster is too small
+        result.set(name, experiences);
+        currentCount++;
+      } else {
+        // Split this cluster into sub-clusters based on grid context
+        const subClusters = this.splitByGridContext(experiences, name, Math.min(needed, 3));
+        for (const [subName, subExps] of subClusters) {
+          result.set(subName, subExps);
+          currentCount++;
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Split a cluster into sub-clusters based on grid context
+   * (row density, column density, box position)
+   */
+  private splitByGridContext(
+    experiences: LLMExperience[],
+    baseName: string,
+    targetSplits: number
+  ): Map<string, LLMExperience[]> {
+    const result = new Map<string, LLMExperience[]>();
+
+    // Simple heuristic: split by move position (row region)
+    const gridSize = experiences[0]?.gridState?.length || 9;
+    const regionSize = Math.ceil(gridSize / targetSplits);
+
+    for (const exp of experiences) {
+      const rowRegion = Math.floor((exp.move.row - 1) / regionSize);
+      const subName = `${baseName}_region${rowRegion}`;
+
+      if (!result.has(subName)) {
+        result.set(subName, []);
+      }
+      result.get(subName)!.push(exp);
+    }
+
+    // Filter out any sub-clusters that are too small (< 2 experiences)
+    const filtered = new Map<string, LLMExperience[]>();
+    const tooSmall: LLMExperience[] = [];
+
+    for (const [name, exps] of result) {
+      if (exps.length >= 2) {
+        filtered.set(name, exps);
+      } else {
+        tooSmall.push(...exps);
+      }
+    }
+
+    // Add too-small experiences to the largest sub-cluster
+    if (tooSmall.length > 0 && filtered.size > 0) {
+      const largest = Array.from(filtered.entries())
+        .sort((a, b) => b[1].length - a[1].length)[0];
+      largest[1].push(...tooSmall);
+    } else if (tooSmall.length > 0) {
+      // No valid sub-clusters, return original
+      filtered.set(baseName, experiences);
+    }
+
+    return filtered;
   }
 
   /**
@@ -948,8 +1052,12 @@ Identify at most 3 anti-patterns.`;
 
   /**
    * Extract reasoning signature for clustering
+   *
+   * @param reasoning - The reasoning text to analyze
+   * @param keywordDepth - How many keywords to include in signature (default 2)
+   *                       Higher values = finer-grained clustering
    */
-  private extractReasoningSignature(reasoning: string): string {
+  private extractReasoningSignature(reasoning: string, keywordDepth: number = 2): string {
     const keywords = [
       'only candidate',
       'missing from row',
@@ -963,12 +1071,18 @@ Identify at most 3 anti-patterns.`;
       'hidden single',
       'only option',
       'must be',
+      'intersection',
+      'subset',
+      'unique',
+      'forced',
+      'pair',
+      'triple',
     ];
 
     const lower = reasoning.toLowerCase();
     const found = keywords.filter((kw) => lower.includes(kw));
 
-    return found.length > 0 ? found.slice(0, 2).join('_') : 'general_reasoning';
+    return found.length > 0 ? found.slice(0, keywordDepth).join('_') : 'general_reasoning';
   }
 
   /**

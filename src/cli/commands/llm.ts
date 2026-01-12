@@ -228,17 +228,31 @@ async function ensureModelLoaded(requiredModel: string, baseUrl: string, modelPa
     return false;
   }
 
-  // Check if the required model is already loaded
-  const loadedModels = await manager.listModels(true);
-  const isLoaded = loadedModels.some(m =>
+  // Check if the required model is already loaded or loading
+  const allModels = await manager.listModels(false); // Get all models with their state
+  const targetModel = allModels.find(m =>
     m.id === requiredModel ||
     m.id.includes(requiredModel) ||
     requiredModel.includes(m.id)
   );
 
-  if (isLoaded) {
-    logger.info(`✓ Model "${requiredModel}" is already loaded`);
-    return true;
+  if (targetModel) {
+    if (targetModel.state === 'loaded') {
+      logger.info(`✓ Model "${requiredModel}" is already loaded`);
+      return true;
+    } else if (targetModel.state === 'loading') {
+      logger.info(`⏳ Model "${requiredModel}" is loading, waiting for it to finish...`);
+      // Wait for model to finish loading (check every 2 seconds, max 60 seconds)
+      for (let i = 0; i < 30; i++) {
+        await new Promise(r => setTimeout(r, 2000));
+        const checkModel = await manager.getModel(requiredModel);
+        if (checkModel?.state === 'loaded') {
+          logger.info(`✓ Model "${requiredModel}" finished loading`);
+          return true;
+        }
+      }
+      logger.warn(`⚠️  Model "${requiredModel}" took too long to load (>60s), will try to reload...`);
+    }
   }
 
   // Model not loaded - need to load it via lms CLI
@@ -758,7 +772,8 @@ export function registerLLMCommand(program: Command): void {
     .option('--endpoint <url>', 'Override LLM endpoint')
     .option('--timeout <ms>', 'Request timeout in milliseconds', '300000')
     .option('--max-moves <n>', 'Maximum moves before abandoning', '200')
-    .option('--visualize', 'Show live solving visualization')
+    .option('--visualize', 'Show live solving visualization with board')
+    .option('--visualize-basic', 'Show compact move outcomes only (no board)')
     .option('--debug', 'Show detailed debug output including prompts')
     .option('--include-reasoning', 'Include reasoning snippets in move history (default: off)')
     .option('--history-limit <n>', 'Limit move history to last N moves (default: 20, 0=unlimited)', '20')
@@ -1021,7 +1036,15 @@ export function registerLLMCommand(program: Command): void {
         });
 
         player.on('llm:parse_failure', ({ error, rawResponse }: { error: string; rawResponse: string }) => {
-          logger.warn(`\n⚠️  Parse failure (move ${moveCounter + 1}): ${error}`);
+          moveCounter++; // Increment counter since this counts as a move attempt
+
+          if (options.visualizeBasic) {
+            // Show parse failure in same format as moves
+            process.stdout.write(`Move ${moveCounter}: (0,0)=0 - PARSE_FAILURE\n`);
+          } else {
+            logger.warn(`\n⚠️  Parse failure (move ${moveCounter}): ${error}`);
+          }
+
           if (options.debug) {
             logger.info('Raw response:');
             logger.info(rawResponse.substring(0, 500));
@@ -1035,6 +1058,9 @@ export function registerLLMCommand(program: Command): void {
             if (move.reasoning && options.debug) {
               logger.info(`   Reasoning: ${move.reasoning.substring(0, 150)}...`);
             }
+          } else if (options.visualizeBasic) {
+            // Basic mode: just show move number and position inline (outcome added after validation)
+            process.stdout.write(`Move ${moveCounter}: (${move.row},${move.col})=${move.value}`);
           } else {
             // Show progress dots
             process.stdout.write('.');
@@ -1047,6 +1073,8 @@ export function registerLLMCommand(program: Command): void {
             if (consecutiveCount > 1) {
               logger.warn(`   ⚠️  Consecutive forbidden attempts: ${consecutiveCount}/10`);
             }
+          } else if (options.visualizeBasic) {
+            process.stdout.write(` - FORBIDDEN\n`);
           }
         });
 
@@ -1076,6 +1104,11 @@ export function registerLLMCommand(program: Command): void {
 
             // Always display updated stats
             displayStats(cumulativeStats, currentGrid);
+          } else if (options.visualizeBasic) {
+            // Basic mode: append outcome to the move line
+            const outcome = experience.validation.isCorrect ? 'CORRECT' :
+                           experience.validation.isValid ? 'WRONG' : 'INVALID';
+            process.stdout.write(` - ${outcome}\n`);
           }
         });
 

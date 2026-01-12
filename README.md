@@ -26,6 +26,18 @@ Machine Dream is a **research platform** exploring continuous machine cognition 
 
 ---
 
+## 📖 Research Basis
+
+This project is grounded in research exploring **continuous machine cognition** and **the economics of infinite thinking**:
+
+- **[What Happens When the Machine Never Stops Thinking?](https://agentics-nz.ghost.io/what-happens-when-the-machine-never-stops-thinking/)** - Explores the implications of continuous AI cognition and the paradigm shift from token-limited interactions to persistent reasoning systems.
+
+- **[What Happens When the Machine Never Stops Thinking? (Part 2)](https://agentics-nz.ghost.io/what-happens-when-the-machine-never-stops-thinking-part-2/)** - Examines the economic and architectural implications of machines that engage in perpetual cognitive processes, with practical implementations.
+
+Machine Dream implements these concepts through persistent memory (AgentDB), continuous learning loops (GRASP), and sleep-like consolidation (Dreaming Pipeline) to create an AI system that thinks, learns, and improves continuously across sessions.
+
+---
+
 ## 🚀 Quick Start (5 Minutes)
 
 ### Prerequisites
@@ -308,10 +320,20 @@ machine-dream llm learning merge unit1 unit2 --output merged-unit
 ./scripts/iterative-learning.sh --learning-unit deep-v1 --double-strategies
 ```
 
-### AISP Mode
+### AISP Integration
 
-AI Specification Protocol (AISP) for low-ambiguity AI-to-AI communication:
+**[AI Specification Protocol (AISP)](https://github.com/bar181/aisp-open-core)** - A formal specification language that reduces ambiguity in AI-to-AI communication from 40-65% (natural language) to under 2%.
 
+**What is AISP?**
+AISP is a proof-carrying protocol that LLMs understand natively—no training, no fine-tuning, no special interpreters required. It uses mathematical notation and formal structures to eliminate interpretation variance across AI models (Claude, GPT-4, Gemini, etc.).
+
+**Key Benefits**:
+- **97x improvement** in multi-agent pipeline success rates (82% vs 0.84%)
+- **Native comprehension** - Works with modern LLMs without modification
+- **Zero execution overhead** - Specification only needed during compilation
+- **Self-validating** - Each document carries its own well-formedness proof
+
+**Machine Dream Integration**:
 ```bash
 # --aisp: Convert prompts to AISP syntax (model responds normally)
 machine-dream llm play puzzles/9x9-easy.json --aisp
@@ -319,6 +341,55 @@ machine-dream llm play puzzles/9x9-easy.json --aisp
 # --aisp-full: End-to-end AISP (spec in prompt, model outputs AISP)
 machine-dream llm play puzzles/9x9-easy.json --aisp-full
 ```
+
+AISP mode is particularly effective for reducing parsing errors and improving move consistency across different AI models. See [Spec 11](docs/specs/11-llm-sudoku-player.md) for implementation details.
+
+### Recent Improvements (2026-01-13)
+
+**Smart Model Loading** - Scripts now detect models in "loading" state and wait instead of triggering unnecessary unload/reload cycles:
+```bash
+# Automatically waits for loading models (up to 60 seconds)
+machine-dream llm play puzzles/9x9-easy.json --profile qwen3-coder
+```
+
+**Live Move Output** - New `--visualize-basic` flag shows compact move-by-move results:
+```bash
+# See each move as it happens
+machine-dream llm play puzzles/9x9-easy.json --visualize-basic
+# Output: Move 1: (0,2)=5 - CORRECT
+#         Move 2: (0,3)=8 - WRONG
+#         Move 3: (0,0)=0 - PARSE_FAILURE
+```
+
+**Dual Consolidation** - Comprehensive test suite now creates both standard and enhanced learning units:
+```bash
+# Creates two units: standard (3-5 strategies) and -2x (6-10 strategies)
+./scripts/comprehensive-test-suite.sh --runs 3
+# Output: gpt-oss_9x9-easy_standard_20260113
+#         gpt-oss_9x9-easy_standard_20260113-2x
+```
+
+**Profile Exclusion** - Skip specific profiles during batch testing:
+```bash
+# Test all profiles except deepseek-r1
+./scripts/comprehensive-test-suite.sh --exclude deepseek-r1
+```
+
+**Size-Based Ordering** - Profiles automatically tested in order from largest to smallest model:
+```bash
+# Tests 120B model first, then 32B, then smaller
+./scripts/comprehensive-test-suite.sh --runs 3
+```
+
+**Validation Testing** - New `batch-test-learning-unit.sh` script for testing specific learning units without dream cycle:
+```bash
+# Compare standard vs -2x units for same profile
+./scripts/batch-test-learning-unit.sh \
+  --profiles gpt-oss:unit_standard,gpt-oss:unit_standard-2x \
+  --runs 10
+```
+
+See [scripts/SCRIPTS.md](scripts/SCRIPTS.md) for complete documentation of all batch testing scripts and workflows.
 
 ### LM Studio Model Management
 

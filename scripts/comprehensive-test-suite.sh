@@ -9,6 +9,7 @@
 #   --no-save-reasoning   Disable full reasoning storage (enabled by default)
 #   --skip-dream       Skip dreaming consolidation
 #   --profiles <list>  Comma-separated list of profiles (default: all)
+#   --exclude <list>   Comma-separated list of profiles to exclude
 #   -h, --help         Show help
 
 set -e
@@ -20,6 +21,7 @@ NO_DUAL=""
 NO_SAVE_REASONING=""
 SKIP_DREAM=false
 PROFILE_FILTER=""
+PROFILE_EXCLUDE=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -30,6 +32,7 @@ while [[ $# -gt 0 ]]; do
     --no-save-reasoning) NO_SAVE_REASONING="--no-save-reasoning"; shift ;;
     --skip-dream) SKIP_DREAM=true; shift ;;
     --profiles) PROFILE_FILTER="$2"; shift 2 ;;
+    --exclude) PROFILE_EXCLUDE="$2"; shift 2 ;;
     -h|--help)
       echo "Usage: $0 [options]"
       echo ""
@@ -40,6 +43,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --no-save-reasoning   Disable full reasoning storage (enabled by default)"
       echo "  --skip-dream       Skip dreaming consolidation"
       echo "  --profiles <list>  Comma-separated list of profiles (default: all)"
+      echo "  --exclude <list>   Comma-separated list of profiles to exclude"
       echo "  -h, --help         Show help"
       exit 0
       ;;
@@ -61,19 +65,50 @@ echo "Results dir: $RESULTS_DIR"
 echo "=============================================="
 echo ""
 
-# Get all profiles (or filtered list)
-if [[ -n "$PROFILE_FILTER" ]]; then
-  PROFILES=$(echo "$PROFILE_FILTER" | tr ',' ' ')
-else
-  PROFILES=$(npx machine-dream llm profile list --format json 2>/dev/null | jq -r '.[].name' | tr '\n' ' ')
-fi
+# Get all profiles (or filtered list) and sort by size tag (largest to smallest)
+PROFILE_JSON=$(npx machine-dream llm profile list --format json 2>/dev/null)
 
-if [[ -z "$PROFILES" ]]; then
+if [[ -z "$PROFILE_JSON" || "$PROFILE_JSON" == "[]" ]]; then
   echo "ERROR: No profiles found. Create profiles first with: machine-dream llm profile add"
   exit 1
 fi
 
-echo "Profiles to test: $PROFILES"
+# Build list of profiles with sizes
+PROFILE_LIST=""
+if [[ -n "$PROFILE_FILTER" ]]; then
+  # Use filtered list
+  for p in $(echo "$PROFILE_FILTER" | tr ',' ' '); do
+    # Get size from tags (extract number from tags like "120b", "32b", etc.)
+    SIZE=$(echo "$PROFILE_JSON" | jq -r --arg name "$p" '.[] | select(.name == $name) | .tags[]?' 2>/dev/null | grep -oE '[0-9]+' | head -1)
+    SIZE=${SIZE:-0}
+    PROFILE_LIST="$PROFILE_LIST$SIZE:$p "
+  done
+else
+  # Get all profiles with their size tags
+  PROFILE_LIST=$(echo "$PROFILE_JSON" | jq -r '.[] | .name as $name | (.tags // []) as $tags | ($tags | map(select(test("[0-9]+")) | gsub("[^0-9]"; "") | tonumber) | if length > 0 then .[0] else 0 end) as $size | "\($size):\($name)"' 2>/dev/null)
+  # Convert to space-separated
+  PROFILE_LIST=$(echo "$PROFILE_LIST" | tr '\n' ' ')
+fi
+
+# Apply exclusions
+if [[ -n "$PROFILE_EXCLUDE" ]]; then
+  EXCLUDED=""
+  for exclude in $(echo "$PROFILE_EXCLUDE" | tr ',' ' '); do
+    PROFILE_LIST=$(echo "$PROFILE_LIST" | tr ' ' '\n' | grep -v ":$exclude$" | tr '\n' ' ')
+    EXCLUDED="$EXCLUDED $exclude"
+  done
+  echo "Excluding profiles:$EXCLUDED"
+fi
+
+# Sort by size descending and extract names
+PROFILES=$(echo "$PROFILE_LIST" | tr ' ' '\n' | grep -v '^$' | sort -t: -k1 -rn | cut -d: -f2 | tr '\n' ' ')
+
+if [[ -z "$PROFILES" ]]; then
+  echo "ERROR: No profiles found after filtering."
+  exit 1
+fi
+
+echo "Profiles to test (ordered by model size, largest first): $PROFILES"
 echo ""
 
 # Summary tracking
@@ -116,15 +151,17 @@ for PROFILE in $PROFILES; do
 
       LOG_FILE="$RESULTS_DIR/${UNIT_NAME}_run${i}.log"
 
-      OUTPUT=$(npx machine-dream llm play "$PUZZLE" \
+      # Run with tee to show output live and save to log
+      npx machine-dream llm play "$PUZZLE" \
         --profile "$PROFILE" \
         --learning-unit "$UNIT_NAME" \
+        --visualize-basic \
         $MODE_OPTS \
         $NO_SAVE_REASONING \
-        2>&1 | tee "$LOG_FILE")
+        2>&1 | tee "$LOG_FILE"
 
-      # Check if solved
-      if echo "$OUTPUT" | grep -q "SOLVED"; then
+      # Check log file for result
+      if grep -q "SOLVED" "$LOG_FILE" 2>/dev/null; then
         TOTAL_SOLVED=$((TOTAL_SOLVED + 1))
         echo "    Result: SOLVED"
       else
@@ -166,15 +203,17 @@ for PROFILE in $PROFILES; do
 
           LOG_FILE="$RESULTS_DIR/${UNIT_2X}_validation${i}.log"
 
-          OUTPUT=$(npx machine-dream llm play "$PUZZLE" \
+          # Run with tee to show output live and save to log
+          npx machine-dream llm play "$PUZZLE" \
             --profile "$PROFILE" \
             --learning-unit "$UNIT_2X" \
+            --visualize-basic \
             $MODE_OPTS \
             $NO_SAVE_REASONING \
-            2>&1 | tee "$LOG_FILE")
+            2>&1 | tee "$LOG_FILE"
 
-          # Check if solved
-          if echo "$OUTPUT" | grep -q "SOLVED"; then
+          # Check log file for result
+          if grep -q "SOLVED" "$LOG_FILE" 2>/dev/null; then
             TOTAL_SOLVED=$((TOTAL_SOLVED + 1))
             echo "      Result: SOLVED"
           else
