@@ -6,6 +6,14 @@
 
 ---
 
+## Related ADRs
+
+| ADR | Relationship |
+|-----|--------------|
+| [ADR-002: Local LLM Provider](../adr/002-local-llm-provider.md) | Authorizes LLM integration |
+
+---
+
 ## 1. Overview
 
 ### 1.1 Purpose

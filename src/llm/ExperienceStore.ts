@@ -136,6 +136,33 @@ export class ExperienceStore {
   }
 
   /**
+   * Reset consolidated status for experiences
+   *
+   * Spec 05 Section 8.4: Dual Mode Support
+   * Used by consolidateDual() to process the same experiences twice -
+   * once for standard strategy count, once for doubled.
+   */
+  async resetConsolidatedStatus(experienceIds: string[]): Promise<void> {
+    for (const id of experienceIds) {
+      const experience = await this.agentMemory.reasoningBank.getMetadata(
+        id,
+        'llm_experience'
+      );
+
+      if (experience) {
+        await this.agentMemory.reasoningBank.storeMetadata(
+          id,
+          'llm_experience',
+          {
+            ...(experience as object),
+            consolidated: false,
+          }
+        );
+      }
+    }
+  }
+
+  /**
    * Save few-shot examples from consolidation
    * Stores per-profile using namespaced key: llm_fewshots:${profileName}
    */

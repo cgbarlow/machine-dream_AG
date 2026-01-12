@@ -1,0 +1,115 @@
+{
+  "testName": "Multi-Model Comparison - All Profiles, All Modes",
+  "description": "Compare baseline and AISP modes across all model profiles (no learning units)",
+  "runsPerConfig": 5,
+  "puzzles": [
+    "puzzles/9x9-easy.json"
+  ],
+  "configurations": [
+    {
+      "name": "deepseek-r1_baseline",
+      "description": "Baseline - no AISP",
+      "profile": "deepseek-r1",
+      "learningUnit": null,
+      "options": []
+    },
+    {
+      "name": "deepseek-r1_aisp",
+      "description": "AISP mode",
+      "profile": "deepseek-r1",
+      "learningUnit": null,
+      "options": ["--aisp"]
+    },
+    {
+      "name": "deepseek-r1_aisp-full",
+      "description": "Full AISP mode",
+      "profile": "deepseek-r1",
+      "learningUnit": null,
+      "options": ["--aisp-full"]
+    },
+    {
+      "name": "gpt-oss-120b_baseline",
+      "description": "Baseline - no AISP",
+      "profile": "gpt-oss-120b",
+      "learningUnit": null,
+      "options": []
+    },
+    {
+      "name": "gpt-oss-120b_aisp",
+      "description": "AISP mode",
+      "profile": "gpt-oss-120b",
+      "learningUnit": null,
+      "options": ["--aisp"]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full",
+      "description": "Full AISP mode",
+      "profile": "gpt-oss-120b",
+      "learningUnit": null,
+      "options": ["--aisp-full"]
+    },
+    {
+      "name": "nemotron-nano_baseline",
+      "description": "Baseline - no AISP",
+      "profile": "nemotron-nano",
+      "learningUnit": null,
+      "options": []
+    },
+    {
+      "name": "nemotron-nano_aisp",
+      "description": "AISP mode",
+      "profile": "nemotron-nano",
+      "learningUnit": null,
+      "options": ["--aisp"]
+    },
+    {
+      "name": "nemotron-nano_aisp-full",
+      "description": "Full AISP mode",
+      "profile": "nemotron-nano",
+      "learningUnit": null,
+      "options": ["--aisp-full"]
+    },
+    {
+      "name": "qwen3-coder_baseline",
+      "description": "Baseline - no AISP",
+      "profile": "qwen3-coder",
+      "learningUnit": null,
+      "options": []
+    },
+    {
+      "name": "qwen3-coder_aisp",
+      "description": "AISP mode",
+      "profile": "qwen3-coder",
+      "learningUnit": null,
+      "options": ["--aisp"]
+    },
+    {
+      "name": "qwen3-coder_aisp-full",
+      "description": "Full AISP mode",
+      "profile": "qwen3-coder",
+      "learningUnit": null,
+      "options": ["--aisp-full"]
+    },
+    {
+      "name": "qwq-32b_baseline",
+      "description": "Baseline - no AISP",
+      "profile": "qwq-32b",
+      "learningUnit": null,
+      "options": []
+    },
+    {
+      "name": "qwq-32b_aisp",
+      "description": "AISP mode",
+      "profile": "qwq-32b",
+      "learningUnit": null,
+      "options": ["--aisp"]
+    },
+    {
+      "name": "qwq-32b_aisp-full",
+      "description": "Full AISP mode",
+      "profile": "qwq-32b",
+      "learningUnit": null,
+      "options": ["--aisp-full"]
+    }
+  ]
+}

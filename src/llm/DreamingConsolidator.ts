@@ -19,16 +19,25 @@ import type {
   LLMExperience,
   FewShotExample,
   ConsolidationReport,
+  DualConsolidationResult,
   LLMErrorPattern,
   LLMWrongPath,
   LLMConfig,
   SynthesizedPattern,
   AbstractionHierarchy,
   HierarchyLevel,
+  ConsolidationOptions,
+} from './types.js';
+import {
+  DEFAULT_CONSOLIDATION_COUNTS,
+  DOUBLED_CONSOLIDATION_COUNTS,
+  DOUBLE_STRATEGY_SUFFIX,
 } from './types.js';
 import { LMStudioClient } from './LMStudioClient.js';
 import { ExperienceStore } from './ExperienceStore.js';
 import { LearningUnitManager } from './LearningUnitManager.js';
+import { AISPBuilder, type AISPMode } from './AISPBuilder.js';
+import { AISPStrategyEncoder } from './AISPStrategyEncoder.js';
 
 /**
  * Dreaming Consolidator
@@ -44,12 +53,54 @@ import { LearningUnitManager } from './LearningUnitManager.js';
 export class DreamingConsolidator {
   private llmClient: LMStudioClient;
   private generateAnonymousPatterns = false;
+  private consolidationOptions: Required<Omit<ConsolidationOptions, 'doubleStrategies'>> = { ...DEFAULT_CONSOLIDATION_COUNTS };
+  private aispMode: AISPMode = 'off';
+  private aispBuilder: AISPBuilder;
+  private aispEncoder: AISPStrategyEncoder;
 
   constructor(
     private experienceStore: ExperienceStore,
     config: LLMConfig
   ) {
     this.llmClient = new LMStudioClient(config);
+    this.aispBuilder = new AISPBuilder();
+    this.aispEncoder = new AISPStrategyEncoder();
+  }
+
+  /**
+   * Enable AISP mode for dreaming consolidation
+   *
+   * Spec 16: When enabled, dreaming uses AISP for:
+   * - Prompts sent to LLM for synthesis
+   * - Strategy storage format (aispEncoded field)
+   * - All reasoning and analysis
+   *
+   * @param mode - 'off' | 'aisp' | 'aisp-full'
+   */
+  setAISPMode(mode: AISPMode): void {
+    this.aispMode = mode;
+    console.log(`🔤 AISP mode set to: ${mode}`);
+  }
+
+  /**
+   * Set consolidation options for strategy counts
+   *
+   * Spec 05 Section 8.4: Strategy Count Configuration
+   */
+  setConsolidationOptions(options: ConsolidationOptions): void {
+    if (options.doubleStrategies) {
+      // Use doubled counts
+      this.consolidationOptions = { ...DOUBLED_CONSOLIDATION_COUNTS };
+    } else {
+      // Use custom counts or defaults
+      this.consolidationOptions = {
+        fewShotMin: options.fewShotMin ?? DEFAULT_CONSOLIDATION_COUNTS.fewShotMin,
+        fewShotMax: options.fewShotMax ?? DEFAULT_CONSOLIDATION_COUNTS.fewShotMax,
+        mergeMin: options.mergeMin ?? DEFAULT_CONSOLIDATION_COUNTS.mergeMin,
+        mergeMax: options.mergeMax ?? DEFAULT_CONSOLIDATION_COUNTS.mergeMax,
+      };
+    }
+    console.log(`📊 Consolidation options: few-shots ${this.consolidationOptions.fewShotMin}-${this.consolidationOptions.fewShotMax}, merge ${this.consolidationOptions.mergeMin}-${this.consolidationOptions.mergeMax}`);
   }
 
   /**
@@ -214,6 +265,11 @@ export class DreamingConsolidator {
    * This is the "dreaming brain" analyzing what worked.
    *
    * CRITICAL: Uses FULL reasoning chain, never truncated!
+   *
+   * Spec 16: When AISP mode is 'aisp-full':
+   * - Uses AISP system prompt
+   * - Uses AISP user prompt format
+   * - Encodes synthesized pattern in AISP format
    */
   private async synthesizePattern(
     cluster: LLMExperience[],
@@ -228,27 +284,145 @@ ${i + 1}. Grid context: ${this.describeGridContext(exp.gridState, exp.move)}
    ${exp.move.reasoning}
 `).join('\n');
 
-    // Use different prompt based on mode
-    const prompt = this.generateAnonymousPatterns
-      ? this.buildAnonymousPatternPrompt(cluster.length, experienceDescriptions)
-      : this.buildNamedStrategyPrompt(cluster.length, experienceDescriptions);
+    // Spec 16: Use AISP prompts when aisp-full mode enabled
+    let systemPrompt: string;
+    let userPrompt: string;
+
+    if (this.aispMode === 'aisp-full') {
+      systemPrompt = this.aispBuilder.buildAISPDreamingSystemPrompt();
+      userPrompt = this.buildAISPPatternPrompt(cluster.length, experienceDescriptions, clusterName);
+    } else {
+      // Use different prompt based on anonymous pattern mode
+      userPrompt = this.generateAnonymousPatterns
+        ? this.buildAnonymousPatternPrompt(cluster.length, experienceDescriptions)
+        : this.buildNamedStrategyPrompt(cluster.length, experienceDescriptions);
+
+      systemPrompt = this.generateAnonymousPatterns
+        ? 'You are extracting reusable patterns from Sudoku moves. Focus on situation and action, NOT strategy names.'
+        : 'You are reflecting on your Sudoku solving experiences to extract reusable strategies. Be specific and practical.';
+    }
 
     try {
-      const response = await this.llmClient.chat([
-        {
-          role: 'system',
-          content: this.generateAnonymousPatterns
-            ? 'You are extracting reusable patterns from Sudoku moves. Focus on situation and action, NOT strategy names.'
-            : 'You are reflecting on your Sudoku solving experiences to extract reusable strategies. Be specific and practical.',
-        },
-        { role: 'user', content: prompt },
+      const result = await this.llmClient.chat([
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
       ]);
 
-      return this.generateAnonymousPatterns
-        ? this.parseAnonymousPatternResponse(response, clusterName, cluster.length)
-        : this.parsePatternResponse(response, clusterName, cluster.length);
+      let pattern: SynthesizedPattern | null;
+
+      if (this.aispMode === 'aisp-full') {
+        pattern = this.parseAISPPatternResponse(result.content, clusterName, cluster.length);
+      } else if (this.generateAnonymousPatterns) {
+        pattern = this.parseAnonymousPatternResponse(result.content, clusterName, cluster.length);
+      } else {
+        pattern = this.parsePatternResponse(result.content, clusterName, cluster.length);
+      }
+
+      // Spec 16: Encode pattern in AISP format when aisp-full mode enabled
+      if (pattern && this.aispMode === 'aisp-full') {
+        pattern.aispEncoded = this.aispEncoder.encodePattern(pattern);
+      }
+
+      return pattern;
     } catch (error) {
       console.warn(`Failed to synthesize pattern:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Build AISP-formatted prompt for pattern synthesis
+   *
+   * Spec 16: Used when --aisp-full mode is enabled
+   */
+  private buildAISPPatternPrompt(count: number, experienceDescriptions: string, clusterName: string): string {
+    const date = new Date().toISOString().split('T')[0];
+    return `𝔸1.0.pattern.synthesis@${date}
+γ≔sudoku.pattern.extraction
+ρ≔⟨experiences,synthesis⟩
+
+⟦Γ:Context⟧{
+  cluster≜"${clusterName}"
+  experience_count≜${count}
+  task≜synthesize(experiences)→⟦Λ:Strategy⟧
+}
+
+⟦Σ:Experiences⟧{
+${experienceDescriptions}
+}
+
+⟦Ε:Output⟧{
+  ;; Synthesize strategy in AISP format
+  format≔⟦Λ:Strategy.Name⟧{
+    when≜condition
+    action≜⟨step1,step2,...⟩
+    proof≜justification
+    conf≔0.0-1.0
+    level≔0-3
+  }
+
+  ∀output:syntax∈AISP
+  ¬prose
+}`;
+  }
+
+  /**
+   * Parse AISP-formatted pattern response
+   *
+   * Spec 16: Parses strategy blocks in AISP format
+   */
+  private parseAISPPatternResponse(
+    response: string,
+    clusterName: string,
+    sourceCount: number
+  ): SynthesizedPattern | null {
+    try {
+      // Extract strategy name from ⟦Λ:Strategy.Name⟧ block
+      const nameMatch = response.match(/⟦Λ:Strategy\.([^⟧]+)⟧/);
+      const strategyName = nameMatch ? nameMatch[1].replace(/_/g, ' ') : clusterName;
+
+      // Extract when condition
+      const whenMatch = response.match(/when≜([^;}\n]+)/);
+      const whenToUse = whenMatch ? whenMatch[1].trim() : 'Not specified';
+
+      // Extract action/steps
+      const actionMatch = response.match(/action≜⟨([^⟩]+)⟩/);
+      const reasoningSteps = actionMatch
+        ? actionMatch[1].split(',').map(s => s.trim().replace(/^"?|"?$/g, ''))
+        : ['Apply constraint reasoning'];
+
+      // Extract proof/insight
+      const proofMatch = response.match(/proof≜"?([^";}\n]+)"?/);
+      const successInsight = proofMatch ? proofMatch[1].trim() : '';
+
+      // Extract confidence
+      const confMatch = response.match(/conf≔([\d.]+)/);
+      const confidence = confMatch ? parseFloat(confMatch[1]) || 0.7 : 0.7;
+
+      // Extract level
+      const levelMatch = response.match(/level≔(\d)/);
+      const parsedLevel = levelMatch ? parseInt(levelMatch[1], 10) : 1;
+      const level = (parsedLevel >= 0 && parsedLevel <= 3 ? parsedLevel : 1) as 0 | 1 | 2 | 3;
+      const levelNames = ['Instance', 'Technique', 'Category', 'Principle'];
+
+      return {
+        strategyName,
+        clusterName,
+        whenToUse,
+        reasoningSteps,
+        example: '',
+        successInsight,
+        abstractionLevel: {
+          level,
+          name: levelNames[level],
+          description: `AISP-encoded level ${level}`,
+        },
+        sourceExperienceCount: sourceCount,
+        confidence,
+        // aispEncoded will be set by caller
+      };
+    } catch (error) {
+      console.warn(`Failed to parse AISP pattern response:`, error);
       return null;
     }
   }
@@ -459,7 +633,7 @@ LEVEL_3_PRINCIPLES:
 Be concise. Each item should be a short phrase or sentence.`;
 
     try {
-      const response = await this.llmClient.chat([
+      const result = await this.llmClient.chat([
         {
           role: 'system',
           content: 'You are organizing Sudoku strategies into an abstraction hierarchy, from specific to general.',
@@ -467,7 +641,7 @@ Be concise. Each item should be a short phrase or sentence.`;
         { role: 'user', content: prompt },
       ]);
 
-      return this.parseHierarchyResponse(response, patterns.length, profileName);
+      return this.parseHierarchyResponse(result.content, patterns.length, profileName);
     } catch (error) {
       // Return a basic hierarchy if LLM fails
       return this.createBasicHierarchy(patterns, profileName);
@@ -571,6 +745,27 @@ Be concise. Each item should be a short phrase or sentence.`;
   }
 
   /**
+   * Convert a SynthesizedPattern to a FewShotExample
+   *
+   * Spec 16: Includes aispEncoded field when present
+   */
+  private patternToFewShot(pattern: SynthesizedPattern): FewShotExample {
+    return {
+      strategy: pattern.strategyName,
+      abstractionLevel: pattern.abstractionLevel.level,
+      situation: pattern.whenToUse,
+      analysis: pattern.reasoningSteps.join('\n'),
+      move: { row: 0, col: 0, value: 0 },
+      outcome: 'CORRECT' as const,
+      gridContext: pattern.example,
+      reasoningTemplate: pattern.reasoningTemplate,
+      isAnonymous: pattern.isAnonymous,
+      // Spec 16: Include AISP encoding when available
+      aispEncoded: pattern.aispEncoded,
+    };
+  }
+
+  /**
    * Generate few-shot examples from synthesized patterns
    *
    * Few-shots are LLM-synthesized teaching examples, NOT raw move data
@@ -583,18 +778,7 @@ Be concise. Each item should be a short phrase or sentence.`;
 
     // If only 1-2 patterns, no need for diversity selection
     if (patterns.length <= 2) {
-      return patterns.map((pattern) => ({
-        strategy: pattern.strategyName,
-        abstractionLevel: pattern.abstractionLevel.level,
-        situation: pattern.whenToUse,
-        analysis: pattern.reasoningSteps.join('\n'),
-        move: { row: 0, col: 0, value: 0 },
-        outcome: 'CORRECT' as const,
-        gridContext: pattern.example,
-        // Include anonymous pattern fields
-        reasoningTemplate: pattern.reasoningTemplate,
-        isAnonymous: pattern.isAnonymous,
-      }));
+      return patterns.map((pattern) => this.patternToFewShot(pattern));
     }
 
     // Use LLM to select diverse strategies
@@ -605,7 +789,7 @@ Be concise. Each item should be a short phrase or sentence.`;
 Your strategies:
 ${patterns.map((p, i) => `${i + 1}. ${p.strategyName}: ${p.whenToUse}`).join('\n')}
 
-Now select 3-5 DIVERSE strategies to remember as few-shot examples.
+Now select ${this.consolidationOptions.fewShotMin}-${this.consolidationOptions.fewShotMax} DIVERSE strategies to remember as few-shot examples.
 
 CRITICAL: Ensure diversity!
 - Do NOT select strategies that use the same underlying technique
@@ -626,7 +810,7 @@ SELECTED: 7
 WHY_DIVERSE: Elimination approach rather than completion`;
 
     try {
-      const response = await this.llmClient.chat([
+      const result = await this.llmClient.chat([
         {
           role: 'system',
           content: 'You are selecting diverse Sudoku strategies. Be strict about avoiding duplicates.',
@@ -635,7 +819,7 @@ WHY_DIVERSE: Elimination approach rather than completion`;
       ]);
 
       // Parse selected indices from LLM response
-      const selectedIndices = this.parseSelectedStrategies(response, patterns.length);
+      const selectedIndices = this.parseSelectedStrategies(result.content, patterns.length);
       console.log(`   LLM selected ${selectedIndices.length} diverse strategies: ${selectedIndices.join(', ')}`);
 
       // Map selected indices to patterns
@@ -645,46 +829,16 @@ WHY_DIVERSE: Elimination approach rather than completion`;
 
       // Fallback if parsing failed
       if (selectedPatterns.length === 0) {
-        console.log(`   ⚠️ LLM selection parsing failed, using first 3 patterns`);
-        return patterns.slice(0, 3).map((pattern) => ({
-          strategy: pattern.strategyName,
-          abstractionLevel: pattern.abstractionLevel.level,
-          situation: pattern.whenToUse,
-          analysis: pattern.reasoningSteps.join('\n'),
-          move: { row: 0, col: 0, value: 0 },
-          outcome: 'CORRECT' as const,
-          gridContext: pattern.example,
-          reasoningTemplate: pattern.reasoningTemplate,
-          isAnonymous: pattern.isAnonymous,
-        }));
+        console.log(`   ⚠️ LLM selection parsing failed, using first ${this.consolidationOptions.fewShotMin} patterns`);
+        return patterns.slice(0, this.consolidationOptions.fewShotMin).map((pattern) => this.patternToFewShot(pattern));
       }
 
-      return selectedPatterns.map((pattern) => ({
-        strategy: pattern.strategyName,
-        abstractionLevel: pattern.abstractionLevel.level,
-        situation: pattern.whenToUse,
-        analysis: pattern.reasoningSteps.join('\n'),
-        move: { row: 0, col: 0, value: 0 },
-        outcome: 'CORRECT' as const,
-        gridContext: pattern.example,
-        reasoningTemplate: pattern.reasoningTemplate,
-        isAnonymous: pattern.isAnonymous,
-      }));
+      return selectedPatterns.map((pattern) => this.patternToFewShot(pattern));
 
     } catch (error) {
       console.warn(`   ⚠️ LLM diversity selection failed:`, error);
       // Fallback to first 3 patterns
-      return patterns.slice(0, 3).map((pattern) => ({
-        strategy: pattern.strategyName,
-        abstractionLevel: pattern.abstractionLevel.level,
-        situation: pattern.whenToUse,
-        analysis: pattern.reasoningSteps.join('\n'),
-        move: { row: 0, col: 0, value: 0 },
-        outcome: 'CORRECT' as const,
-        gridContext: pattern.example,
-        reasoningTemplate: pattern.reasoningTemplate,
-        isAnonymous: pattern.isAnonymous,
-      }));
+      return patterns.slice(0, 3).map((pattern) => this.patternToFewShot(pattern));
     }
   }
 
@@ -743,7 +897,7 @@ Focus on the most common/impactful mistakes. Synthesize patterns, don't just lis
 Identify at most 3 anti-patterns.`;
 
     try {
-      const response = await this.llmClient.chat([
+      const result = await this.llmClient.chat([
         {
           role: 'system',
           content: 'You are analyzing your Sudoku solving mistakes to identify patterns of errors.',
@@ -752,7 +906,7 @@ Identify at most 3 anti-patterns.`;
       ]);
 
       console.log(`   ✅ LLM synthesized anti-patterns`);
-      return response;
+      return result.content;
     } catch (error) {
       console.warn(`   ⚠️ LLM anti-pattern synthesis failed:`, error);
       return '';
@@ -1068,6 +1222,79 @@ Identify at most 3 anti-patterns.`;
   }
 
   /**
+   * Dual consolidation: Create both standard and doubled (-2x) learning units
+   *
+   * Spec 05 Section 8.4: Dual Mode Support
+   * Processes the same experiences twice:
+   * 1. Standard consolidation (3-5 strategies)
+   * 2. Doubled consolidation (6-10 strategies) with -2x suffix
+   *
+   * This allows A/B testing between standard and doubled strategy counts.
+   *
+   * @param learningUnitManager - Manager for the learning unit
+   * @param learningUnitId - Base ID for the learning unit (without -2x suffix)
+   * @param profileName - LLM profile name
+   * @returns DualConsolidationResult with both reports
+   */
+  async consolidateDual(
+    learningUnitManager: LearningUnitManager,
+    learningUnitId: string,
+    profileName: string
+  ): Promise<DualConsolidationResult> {
+    console.log(`\n🔄 Starting DUAL consolidation for "${learningUnitId}"`);
+    console.log(`   Will create: "${learningUnitId}" (standard) + "${learningUnitId}${DOUBLE_STRATEGY_SUFFIX}" (doubled)`);
+
+    // Get all unconsolidated experiences before we start
+    const experiences = await this.experienceStore.getUnconsolidated(profileName);
+    const experienceIds = experiences.map(e => e.id);
+
+    if (experiences.length === 0) {
+      console.log(`⚠️  No unconsolidated experiences to process`);
+      return {
+        standard: this.createEmptyReport(),
+        doubled: this.createEmptyReport(),
+      };
+    }
+
+    console.log(`📊 Found ${experiences.length} unconsolidated experiences`);
+
+    // Phase 1: Standard consolidation (3-5 strategies)
+    console.log(`\n📦 Phase 1: Standard consolidation (${DEFAULT_CONSOLIDATION_COUNTS.fewShotMin}-${DEFAULT_CONSOLIDATION_COUNTS.fewShotMax} strategies)`);
+    this.setConsolidationOptions({ doubleStrategies: false });
+    const standardReport = await this.reConsolidate(
+      learningUnitManager,
+      learningUnitId,
+      profileName
+    );
+    console.log(`   ✅ Standard: ${standardReport.fewShotsUpdated} strategies created`);
+
+    // Phase 2: Reset consolidated status to process same experiences again
+    console.log(`\n🔄 Resetting consolidated status for ${experienceIds.length} experiences...`);
+    await this.experienceStore.resetConsolidatedStatus(experienceIds);
+
+    // Phase 3: Doubled consolidation (6-10 strategies) with -2x suffix
+    const doubledUnitId = `${learningUnitId}${DOUBLE_STRATEGY_SUFFIX}`;
+    console.log(`\n📦 Phase 2: Doubled consolidation (${DOUBLED_CONSOLIDATION_COUNTS.fewShotMin}-${DOUBLED_CONSOLIDATION_COUNTS.fewShotMax} strategies)`);
+    console.log(`   Target unit: "${doubledUnitId}"`);
+    this.setConsolidationOptions({ doubleStrategies: true });
+    const doubledReport = await this.reConsolidate(
+      learningUnitManager,
+      doubledUnitId,
+      profileName
+    );
+    console.log(`   ✅ Doubled: ${doubledReport.fewShotsUpdated} strategies created`);
+
+    console.log(`\n✅ DUAL consolidation complete:`);
+    console.log(`   Standard "${learningUnitId}": ${standardReport.fewShotsUpdated} strategies`);
+    console.log(`   Doubled "${doubledUnitId}": ${doubledReport.fewShotsUpdated} strategies`);
+
+    return {
+      standard: standardReport,
+      doubled: doubledReport,
+    };
+  }
+
+  /**
    * Merge new patterns with existing few-shots using LLM
    *
    * The LLM evaluates all strategies and selects the best diverse set,
@@ -1095,7 +1322,7 @@ ${existingList}
 NEW STRATEGIES (from recent experiences):
 ${newList}
 
-Create a UNIFIED set of 5-7 strategies by:
+Create a UNIFIED set of ${this.consolidationOptions.mergeMin}-${this.consolidationOptions.mergeMax} strategies by:
 1. Keep existing strategies that are still valuable
 2. Add new strategies that provide different insights
 3. Remove duplicates (same technique, different wording)
@@ -1112,7 +1339,7 @@ MERGED_STRATEGIES:
 ...`;
 
     try {
-      const response = await this.llmClient.chat([
+      const result = await this.llmClient.chat([
         {
           role: 'system',
           content: 'You are reviewing Sudoku strategies to create an optimal unified set. Be selective and prioritize diversity.',
@@ -1122,7 +1349,7 @@ MERGED_STRATEGIES:
 
       // Parse the response to determine which strategies to keep
       const mergedFewShots = this.parseMergeResponse(
-        response,
+        result.content,
         existingFewShots,
         newPatterns
       );
@@ -1132,7 +1359,7 @@ MERGED_STRATEGIES:
       console.warn(`⚠️  LLM merge failed, keeping existing strategies:`, error);
       // Fallback: keep existing + add new patterns as few-shots
       const newFewShots = await this.generateFewShotsFromPatterns(newPatterns);
-      return [...existingFewShots, ...newFewShots].slice(0, 7);
+      return [...existingFewShots, ...newFewShots].slice(0, this.consolidationOptions.mergeMax);
     }
   }
 

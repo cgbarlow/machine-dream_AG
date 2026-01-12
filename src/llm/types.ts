@@ -9,7 +9,8 @@
 export interface LLMConfig {
   // LM Studio connection
   baseUrl: string;          // 'http://localhost:1234/v1'
-  model: string;            // 'qwen3-30b' or 'local-model'
+  model: string;            // 'qwen3-30b' or 'local-model' (friendly name)
+  modelPath?: string;       // Full model path for lms CLI (e.g., "Qwen/QwQ-32B-GGUF/qwq-32b-q8_0.gguf")
 
   // Generation parameters
   temperature: number;      // 0.7 default
@@ -70,6 +71,11 @@ export interface LLMExperience {
 
   // Prompt sent to LLM (for debugging/analysis)
   prompt?: string;
+
+  // Full reasoning storage (--save-reasoning)
+  // Distinct from move.reasoning which stores only parsed REASONING field
+  // This stores the complete streaming reasoning tokens from LM Studio
+  fullReasoning?: string;
 }
 
 /**
@@ -80,6 +86,7 @@ export interface LLMExperienceContext {
   emptyCellsAtMove: number;   // Grid complexity indicator
   reasoningLength: number;    // Token proxy (character count)
   constraintDensity: number;  // Avg candidates per empty cell
+  fullReasoningLength?: number; // Character count of full streaming reasoning
 }
 
 /**
@@ -174,6 +181,9 @@ export interface FewShotExample {
 
   // Legacy compatibility (deprecated, use strategy/situation instead)
   gridContext?: string;
+
+  // Spec 16: AISP-encoded version for --aisp-full mode
+  aispEncoded?: string;
 }
 
 /**
@@ -201,6 +211,17 @@ export interface ConsolidationReport {
   experiencesConsolidated: number;
   compressionRatio?: number;       // experiences / patterns (target: 10:1)
   abstractionLevels?: number;      // Number of hierarchy levels built
+}
+
+/**
+ * Dual Consolidation Result - Output of consolidateDual()
+ *
+ * Spec 05 Section 8.4: Dual Mode
+ * Creates both standard AND -2x learning units from the same experiences.
+ */
+export interface DualConsolidationResult {
+  standard: ConsolidationReport;
+  doubled: ConsolidationReport;
 }
 
 export interface LLMPattern {
@@ -271,6 +292,9 @@ export interface SynthesizedPattern {
   abstractionLevel: AbstractionLevel;
   sourceExperienceCount: number;  // How many experiences contributed
   confidence: number;             // LLM's confidence in this pattern (0-1)
+
+  // Spec 16: AISP-encoded version for --aisp-full mode
+  aispEncoded?: string;
 }
 
 /**
@@ -304,6 +328,40 @@ export interface AntiPattern {
   whyWrong: string;           // Why this approach fails
   instead: string;            // What to do instead
 }
+
+/**
+ * Consolidation Options - Configuration for strategy count during dreaming
+ *
+ * Spec 05 Section 8.4: Strategy Count Configuration (2026-01-12)
+ * Controls how many strategies are synthesized during consolidation.
+ */
+export interface ConsolidationOptions {
+  doubleStrategies?: boolean;   // If true, double all strategy counts
+  fewShotMin?: number;          // Min strategies for few-shot selection (default: 3, doubled: 6)
+  fewShotMax?: number;          // Max strategies for few-shot selection (default: 5, doubled: 10)
+  mergeMin?: number;            // Min strategies for merge output (default: 5, doubled: 10)
+  mergeMax?: number;            // Max strategies for merge output (default: 7, doubled: 14)
+}
+
+/**
+ * Default consolidation strategy counts
+ */
+export const DEFAULT_CONSOLIDATION_COUNTS = {
+  fewShotMin: 3,
+  fewShotMax: 5,
+  mergeMin: 5,
+  mergeMax: 7,
+} as const;
+
+/**
+ * Doubled consolidation strategy counts (--double-strategies)
+ */
+export const DOUBLED_CONSOLIDATION_COUNTS = {
+  fewShotMin: 6,
+  fewShotMax: 10,
+  mergeMin: 10,
+  mergeMax: 14,
+} as const;
 
 // ============================================================================
 // Learning Units (Spec 11 - Learning Units section)
@@ -356,6 +414,20 @@ export interface LearningUnitMetadata {
  * Used when no --learning-unit is specified for backwards compatibility
  */
 export const DEFAULT_LEARNING_UNIT_ID = 'default';
+
+/**
+ * Suffix for double-strategy learning units
+ * Automatically appended when --double-strategies is used
+ *
+ * Spec 05 Section 8.4: Naming Convention
+ */
+export const DOUBLE_STRATEGY_SUFFIX = '-2x';
+
+/**
+ * Display text for sessions with no learning unit
+ * Used in session list when --no-learning was enabled
+ */
+export const NO_LEARNING_UNIT_DISPLAY = '(none)';
 
 /**
  * Learning Unit Summary - Lightweight version for listings

@@ -8,6 +8,14 @@
 
 ---
 
+## Related ADRs
+
+| ADR | Relationship |
+|-----|--------------|
+| [ADR-009: CLI-First Interface](../adr/009-cli-first-interface.md) | Authorizes this spec |
+
+---
+
 ## 1. Executive Summary
 
 This specification defines the Console Menu feature for the Machine Dream TUI - an integrated terminal console that captures and displays CLI output within the TUI interface, supports direct command entry, and provides context-sensitive help. This addresses the issue of CLI output escaping to the terminal above the TUI and the non-functional F1 help key (Ink library limitation).

@@ -19,7 +19,6 @@
 #   ./scripts/iterative-learning.sh --batch-size 2 --total-plays 10
 #   ./scripts/iterative-learning.sh --learning-unit training-v1 --batch-size 1
 #   ./scripts/iterative-learning.sh --stream --total-plays 5
-#   ./scripts/iterative-learning.sh --reasoning-template --total-plays 5
 
 set -e
 
@@ -31,8 +30,12 @@ TOTAL_PLAYS=10
 LEARNING_UNIT=""
 STREAM=false
 REASONING_TEMPLATE=false
-ANONYMOUS_PATTERNS=false
 DEBUG=false
+AISP=false
+AISP_FULL=false
+# Note: anonymous-patterns and save-reasoning are ON by default in CLI
+NO_ANONYMOUS_PATTERNS=false
+NO_SAVE_REASONING=false
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -65,12 +68,24 @@ while [[ $# -gt 0 ]]; do
       REASONING_TEMPLATE=true
       shift
       ;;
-    --anonymous-patterns)
-      ANONYMOUS_PATTERNS=true
+    --no-anonymous-patterns)
+      NO_ANONYMOUS_PATTERNS=true
+      shift
+      ;;
+    --no-save-reasoning)
+      NO_SAVE_REASONING=true
       shift
       ;;
     --debug)
       DEBUG=true
+      shift
+      ;;
+    --aisp)
+      AISP=true
+      shift
+      ;;
+    --aisp-full)
+      AISP_FULL=true
       shift
       ;;
     -h|--help)
@@ -79,11 +94,14 @@ while [[ $# -gt 0 ]]; do
       echo "  --puzzle <path>         Puzzle file to use (default: puzzles/4x4-expert.json)"
       echo "  --batch-size <n>        Number of plays before dreaming (default: 1)"
       echo "  --total-plays <n>       Total number of plays (default: 10)"
-      echo "  --learning-unit <id>    Learning unit to use/update (auto-creates if missing)"
+      echo "  --learning-unit <id>    Learning unit to use (auto-generated if not specified)"
       echo "  --stream                Show live gameplay during runs"
       echo "  --reasoning-template    Use structured constraint-intersection format"
-      echo "  --anonymous-patterns    Use anonymous pattern format for learned strategies"
+      echo "  --no-anonymous-patterns Disable anonymous pattern format (enabled by default)"
+      echo "  --no-save-reasoning     Disable full reasoning storage (enabled by default)"
       echo "  --debug                 Show full prompts sent to LLM"
+      echo "  --aisp                  Use AISP syntax for prompts (low-ambiguity format)"
+      echo "  --aisp-full             Use full AISP mode (includes spec, expects AISP output)"
       echo "  -h, --help              Show this help"
       exit 0
       ;;
@@ -95,10 +113,39 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Generate learning unit ID if not specified
+# Auto-generate learning unit name if not specified
+# Format: profileName_(AISP/AISP-full)_YYYYMMDD[_XX]
 if [ -z "$LEARNING_UNIT" ]; then
-  LEARNING_UNIT="iterative-$(date +%Y%m%d_%H%M%S)"
-  echo "Auto-generated learning unit: $LEARNING_UNIT"
+  BASE_NAME="$PROFILE"
+
+  # Add mode suffix
+  if [ "$AISP_FULL" = true ]; then
+    BASE_NAME="${BASE_NAME}_AISP-full"
+  elif [ "$AISP" = true ]; then
+    BASE_NAME="${BASE_NAME}_AISP"
+  fi
+
+  # Add date
+  DATE_STR=$(date +%Y%m%d)
+  LEARNING_UNIT="${BASE_NAME}_${DATE_STR}"
+
+  # Check if this unit already exists, append increment if needed
+  EXISTING=$(npx machine-dream llm learning list --profile "$PROFILE" --format json 2>/dev/null | grep -o "\"id\":\"${LEARNING_UNIT}[^\"]*\"" | wc -l || echo "0")
+  if [ "$EXISTING" -gt 0 ]; then
+    for i in $(seq 1 99); do
+      INCREMENT=$(printf "%02d" $i)
+      CANDIDATE="${LEARNING_UNIT}_${INCREMENT}"
+      EXISTS=$(npx machine-dream llm learning list --profile "$PROFILE" --format json 2>/dev/null | grep -o "\"id\":\"${CANDIDATE}\"" | wc -l || echo "0")
+      if [ "$EXISTS" -eq 0 ]; then
+        LEARNING_UNIT="$CANDIDATE"
+        break
+      fi
+    done
+  fi
+
+  AUTO_GENERATED=true
+else
+  AUTO_GENERATED=false
 fi
 
 RESULTS_DIR="./iterative-results/$LEARNING_UNIT"
@@ -111,15 +158,24 @@ echo "Profile: $PROFILE"
 echo "Puzzle: $PUZZLE"
 echo "Batch size: $BATCH_SIZE plays before dreaming"
 echo "Total plays: $TOTAL_PLAYS"
-echo "Learning unit: $LEARNING_UNIT"
+if [ "$AUTO_GENERATED" = true ]; then
+  echo "Learning unit: $LEARNING_UNIT (auto-generated)"
+else
+  echo "Learning unit: $LEARNING_UNIT"
+fi
 echo "Stream mode: $STREAM"
 echo "Reasoning template: $REASONING_TEMPLATE"
 echo "Debug mode: $DEBUG"
+echo "AISP mode: $AISP"
+echo "AISP-Full mode: $AISP_FULL"
+echo "Anonymous patterns: enabled (default)"
+echo "Save reasoning: enabled (default)"
 echo "Results: $RESULTS_DIR"
 echo "=============================================="
 echo ""
 
 # Build extra options for play command
+# Note: anonymous-patterns and save-reasoning are ON by default in CLI
 EXTRA_OPTS=""
 if [ "$STREAM" = true ]; then
   EXTRA_OPTS="$EXTRA_OPTS --visualize"
@@ -127,11 +183,19 @@ fi
 if [ "$REASONING_TEMPLATE" = true ]; then
   EXTRA_OPTS="$EXTRA_OPTS --reasoning-template"
 fi
-if [ "$ANONYMOUS_PATTERNS" = true ]; then
-  EXTRA_OPTS="$EXTRA_OPTS --anonymous-patterns"
+if [ "$NO_ANONYMOUS_PATTERNS" = true ]; then
+  EXTRA_OPTS="$EXTRA_OPTS --no-anonymous-patterns"
 fi
 if [ "$DEBUG" = true ]; then
   EXTRA_OPTS="$EXTRA_OPTS --debug"
+fi
+if [ "$AISP_FULL" = true ]; then
+  EXTRA_OPTS="$EXTRA_OPTS --aisp-full"
+elif [ "$AISP" = true ]; then
+  EXTRA_OPTS="$EXTRA_OPTS --aisp"
+fi
+if [ "$NO_SAVE_REASONING" = true ]; then
+  EXTRA_OPTS="$EXTRA_OPTS --no-save-reasoning"
 fi
 
 # Function to extract metrics from output

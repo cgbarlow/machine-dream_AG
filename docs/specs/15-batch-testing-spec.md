@@ -1,5 +1,15 @@
 # Specification 15: Batch Testing Scripts
 
+---
+
+## Related ADRs
+
+| ADR | Relationship |
+|-----|--------------|
+| [ADR-004: Spec-First Development](../adr/004-spec-first-development.md) | Governs this spec |
+
+---
+
 ## Overview
 
 This specification defines shell scripts for batch testing of the LLM Sudoku player's learning capabilities. These scripts automate A/B testing and iterative learning workflows.

@@ -8,6 +8,14 @@
 
 ---
 
+## Related ADRs
+
+| ADR | Relationship |
+|-----|--------------|
+| [ADR-010: Immutable Puzzle Engine](../adr/010-immutable-puzzle-engine.md) | Foundation spec |
+
+---
+
 ## 1. Component Overview
 
 ### 1.1 Purpose and Responsibilities

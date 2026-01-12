@@ -43,6 +43,7 @@ export class LLMProfileManager {
       baseUrl: options.baseUrl,
       apiKey: options.apiKey,
       model: options.model,
+      modelPath: options.modelPath,
       parameters: {
         temperature: options.parameters?.temperature ?? 0.7,
         maxTokens: options.parameters?.maxTokens ?? 2048,
@@ -121,6 +122,7 @@ export class LLMProfileManager {
       baseUrl: updates.baseUrl ?? existing.baseUrl,
       apiKey: updates.apiKey ?? existing.apiKey,
       model: updates.model ?? existing.model,
+      modelPath: updates.modelPath ?? existing.modelPath,
       parameters: {
         ...existing.parameters,
         ...updates.parameters,

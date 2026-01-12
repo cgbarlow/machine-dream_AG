@@ -43,7 +43,8 @@ export interface LLMProfile {
   apiKey?: string;                  // API key (optional, stored securely)
 
   // Model Configuration
-  model: string;                    // Model name/ID
+  model: string;                    // Model name/ID (friendly name for display)
+  modelPath?: string;               // Full model path for LM Studio CLI (e.g., "Qwen/QwQ-32B-GGUF/qwq-32b-q8_0.gguf")
   parameters: ModelParameters;      // Generation parameters
 
   // Metadata
@@ -103,6 +104,7 @@ export interface CreateProfileOptions {
   baseUrl: string;
   apiKey?: string;
   model: string;
+  modelPath?: string;               // Full model path for LM Studio CLI
   parameters?: Partial<ModelParameters>;
   timeout?: number;
   retries?: number;

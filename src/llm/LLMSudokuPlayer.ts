@@ -19,7 +19,7 @@ import { PromptBuilder } from './PromptBuilder.js';
 import { ResponseParser } from './ResponseParser.js';
 import { MoveValidator } from './MoveValidator.js';
 import { ExperienceStore } from './ExperienceStore.js';
-import { buildSystemPrompt, type SystemPromptOptions } from './config.js';
+import { buildSystemPrompt, type SystemPromptOptions, type AISPMode } from './config.js';
 import type { AgentMemory } from '../memory/AgentMemory.js';
 import { calculateImportance, calculateContext } from './ImportanceCalculator.js';
 
@@ -42,6 +42,9 @@ export class LLMSudokuPlayer extends EventEmitter {
 
   private streamingEnabled = false;
   private useReasoningTemplate = false;
+  private showReasoning = false;
+  private saveFullReasoning = false;
+  private aispMode: AISPMode = 'off';
 
   constructor(
     private config: LLMConfig,
@@ -88,6 +91,49 @@ export class LLMSudokuPlayer extends EventEmitter {
    */
   enableAnonymousPatterns(enabled: boolean): void {
     this.promptBuilder.setAnonymousPatternMode(enabled);
+  }
+
+  /**
+   * Enable reasoning token display
+   *
+   * When enabled, displays full reasoning tokens from LM Studio
+   * (LM Studio v0.3.9+ with "separate reasoning_content" Developer setting).
+   * Emits 'llm:reasoning' events for each reasoning token.
+   */
+  enableReasoningDisplay(enabled: boolean): void {
+    this.showReasoning = enabled;
+  }
+
+  /**
+   * Enable full reasoning storage
+   *
+   * When enabled, stores the complete streaming reasoning tokens from LM Studio
+   * in the experience's fullReasoning field (separate from move.reasoning which
+   * stores only the parsed REASONING line from the response).
+   *
+   * Requires streaming to be enabled to capture reasoning tokens.
+   */
+  enableSaveReasoning(enabled: boolean): void {
+    this.saveFullReasoning = enabled;
+    // Save reasoning requires streaming to capture tokens
+    if (enabled) {
+      this.streamingEnabled = true;
+    }
+  }
+
+  /**
+   * Enable AISP mode
+   *
+   * Spec 16: AISP mode converts prompts to low-ambiguity AISP syntax.
+   * - 'off': Normal natural language prompts
+   * - 'aisp': User prompt in AISP, system prompt in natural language
+   * - 'aisp-full': BOTH system and user prompts in pure AISP
+   *
+   * @param mode - 'off' | 'aisp' | 'aisp-full'
+   */
+  setAISPMode(mode: AISPMode): void {
+    this.aispMode = mode;
+    this.promptBuilder.setAISPMode(mode);
   }
 
   /**
@@ -148,9 +194,11 @@ export class LLMSudokuPlayer extends EventEmitter {
       );
 
       // 2. Call LLM (use dynamic system prompt based on grid size)
+      // Spec 16: Pass AISP mode to system prompt builder
       const gridSize = gridState.length;
       const promptOptions: SystemPromptOptions = {
         useReasoningTemplate: this.useReasoningTemplate,
+        aispMode: this.aispMode,
       };
       const messages: ChatMessage[] = [
         { role: 'system', content: buildSystemPrompt(gridSize, promptOptions) },
@@ -160,15 +208,28 @@ export class LLMSudokuPlayer extends EventEmitter {
       this.emit('llm:request', { messages, prompt });
 
       let rawResponse: string;
+      let fullReasoning: string | undefined;
       try {
         if (this.streamingEnabled) {
           // Stream tokens as they arrive
-          rawResponse = await this.client.chat(messages, (token: string) => {
-            this.emit('llm:stream', { token });
-          });
+          // Optionally also stream reasoning tokens (LM Studio v0.3.9+ Developer setting)
+          const onReasoning = this.showReasoning
+            ? (token: string) => this.emit('llm:reasoning', { token })
+            : undefined;
+          const result = await this.client.chat(
+            messages,
+            (token: string) => this.emit('llm:stream', { token }),
+            onReasoning
+          );
+          rawResponse = result.content;
+          // Capture full reasoning for storage if enabled
+          if (this.saveFullReasoning) {
+            fullReasoning = result.reasoning;
+          }
         } else {
           // Wait for complete response
-          rawResponse = await this.client.chat(messages);
+          const result = await this.client.chat(messages);
+          rawResponse = result.content;
         }
         this.emit('llm:response', { rawResponse });
       } catch (error) {
@@ -263,7 +324,7 @@ export class LLMSudokuPlayer extends EventEmitter {
         );
       }
 
-      // 5. Record experience (include prompt for debugging/analysis)
+      // 5. Record experience (include prompt and fullReasoning for debugging/analysis)
       const experience = this.createExperience(
         session.id,
         puzzleId,
@@ -273,7 +334,8 @@ export class LLMSudokuPlayer extends EventEmitter {
         validation,
         recentErrorCount,
         learningContext,
-        prompt
+        prompt,
+        fullReasoning
       );
 
       session.experiences.push(experience);
@@ -375,11 +437,17 @@ export class LLMSudokuPlayer extends EventEmitter {
     validation: MoveValidation,
     recentErrorCount: number,
     learningContext: LearningContext,
-    prompt?: string
+    prompt?: string,
+    fullReasoning?: string
   ): LLMExperience {
     // Calculate importance and context (Spec 11, Spec 03)
     const importance = calculateImportance(move, validation, gridState, recentErrorCount);
     const context = calculateContext(move, gridState);
+
+    // Add full reasoning length to context if available
+    if (fullReasoning) {
+      context.fullReasoningLength = fullReasoning.length;
+    }
 
     return {
       id: randomUUID(),
@@ -398,6 +466,7 @@ export class LLMSudokuPlayer extends EventEmitter {
       profileName: this.profileName,
       learningContext,
       prompt,
+      fullReasoning,
     };
   }
 

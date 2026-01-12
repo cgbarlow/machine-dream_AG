@@ -981,6 +981,15 @@ machine-dream llm play puzzles/easy-01.json --profile openai-gpt4
 # Baseline mode (no memory - for A/B testing)
 machine-dream llm play puzzles/easy-01.json --no-memory
 
+# AISP mode (low-ambiguity prompts)
+machine-dream llm play puzzles/easy-01.json --aisp
+
+# Full AISP mode (end-to-end AISP)
+machine-dream llm play puzzles/easy-01.json --aisp-full
+
+# Show reasoning tokens from LM Studio
+machine-dream llm play puzzles/easy-01.json --show-reasoning
+
 # View statistics
 machine-dream llm stats
 
@@ -989,6 +998,52 @@ machine-dream llm dream
 
 # Benchmark learning (memory ON vs OFF)
 machine-dream llm benchmark
+```
+
+#### Model Management Commands
+
+```bash
+# List available models in LM Studio
+machine-dream llm model list
+
+# List only loaded models
+machine-dream llm model list --loaded
+
+# Load a model with time-to-live
+machine-dream llm model load "qwen3-30b-instruct" --ttl 3600
+
+# Unload current model
+machine-dream llm model unload
+
+# Unload specific model
+machine-dream llm model unload "qwen3-30b-instruct"
+```
+
+#### AISP Mode
+
+AISP (AI Specification Protocol) enables low-ambiguity communication:
+
+| Mode | Flag | Description |
+|------|------|-------------|
+| Standard | (none) | Normal prompts, normal responses |
+| AISP | `--aisp` | AISP-formatted prompts, normal responses |
+| Full AISP | `--aisp-full` | AISP prompts + spec, AISP responses |
+
+```bash
+# AISP converts grid state to tensor notation
+# Model receives ⟦Σ:State⟧{board≜Vec₉(Vec₉(Fin₁₀))...}
+
+# Full AISP includes spec and expects AISP output
+# Strategies are encoded in AISP for storage
+```
+
+#### Double Strategies Mode
+
+Enhanced learning with doubled strategy counts:
+
+```bash
+# Dream with double strategies (6-10 instead of 3-5)
+machine-dream llm dream run --learning-unit my-unit --double-strategies
 ```
 
 ---
@@ -1879,6 +1934,24 @@ docker run -it -v $(pwd)/.agentdb:/app/.agentdb machine-dream tui
 - [Spec 11: LLM Integration](specs/11-llm-sudoku-player.md)
 - [Spec 12: Puzzle Generation](specs/12-randomized-puzzle-generation.md)
 - [Spec 13: Profile Management](specs/13-llm-profile-management.md)
+- [Spec 16: AISP Mode](specs/16-aisp-mode-spec.md)
+- [Spec 17: ADR Implementation](specs/17-adr-implementation-spec.md)
+
+### Architecture Decision Records
+
+All major architectural decisions are documented in `docs/adr/`:
+
+- [ADR-000: Master Machine Dream](../adr/000-master-machine-dream.md) - Overview and decision graph
+- [ADR-001: Pure LLM Solving](../adr/001-pure-llm-solving.md) - No deterministic fallback
+- [ADR-002: Local LLM Provider](../adr/002-local-llm-provider.md) - LM Studio over cloud
+- [ADR-003: Memory Persistence](../adr/003-memory-persistence.md) - AgentDB storage
+- [ADR-004: Spec-First Development](../adr/004-spec-first-development.md) - Documentation-driven
+- [ADR-005: Learning Units](../adr/005-learning-units.md) - Isolated learning contexts
+- [ADR-006: GRASP Loop Architecture](../adr/006-grasp-loop-architecture.md) - Cognitive architecture
+- [ADR-007: Event-Driven Integration](../adr/007-event-driven-integration.md) - Loose coupling
+- [ADR-008: Dreaming Pipeline](../adr/008-dreaming-pipeline.md) - 5-phase consolidation
+- [ADR-009: CLI-First Interface](../adr/009-cli-first-interface.md) - Scriptability
+- [ADR-010: Immutable Puzzle Engine](../adr/010-immutable-puzzle-engine.md) - Foundation
 
 ### Week 2 Documentation
 
@@ -1901,13 +1974,16 @@ Machine Dream provides a production-ready platform for exploring continuous mach
 ### What You've Learned
 
 - ✅ How to install and configure Machine Dream
-- ✅ All 25 CLI commands with real backend integration
+- ✅ All CLI commands with real backend integration
 - ✅ How to use the interactive TUI
 - ✅ GRASP loop and dreaming pipeline concepts
 - ✅ LLM integration and profile management
+- ✅ AISP mode for low-ambiguity prompts
+- ✅ Model management for LM Studio
 - ✅ Memory persistence and consolidation
 - ✅ Best practices for production use
 - ✅ Advanced usage patterns and automation
+- ✅ Architecture Decision Records (ADRs)
 
 ### Next Steps
 

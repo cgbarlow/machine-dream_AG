@@ -1,6 +1,7 @@
 /**
  * Response Parser - Extracts moves from LLM output
  * Specification: docs/specs/11-llm-sudoku-player.md
+ * Specification: docs/specs/16-aisp-mode-spec.md
  */
 
 import type { LLMMove, LLMResponse } from './types.js';
@@ -14,31 +15,49 @@ import type { LLMMove, LLMResponse } from './types.js';
  * - VALUE: 1-N (depends on grid size)
  * - REASONING: step-by-step analysis
  *
+ * Spec 16: Also parses AISP move format:
+ * - ⟦Ε:Move⟧{(r,c,v)⊢proof}
+ *
  * Supports variable grid sizes (4x4, 9x9, 16x16, 25x25)
  */
 export class ResponseParser {
   /**
    * Parse LLM response into structured move
    *
-   * Expected format:
+   * Expected formats:
+   *
+   * Standard format:
    * ROW: <number>
    * COL: <number>
    * VALUE: <number>
    * REASONING: <text>
+   *
+   * AISP format (Spec 16):
+   * ⟦Ε:Move⟧{(r,c,v)⊢proof}
    *
    * @param rawResponse - Raw LLM response text
    * @param gridSize - Grid size for validation (default: 9)
    */
   parse(rawResponse: string, gridSize: number = 9): LLMResponse {
     try {
-      const move = this.extractMove(rawResponse);
+      // Spec 16: Try AISP format first if response contains AISP markers
+      let move: LLMMove | null = null;
+
+      if (rawResponse.includes('⟦Ε:Move⟧') || rawResponse.includes('⟦Ε:')) {
+        move = this.extractAISPMove(rawResponse);
+      }
+
+      // Fall back to standard format if AISP parsing failed
+      if (!move) {
+        move = this.extractMove(rawResponse);
+      }
 
       if (!move) {
         return {
           move: this.createEmptyMove(),
           rawResponse,
           parseSuccess: false,
-          parseError: 'Could not extract ROW, COL, VALUE from response',
+          parseError: 'Could not extract move from response (tried AISP and standard formats)',
         };
       }
 
@@ -67,6 +86,92 @@ export class ResponseParser {
           error instanceof Error ? error.message : 'Unknown parse error',
       };
     }
+  }
+
+  /**
+   * Extract move from AISP format
+   *
+   * Spec 16: Parses AISP move format:
+   * ⟦Ε:Move⟧{(r,c,v)⊢proof}
+   *
+   * Also handles the format where analysis precedes the move:
+   * ⟦Σ:Analysis⟧{...}⟦Ε:Move⟧{(r,c,v)⊢...}
+   */
+  private extractAISPMove(text: string): LLMMove | null {
+    // Pattern 1: ⟦Ε:Move⟧{(r,c,v)⊢...}
+    // Matches: (1,1,2)⊢∧(row_missing=2)∧(col_missing=2)∧(box_missing=2)
+    const moveBlockPattern = /⟦Ε:Move⟧\{\s*\((\d+),(\d+),(\d+)\)⊢([^}]*)\}/;
+    const moveMatch = text.match(moveBlockPattern);
+
+    if (moveMatch) {
+      return {
+        row: parseInt(moveMatch[1], 10),
+        col: parseInt(moveMatch[2], 10),
+        value: parseInt(moveMatch[3], 10),
+        reasoning: this.formatAISPReasoning(moveMatch[4], text),
+      };
+    }
+
+    // Pattern 2: Just (r,c,v)⊢ without the block wrapper
+    const simpleMovePattern = /\((\d+),(\d+),(\d+)\)⊢([^\n⟦}]*)/;
+    const simpleMatch = text.match(simpleMovePattern);
+
+    if (simpleMatch) {
+      return {
+        row: parseInt(simpleMatch[1], 10),
+        col: parseInt(simpleMatch[2], 10),
+        value: parseInt(simpleMatch[3], 10),
+        reasoning: this.formatAISPReasoning(simpleMatch[4], text),
+      };
+    }
+
+    // Pattern 3: ⟦Ε:...⟧{...} with embedded (r,c,v)
+    const genericBlockPattern = /⟦Ε:[^⟧]*⟧\{[^}]*\((\d+),(\d+),(\d+)\)[^}]*\}/;
+    const genericMatch = text.match(genericBlockPattern);
+
+    if (genericMatch) {
+      return {
+        row: parseInt(genericMatch[1], 10),
+        col: parseInt(genericMatch[2], 10),
+        value: parseInt(genericMatch[3], 10),
+        reasoning: this.extractAISPAnalysis(text),
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Format AISP reasoning/proof into readable form
+   */
+  private formatAISPReasoning(proof: string, fullText: string): string {
+    // Include analysis block if present
+    const analysis = this.extractAISPAnalysis(fullText);
+    if (analysis) {
+      return `${analysis} | Proof: ${proof.trim()}`;
+    }
+    return proof.trim() || 'AISP proof';
+  }
+
+  /**
+   * Extract analysis from AISP ⟦Σ:Analysis⟧ block
+   */
+  private extractAISPAnalysis(text: string): string {
+    // Find the first analysis block that corresponds to the first move
+    const analysisPattern = /⟦Σ:Analysis⟧\{([^}]+)\}/;
+    const match = text.match(analysisPattern);
+
+    if (match) {
+      // Extract key info: cell, candidates
+      const cellMatch = match[1].match(/cell[≜≔]\((\d+),(\d+)\)/);
+      const candidatesMatch = match[1].match(/candidates[≜≔]\{([^}]+)\}/);
+
+      if (cellMatch && candidatesMatch) {
+        return `Cell (${cellMatch[1]},${cellMatch[2]}) candidates={${candidatesMatch[1]}}`;
+      }
+      return match[1].replace(/\s+/g, ' ').trim();
+    }
+    return '';
   }
 
   /**

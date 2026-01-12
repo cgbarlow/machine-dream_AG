@@ -1,10 +1,12 @@
 /**
  * Prompt Builder - Constructs prompts from puzzle state
  * Specification: docs/specs/11-llm-sudoku-player.md
+ * Specification: docs/specs/16-aisp-mode-spec.md
  */
 
 import type { LLMExperience, FewShotExample, SynthesizedPattern } from './types.js';
 import { BoardFormatter } from './BoardFormatter.js';
+import { AISPBuilder, type ForbiddenMove } from './AISPBuilder.js';
 
 /**
  * Prompt Builder
@@ -14,9 +16,16 @@ import { BoardFormatter } from './BoardFormatter.js';
  * - Move history for this puzzle
  * - Few-shot examples (when memory enabled)
  * - Enhanced strategy evaluation format (Spec 11 - Enhanced Prompt Format)
+ *
+ * Spec 16: AISP mode support
+ * - --aisp: Convert prompts to AISP syntax (normal output)
+ * - --aisp-full: Include AISP spec, expect AISP output
  */
 export class PromptBuilder {
   private useAnonymousPatterns = false;
+  private useAISP = false;
+  private useAISPFull = false;
+  private aispBuilder: AISPBuilder | null = null;
 
   /**
    * @param includeReasoning - Include reasoning snippets in move history
@@ -38,6 +47,20 @@ export class PromptBuilder {
   }
 
   /**
+   * Enable AISP mode
+   *
+   * Spec 16: AISP mode converts prompts to AISP syntax.
+   * @param mode - 'off' | 'aisp' | 'aisp-full'
+   */
+  setAISPMode(mode: 'off' | 'aisp' | 'aisp-full'): void {
+    this.useAISP = mode === 'aisp' || mode === 'aisp-full';
+    this.useAISPFull = mode === 'aisp-full';
+    if (this.useAISP && !this.aispBuilder) {
+      this.aispBuilder = new AISPBuilder();
+    }
+  }
+
+  /**
    * Build complete prompt for LLM
    *
    * @param gridState - Current 9x9 grid (0 = empty, 1-9 = filled)
@@ -55,6 +78,11 @@ export class PromptBuilder {
     allExperiences?: LLMExperience[],
     profileSystemPrompt?: string
   ): string {
+    // Spec 16: Route to AISP format when enabled
+    if (this.useAISP && this.aispBuilder) {
+      return this.buildAISPPrompt(gridState, experiencesToShow, fewShots, allExperiences);
+    }
+
     const size = gridState.length;
     let prompt = '';
 
@@ -362,6 +390,51 @@ Use the first matching pattern. Follow its template exactly.`;
     if (!analysis) return 'Apply constraint reasoning';
     const firstLine = analysis.split('\n')[0] || analysis.split('.')[0];
     return firstLine.trim().substring(0, 100);
+  }
+
+  /**
+   * Build AISP-formatted prompt
+   *
+   * Spec 16: Converts prompt to AISP syntax for low-ambiguity communication.
+   * Uses AISPBuilder to format grid, strategies, history, and forbidden moves.
+   */
+  private buildAISPPrompt(
+    gridState: number[][],
+    experiencesToShow: LLMExperience[],
+    fewShots: FewShotExample[],
+    allExperiences?: LLMExperience[]
+  ): string {
+    if (!this.aispBuilder) {
+      throw new Error('AISPBuilder not initialized');
+    }
+
+    // Extract forbidden moves from all experiences
+    const forbiddenSource = allExperiences || experiencesToShow;
+    const forbidden: ForbiddenMove[] = [];
+
+    for (const exp of forbiddenSource) {
+      if (exp.validation.outcome === 'invalid' || exp.validation.outcome === 'valid_but_wrong') {
+        forbidden.push({
+          row: exp.move.row,
+          col: exp.move.col,
+          value: exp.move.value,
+          reason: exp.validation.error || exp.validation.outcome,
+        });
+      }
+    }
+
+    // Build AISP prompt
+    return this.aispBuilder.buildAISPPrompt(
+      gridState,
+      experiencesToShow,
+      fewShots,
+      forbidden,
+      {
+        includeSpec: this.useAISPFull,
+        gridSize: gridState.length,
+        anonymousPatterns: this.useAnonymousPatterns,
+      }
+    );
   }
 
 }

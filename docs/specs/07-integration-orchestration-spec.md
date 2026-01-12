@@ -7,6 +7,14 @@
 
 ---
 
+## Related ADRs
+
+| ADR | Relationship |
+|-----|--------------|
+| [ADR-007: Event-Driven Integration](../adr/007-event-driven-integration.md) | Authorizes this spec |
+
+---
+
 ## 1. Component Overview
 
 ### 1.1 Purpose and Responsibilities

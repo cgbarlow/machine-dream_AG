@@ -17,9 +17,7 @@
 # Examples:
 #   ./scripts/ab-test-learning.sh --puzzle puzzles/4x4-diabolical.json
 #   ./scripts/ab-test-learning.sh --skip-dream --runs 5
-#   ./scripts/ab-test-learning.sh --profile qwen3-coder --learning-unit training-v1
 #   ./scripts/ab-test-learning.sh --stream --runs 2
-#   ./scripts/ab-test-learning.sh --reasoning-template --runs 5
 
 set -e
 
@@ -28,11 +26,15 @@ PROFILE="qwen3-coder"
 PUZZLE="puzzles/4x4-expert.json"
 RUNS=10
 SKIP_DREAM=false
-LEARNING_UNIT="default"
+LEARNING_UNIT=""  # Will be auto-generated if not specified
 STREAM=false
 REASONING_TEMPLATE=false
-ANONYMOUS_PATTERNS=false
 DEBUG=false
+AISP=false
+AISP_FULL=false
+# Note: anonymous-patterns and save-reasoning are ON by default in CLI
+NO_ANONYMOUS_PATTERNS=false
+NO_SAVE_REASONING=false
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -65,12 +67,24 @@ while [[ $# -gt 0 ]]; do
       REASONING_TEMPLATE=true
       shift
       ;;
-    --anonymous-patterns)
-      ANONYMOUS_PATTERNS=true
+    --no-anonymous-patterns)
+      NO_ANONYMOUS_PATTERNS=true
+      shift
+      ;;
+    --no-save-reasoning)
+      NO_SAVE_REASONING=true
       shift
       ;;
     --debug)
       DEBUG=true
+      shift
+      ;;
+    --aisp)
+      AISP=true
+      shift
+      ;;
+    --aisp-full)
+      AISP_FULL=true
       shift
       ;;
     -h|--help)
@@ -78,12 +92,15 @@ while [[ $# -gt 0 ]]; do
       echo "  --profile <name>        LLM profile to use (default: qwen3-coder)"
       echo "  --puzzle <path>         Puzzle file to use (default: puzzles/4x4-expert.json)"
       echo "  --runs <n>              Number of runs per phase (default: 10)"
-      echo "  --learning-unit <id>    Use specific learning unit (default: \"default\")"
+      echo "  --learning-unit <id>    Learning unit to use (auto-generated if not specified)"
       echo "  --stream                Show live gameplay during runs (verbose mode)"
       echo "  --skip-dream            Skip Phase 2 (dream cycle) - use existing learned strategies"
       echo "  --reasoning-template    Use structured constraint-intersection format"
-      echo "  --anonymous-patterns    Use anonymous pattern format for learned strategies"
+      echo "  --no-anonymous-patterns Disable anonymous pattern format (enabled by default)"
+      echo "  --no-save-reasoning     Disable full reasoning storage (enabled by default)"
       echo "  --debug                 Show full prompts sent to LLM"
+      echo "  --aisp                  Use AISP syntax for prompts (low-ambiguity format)"
+      echo "  --aisp-full             Use full AISP mode (includes spec, expects AISP output)"
       echo "  -h, --help              Show this help"
       exit 0
       ;;
@@ -95,6 +112,41 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Auto-generate learning unit name if not specified
+# Format: profileName_(AISP/AISP-full)_YYYYMMDD[_XX]
+if [ -z "$LEARNING_UNIT" ]; then
+  BASE_NAME="$PROFILE"
+
+  # Add mode suffix
+  if [ "$AISP_FULL" = true ]; then
+    BASE_NAME="${BASE_NAME}_AISP-full"
+  elif [ "$AISP" = true ]; then
+    BASE_NAME="${BASE_NAME}_AISP"
+  fi
+
+  # Add date
+  DATE_STR=$(date +%Y%m%d)
+  LEARNING_UNIT="${BASE_NAME}_${DATE_STR}"
+
+  # Check if this unit already exists, append increment if needed
+  EXISTING=$(npx machine-dream llm learning list --profile "$PROFILE" --format json 2>/dev/null | grep -o "\"id\":\"${LEARNING_UNIT}[^\"]*\"" | wc -l || echo "0")
+  if [ "$EXISTING" -gt 0 ]; then
+    for i in $(seq 1 99); do
+      INCREMENT=$(printf "%02d" $i)
+      CANDIDATE="${LEARNING_UNIT}_${INCREMENT}"
+      EXISTS=$(npx machine-dream llm learning list --profile "$PROFILE" --format json 2>/dev/null | grep -o "\"id\":\"${CANDIDATE}\"" | wc -l || echo "0")
+      if [ "$EXISTS" -eq 0 ]; then
+        LEARNING_UNIT="$CANDIDATE"
+        break
+      fi
+    done
+  fi
+
+  AUTO_GENERATED=true
+else
+  AUTO_GENERATED=false
+fi
+
 RESULTS_DIR="./ab-test-results/$(date +%Y%m%d_%H%M%S)"
 
 echo "=============================================="
@@ -103,17 +155,25 @@ echo "=============================================="
 echo "Profile: $PROFILE"
 echo "Puzzle: $PUZZLE"
 echo "Runs per phase: $RUNS"
-echo "Learning unit: $LEARNING_UNIT"
+if [ "$AUTO_GENERATED" = true ]; then
+  echo "Learning unit: $LEARNING_UNIT (auto-generated)"
+else
+  echo "Learning unit: $LEARNING_UNIT"
+fi
 echo "Stream mode: $STREAM"
 echo "Skip dream cycle: $SKIP_DREAM"
 echo "Reasoning template: $REASONING_TEMPLATE"
-echo "Anonymous patterns: $ANONYMOUS_PATTERNS"
 echo "Debug mode: $DEBUG"
+echo "AISP mode: $AISP"
+echo "AISP-Full mode: $AISP_FULL"
+echo "Anonymous patterns: enabled (default)"
+echo "Save reasoning: enabled (default)"
 echo "Results: $RESULTS_DIR"
 echo "=============================================="
 echo ""
 
 # Build extra options for play command
+# Note: anonymous-patterns and save-reasoning are ON by default in CLI
 EXTRA_OPTS=""
 if [ "$STREAM" = true ]; then
   EXTRA_OPTS="$EXTRA_OPTS --visualize"
@@ -121,17 +181,26 @@ fi
 if [ "$REASONING_TEMPLATE" = true ]; then
   EXTRA_OPTS="$EXTRA_OPTS --reasoning-template"
 fi
-if [ "$ANONYMOUS_PATTERNS" = true ]; then
-  EXTRA_OPTS="$EXTRA_OPTS --anonymous-patterns"
+if [ "$NO_ANONYMOUS_PATTERNS" = true ]; then
+  EXTRA_OPTS="$EXTRA_OPTS --no-anonymous-patterns"
 fi
 if [ "$DEBUG" = true ]; then
   EXTRA_OPTS="$EXTRA_OPTS --debug"
 fi
+if [ "$AISP_FULL" = true ]; then
+  EXTRA_OPTS="$EXTRA_OPTS --aisp-full"
+elif [ "$AISP" = true ]; then
+  EXTRA_OPTS="$EXTRA_OPTS --aisp"
+fi
+if [ "$NO_SAVE_REASONING" = true ]; then
+  EXTRA_OPTS="$EXTRA_OPTS --no-save-reasoning"
+fi
 
 # Build extra options for dream command
+# anonymous-patterns is ON by default in dream command too
 DREAM_OPTS=""
-if [ "$ANONYMOUS_PATTERNS" = true ]; then
-  DREAM_OPTS="$DREAM_OPTS --anonymous-patterns"
+if [ "$NO_ANONYMOUS_PATTERNS" = true ]; then
+  DREAM_OPTS="$DREAM_OPTS --no-anonymous-patterns"
 fi
 
 mkdir -p "$RESULTS_DIR"

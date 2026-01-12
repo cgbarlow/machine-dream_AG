@@ -1,5 +1,16 @@
 # Specification 11: LLM Sudoku Player
 
+---
+
+## Related ADRs
+
+| ADR | Relationship |
+|-----|--------------|
+| [ADR-001: Pure LLM Solving](../adr/001-pure-llm-solving.md) | Authorizes pure LLM approach |
+| [ADR-002: Local LLM Provider](../adr/002-local-llm-provider.md) | Authorizes LM Studio integration |
+
+---
+
 ## Overview
 
 This specification defines the architecture for a **true LLM-based Sudoku player** where a Large Language Model iteratively attempts to solve puzzles through reasoning, feedback, and learning.
@@ -172,6 +183,41 @@ src/llm/
 - `countEmptyCells(grid)` - Utility to count empty cells
 
 **Design Pattern**: Static utility class to avoid code duplication
+
+### Reasoning Token Capture (Added 2026-01-12)
+
+LM Studio v0.3.9+ can expose the model's internal reasoning separately from the final output.
+
+#### LM Studio Configuration
+
+Enable in **LM Studio → App Settings → Developer**:
+> "When applicable, separate reasoning_content and content in API responses"
+
+#### API Response Fields
+
+| Mode | Field |
+|------|-------|
+| Non-streaming | `choices.message.reasoning` or `choices.message.reasoning_content` |
+| Streaming | `choices.delta.reasoning` or `choices.delta.reasoning_content` |
+
+#### CLI Flag
+
+```bash
+npx machine-dream llm play puzzle.json --profile <name> --show-reasoning
+```
+
+When `--show-reasoning` is enabled:
+- Full reasoning tokens are displayed before the final ROW/COL/VALUE output
+- Useful for debugging model behavior and understanding decision chains
+- Works with reasoning-capable models (gpt-oss-120b, DeepSeek-R1, etc.)
+
+#### Implementation Notes
+
+`LMStudioClient.handleStreamingResponse()` extracts both:
+- `delta.reasoning` / `delta.reasoning_content` → Internal reasoning
+- `delta.content` → Final output
+
+Both are streamed to display via the `onStream` callback.
 
 ## Interfaces
 

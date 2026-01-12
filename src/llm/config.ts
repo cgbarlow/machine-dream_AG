@@ -2,11 +2,25 @@
  * LLM Sudoku Player - Configuration
  * Specification: docs/specs/11-llm-sudoku-player.md
  * Specification: docs/specs/13-llm-profile-management.md
+ * Specification: docs/specs/16-aisp-mode-spec.md
  */
 
 import type { LLMConfig } from './types.js';
 import { LLMProfileManager } from './profiles/index.js';
 import type { LLMProfile } from './profiles/index.js';
+import { AISPBuilder, type AISPMode } from './AISPBuilder.js';
+
+/**
+ * LLM Retry Configuration
+ *
+ * Used for waitForAvailability() retry loop when LLM is temporarily unavailable.
+ * 10 second wait, 6 retries = 60 seconds total maximum wait.
+ */
+export const LLM_RETRY_CONFIG = {
+  maxRetries: 6,
+  retryDelayMs: 10000,  // 10 seconds
+  maxTimeoutMs: 60000,  // 60 seconds total
+} as const;
 
 /**
  * Default LLM Configuration
@@ -50,16 +64,36 @@ export const SYSTEM_PROMPT = buildSystemPrompt(9);
 export interface SystemPromptOptions {
   /** Use structured reasoning template (constraint intersection format) */
   useReasoningTemplate?: boolean;
+  /** AISP mode: 'off' | 'aisp' | 'aisp-full' (Spec 16) */
+  aispMode?: AISPMode;
 }
+
+// Re-export AISPMode for convenience
+export type { AISPMode };
 
 /**
  * Build system prompt for specific grid size
  * Supports 4x4, 9x9, 16x16, 25x25 grids
  *
+ * Spec 16: AISP mode support
+ * - 'aisp': Pure AISP prompt (no generation spec, normal output expected)
+ * - 'aisp-full': Pure AISP prompt + generation spec + AISP output enforcement
+ *
  * @param gridSize - Grid dimension (4, 9, 16, or 25)
  * @param options - Optional configuration for prompt style
  */
 export function buildSystemPrompt(gridSize: number, options: SystemPromptOptions = {}): string {
+  // Spec 16: AISP modes - return pure AISP system prompt
+  if (options.aispMode === 'aisp-full') {
+    const aispBuilder = new AISPBuilder();
+    return aispBuilder.buildAISPSystemPrompt(gridSize);
+  }
+
+  if (options.aispMode === 'aisp') {
+    // Standard AISP mode: Pure AISP prompt but expects normal text output
+    return buildAISPSystemPromptBasic(gridSize);
+  }
+
   const boxSize = Math.sqrt(gridSize);
   const maxValue = gridSize;
 
@@ -185,6 +219,7 @@ export function profileToConfig(profile: LLMProfile): LLMConfig {
   return {
     baseUrl,
     model: profile.model,
+    modelPath: profile.modelPath,
     temperature: profile.parameters.temperature,
     maxTokens: profile.parameters.maxTokens,
     timeout: profile.timeout,
@@ -244,4 +279,59 @@ export function getLLMConfig(profileName?: string): LLMConfig {
   } catch (error) {
     throw new Error(`Failed to load profile "${profileName}": ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+/**
+ * Build basic AISP system prompt (without generation spec)
+ *
+ * Spec 16: Standard AISP mode ('--aisp')
+ * - Pure AISP syntax for the prompt
+ * - But expects normal text output (ROW: X, COL: Y, VALUE: Z)
+ * - No generation spec included
+ * - No AISP output enforcement
+ *
+ * @param gridSize - Grid dimension (4, 9, 16, or 25)
+ */
+function buildAISPSystemPromptBasic(gridSize: number): string {
+  const boxSize = Math.sqrt(gridSize);
+  const date = new Date().toISOString().split('T')[0];
+
+  return `𝔸1.0.sudoku.system@${date}
+γ≔sudoku.solving.instruction
+ρ≔⟨rules,notation,feedback,output⟩
+
+⟦Ω:Rules⟧{
+  grid≜${gridSize}×${gridSize}
+  boxes≜${gridSize}×(${boxSize}×${boxSize})
+  ∀row∈{1..${gridSize}}:∀v∈{1..${gridSize}}:count(row,v)=1
+  ∀col∈{1..${gridSize}}:∀v∈{1..${gridSize}}:count(col,v)=1
+  ∀box∈{1..${gridSize}}:∀v∈{1..${gridSize}}:count(box,v)=1
+}
+
+⟦Σ:Notation⟧{
+  filled≜{1..${gridSize}}:immutable
+  empty≜0:mutable
+  index≜{1..${gridSize}}
+}
+
+⟦Γ:Feedback⟧{
+  ⊕≔CORRECT:move_accepted
+  ⊖≔INVALID:rule_violation
+  ⊘≔VALID_BUT_WRONG:legal_but_incorrect
+}
+
+⟦Χ:Banned⟧{
+  ∀m∈banned:attempt(m)⇒⊘:immediate_rejection
+  constraint≔HARD
+  ¬retry(banned)
+}
+
+⟦Ε:Output⟧{
+  ;; Output in standard text format
+  format≔"ROW: <1-${gridSize}>\\nCOL: <1-${gridSize}>\\nVALUE: <1-${gridSize}>\\nREASONING: <brief>"
+
+  ;; Constraints
+  ¬restart; ¬second_guess
+  reasoning.length≤200
+}`;
 }

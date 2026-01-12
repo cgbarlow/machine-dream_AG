@@ -31,6 +31,9 @@ Machine Dream is a **research platform** exploring continuous machine cognition 
 ### Prerequisites
 - **Node.js v20+** (v24 fully supported)
 - **npm** (comes with Node.js)
+- **LM Studio** (optional) - For LLM integration, running on localhost:1234
+
+> **Test Environment Note:** Machine Dream is developed and tested on WSL (Windows Subsystem for Linux) with LM Studio running on the Windows host. The `llm play` command includes automatic model loading that requires the `lms` CLI to be accessible from WSL. See [CLI Reference - WSL Setup](docs/cli-reference.md#test-environment-wsl--lm-studio) for configuration details.
 
 ### Installation
 ```bash
@@ -297,6 +300,45 @@ machine-dream llm learning merge unit1 unit2 --output merged-unit
 
 # Iterative learning: track improvement over time
 ./scripts/iterative-learning.sh --batch-size 2 --total-plays 10 --learning-unit train-v1
+
+# AISP mode for low-ambiguity prompts
+./scripts/ab-test-learning.sh --puzzle puzzles/9x9-easy.json --aisp
+
+# Double strategies for enhanced learning
+./scripts/iterative-learning.sh --learning-unit deep-v1 --double-strategies
+```
+
+### AISP Mode
+
+AI Specification Protocol (AISP) for low-ambiguity AI-to-AI communication:
+
+```bash
+# --aisp: Convert prompts to AISP syntax (model responds normally)
+machine-dream llm play puzzles/9x9-easy.json --aisp
+
+# --aisp-full: End-to-end AISP (spec in prompt, model outputs AISP)
+machine-dream llm play puzzles/9x9-easy.json --aisp-full
+```
+
+### LM Studio Model Management
+
+> **Note:** The `llm play` command now automatically loads the required model based on your profile configuration. Manual model management is typically not needed.
+
+```bash
+# List available models
+machine-dream llm model list
+
+# Manual model control (use lms CLI directly)
+lms load "qwen3-30b-instruct"
+lms unload --all
+lms ps  # Show loaded models
+```
+
+### Reasoning Token Display
+
+```bash
+# Show full LM Studio reasoning tokens (v0.3.9+)
+machine-dream llm play puzzles/9x9-easy.json --show-reasoning
 ```
 
 ---
@@ -411,7 +453,12 @@ machine-dream_AG/
 ### Research Documentation
 - [Continuous Machine Thinking Research](docs/continuous-machine-thinking-research.md)
 - [POC Strategy Report](docs/poc-strategy-report.md)
-- [14 Formal Specifications](docs/specs/)
+- [17 Formal Specifications](docs/specs/)
+- [10 Architecture Decision Records](docs/adr/)
+- [Hardest Sudoku Puzzles](docs/research/hardest-sudoku-puzzles.md)
+
+### Notable Puzzles
+- **AI Escargot** - World's hardest 9x9 Sudoku (Arto Inkala, 2006): `puzzles/9x9-ai-escargot.json`
 
 ---
 
@@ -423,7 +470,9 @@ machine-dream_AG/
 | [**Week 2 Completion Report**](docs/WEEK2-COMPLETION-REPORT.md) | Full Week 2 implementation summary (310 tests, 0 mocks) |
 | [**Production Action Plan**](docs/PRODUCTION_ACTION_PLAN.md) | 11-week roadmap to full production deployment |
 | [**Week 2 Progress Tracker**](docs/week2-progress.md) | Day-by-day Week 2 breakdown |
-| [**Architecture Specs**](docs/specs/) | 14 formal specifications (Spec 01-14) |
+| [**Architecture Specs**](docs/specs/) | 17 formal specifications (Spec 01-17) |
+| [**Architecture Decision Records**](docs/adr/) | 10 ADRs documenting key decisions |
+| [**Hardest Puzzles Research**](docs/research/hardest-sudoku-puzzles.md) | Research on world's hardest Sudoku puzzles |
 
 ---
 

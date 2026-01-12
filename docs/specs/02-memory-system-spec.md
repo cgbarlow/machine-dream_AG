@@ -7,6 +7,14 @@
 
 ---
 
+## Related ADRs
+
+| ADR | Relationship |
+|-----|--------------|
+| [ADR-003: Memory Persistence](../adr/003-memory-persistence.md) | Authorizes this spec |
+
+---
+
 ## 1. Component Overview
 
 ### 1.1 Purpose and Responsibilities

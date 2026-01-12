@@ -7,6 +7,14 @@
 
 ---
 
+## Related ADRs
+
+| ADR | Relationship |
+|-----|--------------|
+| [ADR-006: GRASP Loop Architecture](../adr/006-grasp-loop-architecture.md) | Authorizes this spec |
+
+---
+
 ## 1. Component Overview
 
 ### 1.1 Purpose and Responsibilities

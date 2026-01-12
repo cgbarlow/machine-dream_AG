@@ -6,6 +6,15 @@
 import type { LLMConfig, ChatMessage } from './types.js';
 
 /**
+ * Result from chat() method
+ * Contains both content and optional full reasoning tokens
+ */
+export interface ChatResult {
+  content: string;
+  reasoning?: string;  // Full streaming reasoning tokens from LM Studio
+}
+
+/**
  * OpenAI-compatible API response
  */
 interface ChatCompletionResponse {
@@ -43,11 +52,14 @@ export class LMStudioClient {
    * Spec 11: Uses OpenAI-compatible /v1/chat/completions endpoint
    * @param messages - Chat messages to send
    * @param onStream - Optional callback for streaming tokens
+   * @param onReasoning - Optional callback for reasoning tokens (LM Studio v0.3.9+ with Developer setting)
+   * @returns ChatResult with content and optional full reasoning
    */
   async chat(
     messages: ChatMessage[],
-    onStream?: (token: string) => void
-  ): Promise<string> {
+    onStream?: (token: string) => void,
+    onReasoning?: (token: string) => void
+  ): Promise<ChatResult> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
@@ -76,7 +88,7 @@ export class LMStudioClient {
 
       // Handle streaming response
       if (onStream && response.body) {
-        return await this.handleStreamingResponse(response, onStream, controller.signal);
+        return await this.handleStreamingResponse(response, onStream, controller.signal, onReasoning);
       }
 
       // Handle non-streaming response
@@ -86,7 +98,7 @@ export class LMStudioClient {
         throw new Error('No response from LM Studio');
       }
 
-      return data.choices[0].message.content;
+      return { content: data.choices[0].message.content };
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         throw new Error(
@@ -102,15 +114,24 @@ export class LMStudioClient {
   /**
    * Handle streaming response from LM Studio
    * Now properly respects abort signal during streaming
+   * Supports reasoning token capture (LM Studio v0.3.9+)
+   *
+   * @param response - Fetch response with streaming body
+   * @param onStream - Callback for content tokens
+   * @param signal - Abort signal for timeout handling
+   * @param onReasoning - Optional callback for reasoning tokens (LM Studio Developer setting required)
+   * @returns ChatResult with content and optional full reasoning
    */
   private async handleStreamingResponse(
     response: Response,
     onStream: (token: string) => void,
-    signal: AbortSignal
-  ): Promise<string> {
+    signal: AbortSignal,
+    onReasoning?: (token: string) => void
+  ): Promise<ChatResult> {
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let fullContent = '';
+    let fullReasoning = '';
     let finishReason: string | null = null;
 
     try {
@@ -134,11 +155,25 @@ export class LMStudioClient {
 
             try {
               const parsed = JSON.parse(data);
-              const token = parsed.choices?.[0]?.delta?.content;
+              const delta = parsed.choices?.[0]?.delta;
+
+              // Extract reasoning tokens (LM Studio v0.3.9+ with Developer setting enabled)
+              // Try both field names: reasoning (gpt-oss style) and reasoning_content (DeepSeek style)
+              const reasoning = delta?.reasoning || delta?.reasoning_content;
+              if (reasoning) {
+                fullReasoning += reasoning;
+                if (onReasoning) {
+                  onReasoning(reasoning);
+                }
+              }
+
+              // Extract content tokens
+              const token = delta?.content;
               if (token) {
                 fullContent += token;
                 onStream(token);
               }
+
               // Capture finish_reason when it appears
               const reason = parsed.choices?.[0]?.finish_reason;
               if (reason) {
@@ -159,7 +194,11 @@ export class LMStudioClient {
       throw new Error(`LLM response incomplete: finish_reason=${finishReason}`);
     }
 
-    return fullContent;
+    // Return both content and reasoning (if any was captured)
+    return {
+      content: fullContent,
+      reasoning: fullReasoning || undefined,
+    };
   }
 
   /**

@@ -7,6 +7,14 @@
 
 ---
 
+## Related ADRs
+
+| ADR | Relationship |
+|-----|--------------|
+| [ADR-004: Spec-First Development](../adr/004-spec-first-development.md) | Governs this spec |
+
+---
+
 ## 1. Component Overview
 
 ### 1.1 Purpose and Responsibilities

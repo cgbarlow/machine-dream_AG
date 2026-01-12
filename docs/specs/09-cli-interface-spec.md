@@ -7,6 +7,14 @@
 
 ---
 
+## Related ADRs
+
+| ADR | Relationship |
+|-----|--------------|
+| [ADR-009: CLI-First Interface](../adr/009-cli-first-interface.md) | Authorizes this spec |
+
+---
+
 ## 1. Executive Summary
 
 This specification defines a comprehensive, production-ready CLI for the Machine Dream system - a Cognitive Puzzle Solver using the GRASP loop and AgentDB memory. The CLI provides unified access to all system capabilities including puzzle solving, memory management, dreaming/consolidation, benchmarking, configuration, and data export.

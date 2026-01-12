@@ -7,6 +7,15 @@
 
 ---
 
+## Related ADRs
+
+| ADR | Relationship |
+|-----|--------------|
+| [ADR-008: Dreaming Pipeline](../adr/008-dreaming-pipeline.md) | Authorizes this spec |
+| [ADR-005: Learning Units](../adr/005-learning-units.md) | Learning unit storage |
+
+---
+
 ## 1. Component Overview
 
 ### 1.1 Purpose and Responsibilities
@@ -1509,6 +1518,70 @@ The memory toggle (Spec 11) affects consolidation:
 
 - **Memory ON**: Full consolidation with few-shot generation
 - **Memory OFF**: No consolidation (baseline mode for A/B testing)
+
+### 8.4 Strategy Count Configuration (Added 2026-01-12)
+
+Strategy counts during consolidation are configurable via CLI options and `ConsolidationOptions`:
+
+#### Default vs Doubled Strategy Counts
+
+| Setting | Default | Doubled (`--double-strategies`) |
+|---------|---------|--------------------------------|
+| fewShotMin | 3 | 6 |
+| fewShotMax | 5 | 10 |
+| mergeMin | 5 | 10 |
+| mergeMax | 7 | 14 |
+
+#### Configuration Interface
+
+```typescript
+interface ConsolidationOptions {
+  doubleStrategies?: boolean;    // If true, double all strategy counts
+  fewShotMin?: number;           // Default: 3 (or 6 if doubled)
+  fewShotMax?: number;           // Default: 5 (or 10 if doubled)
+  mergeMin?: number;             // Default: 5 (or 10 if doubled)
+  mergeMax?: number;             // Default: 7 (or 14 if doubled)
+}
+```
+
+#### CLI Usage
+
+```bash
+# Standard consolidation (3-5 few-shots, 5-7 merged strategies)
+npx machine-dream llm dream run --profile <name> --learning-unit <unit>
+
+# Doubled consolidation (6-10 few-shots, 10-14 merged strategies)
+npx machine-dream llm dream run --profile <name> --learning-unit <unit> --double-strategies
+
+# Dual consolidation (creates BOTH standard AND -2x units from same experiences)
+npx machine-dream llm dream run --profile <name> --learning-unit <unit> --dual-unit
+```
+
+#### Naming Convention
+
+The `--double-strategies` flag automatically appends `-2x` to the learning unit name:
+
+| Command | Resulting Unit Name |
+|---------|---------------------|
+| `--learning-unit training` | `training` |
+| `--learning-unit training --double-strategies` | `training-2x` |
+| `--learning-unit my-exp --double-strategies` | `my-exp-2x` |
+
+The `--dual-unit` flag creates both standard and doubled units from the same experiences:
+- Standard unit: `<unit-name>` (3-5 strategies)
+- Doubled unit: `<unit-name>-2x` (6-10 strategies)
+
+This enables A/B testing between standard and doubled strategy counts without re-running experiences.
+
+#### Rationale
+
+Doubling strategy counts is useful when:
+- Training on large experience sets (100+ moves)
+- Capturing more diverse patterns
+- Reducing over-generalization
+- Building comprehensive strategy libraries
+
+The trade-off is larger prompts and potentially more redundant strategies.
 
 ---
 

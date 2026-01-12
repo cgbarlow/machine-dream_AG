@@ -17,11 +17,15 @@ import { LLMProfileManager, ProfileValidator } from '../../llm/profiles/index.js
 import type { CreateProfileOptions, UpdateProfileOptions, LLMProvider } from '../../llm/profiles/index.js';
 import { LearningUnitManager } from '../../llm/LearningUnitManager.js';
 import type { LearningUnitExport } from '../../llm/LearningUnitManager.js';
-import { DEFAULT_LEARNING_UNIT_ID } from '../../llm/types.js';
+import { DEFAULT_LEARNING_UNIT_ID, DOUBLE_STRATEGY_SUFFIX, NO_LEARNING_UNIT_DISPLAY } from '../../llm/types.js';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { resolve, join, basename } from 'path';
 import * as readline from 'readline/promises';
 import { homedir } from 'os';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 // Helper to create default AgentDB config
 function createDefaultMemoryConfig(): AgentDBConfig {
@@ -46,6 +50,253 @@ function createDefaultMemoryConfig(): AgentDBConfig {
     reflexion: { enabled: true, maxEntries: 1000, similarityThreshold: 0.8 },
     skillLibrary: { enabled: false, minSuccessRate: 0.8, maxSkills: 100, autoConsolidate: false }
   };
+}
+
+/**
+ * Generate a unique profile name with date suffix
+ * Format: baseName_YYYYMMDD or baseName_YYYYMMDD_001 if exists
+ */
+function generateUniqueProfileName(baseName: string, manager: LLMProfileManager): string {
+  // Get current date in YYYYMMDD format
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const dateStr = `${year}${month}${day}`;
+
+  // Create base name with date
+  const nameWithDate = `${baseName}_${dateStr}`;
+
+  // Check if this name already exists
+  if (!manager.get(nameWithDate)) {
+    return nameWithDate;
+  }
+
+  // Find next available increment
+  for (let i = 1; i <= 999; i++) {
+    const increment = String(i).padStart(3, '0');
+    const candidateName = `${nameWithDate}_${increment}`;
+    if (!manager.get(candidateName)) {
+      return candidateName;
+    }
+  }
+
+  // Fallback: use timestamp if all increments exhausted (unlikely)
+  return `${nameWithDate}_${Date.now()}`;
+}
+
+/**
+ * Generate a unique learning unit name based on profile and options
+ * Format: profileName_(AISP/AISP-full)_(2x)_YYYYMMDD_(XX)
+ */
+function generateUniqueLearningUnitName(
+  profileName: string,
+  options: { aisp?: boolean; aispFull?: boolean; doubleStrategies?: boolean },
+  existingUnits: string[]
+): string {
+  // Build base name from profile and mode options
+  let baseName = profileName;
+
+  // Add mode suffix (only one)
+  if (options.aispFull) {
+    baseName += '_AISP-full';
+  } else if (options.aisp) {
+    baseName += '_AISP';
+  }
+
+  // Add 2x suffix if double strategies
+  if (options.doubleStrategies) {
+    baseName += '_2x';
+  }
+
+  // Add date
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const dateStr = `${year}${month}${day}`;
+
+  const nameWithDate = `${baseName}_${dateStr}`;
+
+  // Check if this name already exists
+  if (!existingUnits.includes(nameWithDate)) {
+    return nameWithDate;
+  }
+
+  // Find next available increment
+  for (let i = 1; i <= 99; i++) {
+    const increment = String(i).padStart(2, '0');
+    const candidateName = `${nameWithDate}_${increment}`;
+    if (!existingUnits.includes(candidateName)) {
+      return candidateName;
+    }
+  }
+
+  // Fallback: use timestamp
+  return `${nameWithDate}_${Date.now()}`;
+}
+
+/**
+ * Find the lms CLI executable path
+ * In WSL, lms is typically an alias to the Windows LM Studio CLI
+ */
+async function findLmsPath(): Promise<string | null> {
+  // Common locations to check
+  const homeDir = homedir();
+  const possiblePaths = [
+    'lms', // In PATH
+    'lms.exe', // Windows executable accessible from WSL
+    `${homeDir}/.lmstudio/bin/lms`,
+    `${homeDir}/.lmstudio/bin/lms.exe`,
+    '/mnt/c/Users/*/AppData/Local/LM-Studio/lms.exe',
+  ];
+
+  // Try each path
+  for (const lmsPath of possiblePaths) {
+    try {
+      // Use 'command -v' to check if it's executable
+      if (lmsPath.includes('*')) {
+        // Glob pattern - use bash to expand
+        const { stdout } = await execAsync(`bash -c 'ls ${lmsPath} 2>/dev/null | head -1'`, { timeout: 5000 });
+        if (stdout.trim()) {
+          return stdout.trim();
+        }
+      } else {
+        await execAsync(`command -v "${lmsPath}" || test -x "${lmsPath}"`, { timeout: 5000 });
+        return lmsPath;
+      }
+    } catch {
+      // Not found, try next
+    }
+  }
+
+  // Try to extract from user's bash aliases
+  try {
+    const { stdout } = await execAsync(
+      `grep -h "alias lms=" ~/.bashrc ~/.bash_aliases 2>/dev/null | head -1 | sed "s/.*=['\\"]\\?\\([^'\\";]*\\).*/\\1/"`,
+      { timeout: 5000 }
+    );
+    if (stdout.trim()) {
+      return stdout.trim();
+    }
+  } catch {
+    // No alias found
+  }
+
+  return null;
+}
+
+// Cache the lms path once found
+let cachedLmsPath: string | null | undefined = undefined;
+
+/**
+ * Run an lms command, automatically finding the correct executable path
+ */
+async function runLmsCommand(args: string, timeout = 30000): Promise<{ stdout: string; stderr: string }> {
+  // Find lms path if not cached
+  if (cachedLmsPath === undefined) {
+    cachedLmsPath = await findLmsPath();
+    if (cachedLmsPath) {
+      logger.debug(`   Found lms at: ${cachedLmsPath}`);
+    }
+  }
+
+  if (!cachedLmsPath) {
+    throw new Error('lms CLI not found. Please ensure LM Studio CLI is installed and accessible.');
+  }
+
+  // Run the command
+  const fullCommand = `"${cachedLmsPath}" ${args}`;
+  return execAsync(fullCommand, { timeout });
+}
+
+/**
+ * Ensure the required model is loaded in LM Studio
+ * Uses lms CLI to unload/load models as needed
+ * @param requiredModel - Friendly model name (for display and API matching)
+ * @param baseUrl - LM Studio API base URL
+ * @param modelPath - Full model path for lms CLI (e.g., "Qwen/QwQ-32B-GGUF/qwq-32b-q8_0.gguf")
+ */
+async function ensureModelLoaded(requiredModel: string, baseUrl: string, modelPath?: string): Promise<boolean> {
+  const { LMStudioModelManager } = await import('../../llm/ModelManager.js');
+  const manager = new LMStudioModelManager(baseUrl);
+
+  // Check if LM Studio is reachable
+  const healthy = await manager.healthCheck();
+  if (!healthy) {
+    logger.error(`❌ Cannot connect to LM Studio at ${baseUrl}`);
+    return false;
+  }
+
+  // Check if the required model is already loaded
+  const loadedModels = await manager.listModels(true);
+  const isLoaded = loadedModels.some(m =>
+    m.id === requiredModel ||
+    m.id.includes(requiredModel) ||
+    requiredModel.includes(m.id)
+  );
+
+  if (isLoaded) {
+    logger.info(`✓ Model "${requiredModel}" is already loaded`);
+    return true;
+  }
+
+  // Model not loaded - need to load it via lms CLI
+  logger.info(`📦 Model "${requiredModel}" not loaded. Loading via LM Studio CLI...`);
+
+  // Use modelPath if available, otherwise fall back to model name
+  const loadIdentifier = modelPath || requiredModel;
+
+  try {
+    // Unload all models first
+    logger.info('   Unloading all models...');
+    try {
+      await runLmsCommand('unload --all', 30000);
+    } catch (e) {
+      // Ignore errors - might not have any models loaded
+      logger.debug('   (No models to unload or lms command not available)');
+    }
+
+    // Wait for unload
+    logger.info('   Waiting 5 seconds for unload...');
+    await new Promise(r => setTimeout(r, 5000));
+
+    // Load the required model (--exact requires exact match, --yes skips prompts)
+    // Extended timeout (5 minutes) for large models like qwq-32b (35GB)
+    logger.info(`   Loading model: ${loadIdentifier}`);
+    const { stderr } = await runLmsCommand(`load "${loadIdentifier}" --exact --yes`, 300000);
+
+    if (stderr && !stderr.includes('Loading')) {
+      logger.warn(`   lms stderr: ${stderr}`);
+    }
+
+    // Wait for model initialization
+    logger.info('   Waiting 5 seconds for model initialization...');
+    await new Promise(r => setTimeout(r, 5000));
+
+    // Verify model is loaded
+    const verifyLoaded = await manager.listModels(true);
+    const nowLoaded = verifyLoaded.some(m =>
+      m.id === requiredModel ||
+      m.id.includes(requiredModel) ||
+      requiredModel.includes(m.id)
+    );
+
+    if (nowLoaded) {
+      logger.info(`✓ Model "${requiredModel}" loaded successfully`);
+      return true;
+    } else {
+      logger.error(`❌ Model "${requiredModel}" failed to load`);
+      logger.info('   Loaded models: ' + (verifyLoaded.map(m => m.id).join(', ') || 'none'));
+      return false;
+    }
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    logger.error(`❌ Failed to load model: ${errMsg}`);
+    logger.info('   Make sure the lms CLI is available (alias in ~/.bashrc or in PATH)');
+    logger.info('   You can manually load the model in LM Studio GUI and retry');
+    return false;
+  }
 }
 
 /**
@@ -113,6 +364,7 @@ export function registerLLMCommand(program: Command): void {
 
             logger.info(`${marker} ${p.name} ${activeTag}`);
             logger.info(`   Provider: ${p.provider} | Model: ${p.model}`);
+            if (p.modelPath) logger.info(`   Path: ${p.modelPath}`);
             logger.info(`   URL: ${p.baseUrl}`);
             logger.info(`   Usage: ${p.usageCount} times | Last used: ${formatTimestamp(p.lastUsed)}`);
             logger.info(`   Tags: ${p.tags.join(', ') || 'none'}`);
@@ -132,7 +384,8 @@ export function registerLLMCommand(program: Command): void {
     .option('--provider <provider>', 'Provider (lmstudio|openai|anthropic|ollama|openrouter|custom)')
     .option('--base-url <url>', 'API endpoint URL')
     .option('--api-key <key>', 'API key or ${ENV_VAR} reference')
-    .option('--model <model>', 'Model name')
+    .option('--model <model>', 'Model name (friendly name for display)')
+    .option('--model-path <path>', 'Full model path for lms CLI (e.g., Qwen/QwQ-32B-GGUF/qwq-32b-q8_0.gguf)')
     .option('--temperature <n>', 'Temperature (0.0-2.0)', '0.7')
     .option('--max-tokens <n>', 'Max response tokens', '2048')
     .option('--timeout <ms>', 'Request timeout (ms)', '60000')
@@ -151,21 +404,29 @@ export function registerLLMCommand(program: Command): void {
         logger.info('\n🤖 Create New AI Model Profile\n');
 
         // Interactive prompts if not provided
-        const name = options.name || await rl.question('Profile name: ');
+        const baseName = options.name || await rl.question('Profile name: ');
         const provider = options.provider || await rl.question('Provider (lmstudio/openai/anthropic/ollama/openrouter/custom): ');
         const baseUrl = options.baseUrl || await rl.question('Base URL: ');
         const model = options.model || await rl.question('Model name: ');
+        const modelPath = options.modelPath || (provider === 'lmstudio' ? await rl.question('Model path for lms CLI (e.g., Qwen/QwQ-32B-GGUF/qwq-32b-q8_0.gguf, or press Enter to skip): ') : '');
         const apiKey = options.apiKey || await rl.question('API key (or ${ENV_VAR}, press Enter to skip): ');
         const tags = options.tags || await rl.question('Tags (comma-separated, optional): ');
 
         rl.close();
 
+        // Generate unique profile name with date suffix
+        const uniqueName = generateUniqueProfileName(baseName, manager);
+        if (uniqueName !== baseName) {
+          logger.info(`📅 Profile name: ${baseName} → ${uniqueName}`);
+        }
+
         // Build creation options
         const createOptions: CreateProfileOptions = {
-          name,
+          name: uniqueName,
           provider: provider as LLMProvider,
           baseUrl,
           model,
+          modelPath: modelPath || undefined,
           apiKey: apiKey || undefined,
           parameters: {
             temperature: parseFloat(options.temperature),
@@ -185,6 +446,9 @@ export function registerLLMCommand(program: Command): void {
         logger.info(`   Name: ${profile.name}`);
         logger.info(`   Provider: ${profile.provider}`);
         logger.info(`   Model: ${profile.model}`);
+        if (profile.modelPath) {
+          logger.info(`   Model Path: ${profile.modelPath}`);
+        }
         logger.info(`   URL: ${profile.baseUrl}`);
 
         if (validation.warnings.length > 0) {
@@ -221,6 +485,7 @@ export function registerLLMCommand(program: Command): void {
         logger.info(`Provider:       ${p.provider}`);
         logger.info(`Base URL:       ${p.baseUrl}`);
         logger.info(`Model:          ${p.model}`);
+        if (p.modelPath) logger.info(`Model Path:     ${p.modelPath}`);
         logger.info(`API Key:        ${p.apiKey ? (ProfileValidator.isEnvVarReference(p.apiKey) ? p.apiKey : '***hidden***') : '(none)'}`);
         logger.info('');
         logger.info('Parameters:');
@@ -295,6 +560,7 @@ export function registerLLMCommand(program: Command): void {
     .option('--base-url <url>', 'API endpoint URL')
     .option('--api-key <key>', 'API key or ${ENV_VAR} reference')
     .option('--model <model>', 'Model name')
+    .option('--model-path <path>', 'Full model path for lms CLI (e.g., Qwen/QwQ-32B-GGUF/qwq-32b-q8_0.gguf)')
     .option('--temperature <n>', 'Temperature (0.0-2.0)')
     .option('--max-tokens <n>', 'Max response tokens')
     .option('--timeout <ms>', 'Request timeout (ms)')
@@ -318,6 +584,7 @@ export function registerLLMCommand(program: Command): void {
         if (options.baseUrl) updates.baseUrl = options.baseUrl;
         if (options.apiKey) updates.apiKey = options.apiKey;
         if (options.model) updates.model = options.model;
+        if (options.modelPath) updates.modelPath = options.modelPath;
         if (options.description) updates.description = options.description;
         if (options.timeout) updates.timeout = parseInt(options.timeout, 10);
         if (options.tags) updates.tags = options.tags.split(',').map((t: string) => t.trim());
@@ -497,7 +764,12 @@ export function registerLLMCommand(program: Command): void {
     .option('--history-limit <n>', 'Limit move history to last N moves (default: 20, 0=unlimited)', '20')
     .option('--learning-unit <id>', 'Use specific learning unit (default: "default")')
     .option('--reasoning-template', 'Use structured constraint-intersection reasoning format (improves accuracy)')
-    .option('--anonymous-patterns', 'Use anonymous pattern format for learned strategies (no strategy names)')
+    .option('--no-anonymous-patterns', 'Disable anonymous pattern format (use named strategies)')
+    .option('--no-streaming', 'Disable streaming mode (wait for full response)')
+    .option('--show-reasoning', 'Display full reasoning tokens from LM Studio (requires Developer setting in LM Studio)')
+    .option('--aisp', 'Use AISP syntax for prompts (low-ambiguity format, normal output)')
+    .option('--aisp-full', 'Use full AISP mode (includes spec, expects AISP output)')
+    .option('--no-save-reasoning', 'Disable storing full reasoning tokens in experience memory')
     .action(async (puzzleFile, options) => {
       try {
         logger.info('🤖 Starting LLM Sudoku Player...');
@@ -538,6 +810,12 @@ export function registerLLMCommand(program: Command): void {
         config.maxHistoryMoves = parseInt(options.historyLimit, 10);
 
         validateConfig(config);
+
+        // Ensure the required model is loaded in LM Studio
+        const modelReady = await ensureModelLoaded(config.model, config.baseUrl, config.modelPath);
+        if (!modelReady) {
+          throw new CLIError('Model not available', 1, `Could not load model "${config.model}". Please load it manually in LM Studio.`);
+        }
 
         /**
          * Display sudoku board with highlighting (DRY - uses BoardFormatter)
@@ -588,8 +866,9 @@ export function registerLLMCommand(program: Command): void {
         const learningUnitId = options.learningUnit || DEFAULT_LEARNING_UNIT_ID;
         const player = new LLMSudokuPlayer(config, memory, profileName, learningUnitId);
 
-        // Enable streaming if debug or visualize enabled
-        if (options.debug || options.visualize) {
+        // Enable streaming by default (unless --no-streaming)
+        // Also enable if debug or visualize is requested
+        if (options.streaming !== false) {
           player.enableStreaming(true);
         }
 
@@ -599,10 +878,32 @@ export function registerLLMCommand(program: Command): void {
           logger.info('📐 Reasoning template mode enabled (constraint-intersection format)');
         }
 
-        // Enable anonymous pattern mode if requested
-        if (options.anonymousPatterns) {
+        // Enable anonymous pattern mode by default (unless --no-anonymous-patterns)
+        if (options.anonymousPatterns !== false) {
           player.enableAnonymousPatterns(true);
-          logger.info('📋 Anonymous pattern mode enabled (no strategy names)');
+        }
+
+        // Enable reasoning token display if requested (LM Studio v0.3.9+)
+        if (options.showReasoning) {
+          player.enableReasoningDisplay(true);
+          // Reasoning display requires streaming to capture tokens
+          player.enableStreaming(true);
+          logger.info('💭 Reasoning token display enabled (requires LM Studio Developer setting)');
+        }
+
+        // Enable AISP mode if requested (Spec 16)
+        if (options.aispFull) {
+          player.setAISPMode('aisp-full');
+          logger.info('𝔸 AISP-Full mode enabled (includes spec, expects AISP output)');
+        } else if (options.aisp) {
+          player.setAISPMode('aisp');
+          logger.info('𝔸 AISP mode enabled (low-ambiguity prompts, normal output)');
+        }
+
+        // Enable full reasoning storage by default (unless --no-save-reasoning)
+        if (options.saveReasoning !== false) {
+          player.enableSaveReasoning(true);
+          logger.info('💾 Full reasoning storage enabled');
         }
 
         // Health check and model verification
@@ -668,9 +969,30 @@ export function registerLLMCommand(program: Command): void {
           }
         });
 
+        // Track if we've started reasoning output for proper formatting
+        let reasoningStarted = false;
+        let contentStarted = false;
+
         player.on('llm:stream', ({ token }: { token: string }) => {
-          if (options.visualize || options.debug) {
+          if (options.visualize || options.debug || options.showReasoning) {
+            // If reasoning was shown, add OUTPUT header before first content token
+            if (options.showReasoning && reasoningStarted && !contentStarted) {
+              process.stdout.write('\n\n   📝 OUTPUT:\n   ');
+              contentStarted = true;
+            }
             process.stdout.write(token);
+          }
+        });
+
+        player.on('llm:reasoning', ({ token }: { token: string }) => {
+          if (options.showReasoning) {
+            // Add header on first reasoning token
+            if (!reasoningStarted) {
+              process.stdout.write('\n   🧠 REASONING:\n   ');
+              reasoningStarted = true;
+            }
+            // Output reasoning tokens with proper indentation for newlines
+            process.stdout.write(token.replace(/\n/g, '\n   '));
           }
         });
 
@@ -689,10 +1011,13 @@ export function registerLLMCommand(program: Command): void {
         });
 
         player.on('llm:response', () => {
-          if (options.visualize || options.debug) {
+          if (options.visualize || options.debug || options.showReasoning) {
             // Add newline after streaming
             process.stdout.write('\n');
           }
+          // Reset flags for next move
+          reasoningStarted = false;
+          contentStarted = false;
         });
 
         player.on('llm:parse_failure', ({ error, rawResponse }: { error: string; rawResponse: string }) => {
@@ -1617,6 +1942,210 @@ export function registerLLMCommand(program: Command): void {
     });
 
   // ===================================================================
+  // llm model - LM Studio model management commands
+  // ===================================================================
+
+  const model = llm.command('model').description('Manage LM Studio models');
+
+  // llm model list
+  model
+    .command('list')
+    .description('List available models in LM Studio')
+    .option('--profile <name>', 'Use specific profile for connection')
+    .option('--loaded', 'Only show currently loaded models')
+    .option('--format <format>', 'Output format (text|json)', 'text')
+    .action(async (options) => {
+      const { LMStudioModelManager } = await import('../../llm/ModelManager.js');
+
+      try {
+        // Get connection config from profile or default
+        let baseUrl = 'http://localhost:1234';
+        if (options.profile) {
+          const profileManager = new LLMProfileManager();
+          const profile = profileManager.get(options.profile);
+          if (profile) {
+            baseUrl = profile.baseUrl;
+          }
+        }
+
+        const manager = new LMStudioModelManager(baseUrl);
+
+        // Health check
+        const healthy = await manager.healthCheck();
+        if (!healthy) {
+          throw new CLIError('Cannot connect to LM Studio', 1, `Unable to reach ${baseUrl}`, [
+            'Start LM Studio and ensure the server is running',
+            'Check that the endpoint URL is correct',
+          ]);
+        }
+
+        const models = await manager.listModels(options.loaded);
+
+        if (options.format === 'json') {
+          console.log(JSON.stringify(models, null, 2));
+        } else {
+          logger.info(`\n🤖 LM Studio Models (${models.length} total)\n`);
+
+          if (models.length === 0) {
+            logger.info('  No models found. Download models from LM Studio.');
+            return;
+          }
+
+          // Group by state
+          const loaded = models.filter(m => m.state === 'loaded');
+          const notLoaded = models.filter(m => m.state === 'not-loaded');
+
+          if (loaded.length > 0) {
+            logger.info('  📦 LOADED:');
+            for (const m of loaded) {
+              const quant = m.quantization ? ` (${m.quantization})` : '';
+              const ctx = m.maxContextLength ? ` | ctx: ${m.maxContextLength}` : '';
+              logger.info(`    ✓ ${m.id}${quant}${ctx}`);
+            }
+            logger.info('');
+          }
+
+          if (!options.loaded && notLoaded.length > 0) {
+            logger.info('  📁 AVAILABLE:');
+            for (const m of notLoaded) {
+              const quant = m.quantization ? ` (${m.quantization})` : '';
+              const ctx = m.maxContextLength ? ` | ctx: ${m.maxContextLength}` : '';
+              logger.info(`    - ${m.id}${quant}${ctx}`);
+            }
+          }
+        }
+      } catch (error) {
+        if (error instanceof CLIError) throw error;
+        throw new CLIError('Failed to list models', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm model load (DEPRECATED)
+  model
+    .command('load')
+    .description('[DEPRECATED] Load a model into memory - Use "lms load <model>" instead')
+    .argument('<model-id>', 'Model identifier to load')
+    .option('--profile <name>', 'Use specific profile for connection')
+    .option('--ttl <seconds>', 'Auto-unload after N seconds of idle time', '3600')
+    .option('--estimate', 'Show memory estimate before loading')
+    .action(async (modelId, options) => {
+      const { LMStudioModelManager } = await import('../../llm/ModelManager.js');
+
+      logger.warn('⚠️  DEPRECATED: This command is deprecated and may not work reliably.');
+      logger.warn('   Use the LM Studio CLI instead: lms load ' + modelId);
+      logger.warn('');
+
+      try {
+        // Get connection config from profile or default
+        let baseUrl = 'http://localhost:1234';
+        if (options.profile) {
+          const profileManager = new LLMProfileManager();
+          const profile = profileManager.get(options.profile);
+          if (profile) {
+            baseUrl = profile.baseUrl;
+          }
+        }
+
+        const manager = new LMStudioModelManager(baseUrl);
+
+        // Health check
+        const healthy = await manager.healthCheck();
+        if (!healthy) {
+          throw new CLIError('Cannot connect to LM Studio', 1, `Unable to reach ${baseUrl}`);
+        }
+
+        // Check if already loaded
+        const isLoaded = await manager.isModelLoaded(modelId);
+        if (isLoaded) {
+          logger.info(`✓ Model "${modelId}" is already loaded`);
+          return;
+        }
+
+        // Show memory estimate if requested
+        if (options.estimate) {
+          const estimate = await manager.estimateMemory(modelId);
+          if (estimate) {
+            logger.info(`📊 Memory Estimate for ${modelId}:`);
+            logger.info(`   VRAM: ~${estimate.estimatedVram}`);
+            logger.info(`   RAM:  ~${estimate.estimatedRam}`);
+            logger.info(`   Context: ${estimate.contextLength} tokens`);
+            logger.info('');
+          }
+        }
+
+        const ttl = parseInt(options.ttl, 10);
+        logger.info(`Loading model "${modelId}" (TTL: ${ttl}s)...`);
+
+        await manager.loadModel(modelId, { ttl });
+
+        logger.info(`✓ Model "${modelId}" loaded successfully`);
+        if (ttl > 0) {
+          logger.info(`  Will auto-unload after ${ttl} seconds of idle time`);
+        }
+      } catch (error) {
+        if (error instanceof CLIError) throw error;
+        throw new CLIError('Failed to load model', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm model unload (DEPRECATED)
+  model
+    .command('unload')
+    .description('[DEPRECATED] Unload a model from memory - Use "lms unload" instead')
+    .argument('[model-id]', 'Model identifier to unload (omit to unload all)')
+    .option('--profile <name>', 'Use specific profile for connection')
+    .action(async (modelId, options) => {
+      const { LMStudioModelManager } = await import('../../llm/ModelManager.js');
+
+      logger.warn('⚠️  DEPRECATED: This command is deprecated and may not work reliably.');
+      logger.warn('   Use the LM Studio CLI instead: lms unload' + (modelId ? ` ${modelId}` : ' --all'));
+      logger.warn('');
+
+      try {
+        // Get connection config from profile or default
+        let baseUrl = 'http://localhost:1234';
+        if (options.profile) {
+          const profileManager = new LLMProfileManager();
+          const profile = profileManager.get(options.profile);
+          if (profile) {
+            baseUrl = profile.baseUrl;
+          }
+        }
+
+        const manager = new LMStudioModelManager(baseUrl);
+
+        // Health check
+        const healthy = await manager.healthCheck();
+        if (!healthy) {
+          throw new CLIError('Cannot connect to LM Studio', 1, `Unable to reach ${baseUrl}`);
+        }
+
+        if (modelId) {
+          // Check if loaded
+          const isLoaded = await manager.isModelLoaded(modelId);
+          if (!isLoaded) {
+            logger.info(`Model "${modelId}" is not currently loaded`);
+            return;
+          }
+
+          logger.info(`Unloading model "${modelId}"...`);
+          await manager.unloadModel(modelId);
+          logger.info(`✓ Model "${modelId}" unloaded`);
+        } else {
+          logger.info('Unloading all models...');
+          await manager.unloadModel();
+          logger.info('✓ All models unloaded');
+        }
+      } catch (error) {
+        if (error instanceof CLIError) throw error;
+        throw new CLIError('Failed to unload model', 1, error instanceof Error ? error.message : String(error), [
+          'Model unload via API may not be available in your LM Studio version',
+          'Use the LM Studio GUI or CLI (lms unload) instead',
+        ]);
+      }
+    });
+
+  // ===================================================================
   // llm dream - LLM learning consolidation commands
   // ===================================================================
 
@@ -1628,9 +2157,13 @@ export function registerLLMCommand(program: Command): void {
     .description('Run dreaming consolidation for a profile')
     .option('--profile <name>', 'LLM profile to consolidate (default: active profile)')
     .option('--all', 'Consolidate all profiles separately')
-    .option('--learning-unit <id>', 'Update specific learning unit (uses reConsolidate for iterative learning)')
+    .option('--learning-unit <id>', 'Update specific learning unit (auto-generates if not specified)')
     .option('--reset', 'Reset consolidated status and reprocess all experiences')
-    .option('--anonymous-patterns', 'Generate patterns in anonymous format (no strategy names)')
+    .option('--no-anonymous-patterns', 'Disable anonymous pattern format (use named strategies)')
+    .option('--double-strategies', 'Double the number of strategies created (6-10 few-shots, 10-14 merged)')
+    .option('--aisp', 'Mark learning unit as AISP mode (for naming)')
+    .option('--aisp-full', 'Mark learning unit as AISP-full mode (for naming)')
+    .option('--no-dual-unit', 'Create only single learning unit (default: creates BOTH standard AND -2x)')
     .option('--output <file>', 'Save consolidation report')
     .action(async (options) => {
       try {
@@ -1661,6 +2194,13 @@ export function registerLLMCommand(program: Command): void {
           const config = getLLMConfig(profileName);
           manager.recordUsage(profileName);
 
+          // Ensure the required model is loaded in LM Studio (auto-loads if needed)
+          const modelReady = await ensureModelLoaded(config.model, config.baseUrl, config.modelPath);
+          if (!modelReady) {
+            logger.warn(`⚠️ Could not load model "${config.model}" for profile ${profileName}. Skipping...`);
+            continue;
+          }
+
           // Import required classes
           const { ExperienceStore } = await import('../../llm/ExperienceStore.js');
           const { DreamingConsolidator } = await import('../../llm/DreamingConsolidator.js');
@@ -1669,10 +2209,25 @@ export function registerLLMCommand(program: Command): void {
           const experienceStore = new ExperienceStore(agentMemory, config, profileName);
           const consolidator = new DreamingConsolidator(experienceStore, config);
 
-          // Enable anonymous pattern mode if requested
-          if (options.anonymousPatterns) {
+          // Enable anonymous pattern mode by default (unless --no-anonymous-patterns)
+          if (options.anonymousPatterns !== false) {
             consolidator.setAnonymousPatternMode(true);
-            logger.info('📋 Anonymous pattern mode enabled (no strategy names)');
+            logger.info('📋 Anonymous pattern mode enabled');
+          }
+
+          // Spec 16: Set AISP mode for dreaming consolidation
+          if (options.aispFull) {
+            consolidator.setAISPMode('aisp-full');
+            logger.info('𝔸 AISP-Full mode enabled (strategies stored in AISP format)');
+          } else if (options.aisp) {
+            consolidator.setAISPMode('aisp');
+            logger.info('𝔸 AISP mode enabled');
+          }
+
+          // Set consolidation options (strategy counts)
+          if (options.doubleStrategies) {
+            consolidator.setConsolidationOptions({ doubleStrategies: true });
+            logger.info('📊 Double strategies mode enabled (6-10 few-shots, 10-14 merged)');
           }
 
           // Reset consolidated status if requested
@@ -1694,13 +2249,40 @@ export function registerLLMCommand(program: Command): void {
             logger.info(`   Reset ${resetCount} experiences to unconsolidated`);
           }
 
-          // Get learning unit ID
-          const learningUnitId = options.learningUnit || DEFAULT_LEARNING_UNIT_ID;
+          // Get or generate learning unit ID
+          const unitManager = new LearningUnitManager(agentMemory, profileName);
+          let learningUnitId: string;
+
+          if (options.learningUnit) {
+            // Use specified learning unit
+            learningUnitId = options.learningUnit;
+            // Auto-append -2x suffix for double-strategies in single-unit mode
+            if (options.doubleStrategies && options.dualUnit === false && !learningUnitId.endsWith(DOUBLE_STRATEGY_SUFFIX)) {
+              learningUnitId = `${learningUnitId}${DOUBLE_STRATEGY_SUFFIX}`;
+              logger.info(`📊 Double strategies mode: auto-appending suffix → "${learningUnitId}"`);
+            }
+          } else {
+            // Auto-generate learning unit name: profile_(AISP/AISP-full)_(2x)_YYYYMMDD_(XX)
+            const existingUnitsList = await unitManager.list();
+            const existingUnits = existingUnitsList.map(u => u.id);
+            learningUnitId = generateUniqueLearningUnitName(
+              profileName,
+              {
+                aisp: options.aisp,
+                aispFull: options.aispFull,
+                doubleStrategies: options.doubleStrategies && options.dualUnit === false,
+              },
+              existingUnits
+            );
+            logger.info(`📝 Auto-generated learning unit: ${learningUnitId}`);
+          }
 
           // Get unconsolidated count before
           const before = await experienceStore.getUnconsolidated(profileName);
           logger.info(`📦 Found ${before.length} unconsolidated experiences`);
-          logger.info(`📚 Learning unit: ${learningUnitId}`);
+          if (options.dualUnit === false) {
+            logger.info(`📚 Learning unit: ${learningUnitId}`);
+          }
 
           if (before.length === 0) {
             logger.info('💤 No experiences to consolidate');
@@ -1709,24 +2291,58 @@ export function registerLLMCommand(program: Command): void {
 
           // Run consolidation - use reConsolidate for specific learning units (iterative learning)
           let report;
-          if (options.learningUnit) {
+
+          if (options.dualUnit !== false) {
+            // DUAL MODE (DEFAULT): Create both standard and -2x learning units
+            logger.info(`🔄 Dual unit mode: creating "${learningUnitId}" AND "${learningUnitId}${DOUBLE_STRATEGY_SUFFIX}"`);
+            const dualResult = await consolidator.consolidateDual(unitManager, learningUnitId, profileName);
+
+            // Show dual results
+            logger.info(`\n✅ Dual Dream Cycle Complete`);
+            logger.info(`   Standard unit "${learningUnitId}":`);
+            logger.info(`      Experiences processed: ${dualResult.standard.experiencesConsolidated}`);
+            logger.info(`      Few-shots created: ${dualResult.standard.fewShotsUpdated}`);
+            logger.info(`   Doubled unit "${learningUnitId}${DOUBLE_STRATEGY_SUFFIX}":`);
+            logger.info(`      Experiences processed: ${dualResult.doubled.experiencesConsolidated}`);
+            logger.info(`      Few-shots created: ${dualResult.doubled.fewShotsUpdated}`);
+
+            // Verify both units
+            const standardFewShots = await experienceStore.getFewShots(profileName, learningUnitId);
+            const doubledFewShots = await experienceStore.getFewShots(profileName, `${learningUnitId}${DOUBLE_STRATEGY_SUFFIX}`);
+            logger.info(`\n📚 Learning units created:`);
+            logger.info(`   "${learningUnitId}": ${standardFewShots.length} few-shot examples`);
+            logger.info(`   "${learningUnitId}${DOUBLE_STRATEGY_SUFFIX}": ${doubledFewShots.length} few-shot examples\n`);
+
+            // Use standard report for output file (contains both in insights)
+            report = dualResult.standard;
+            report.insights = `Dual consolidation: Standard=${dualResult.standard.fewShotsUpdated} strategies, Doubled=${dualResult.doubled.fewShotsUpdated} strategies`;
+          } else if (options.learningUnit) {
             // Use reConsolidate for iterative learning on a specific unit
-            const unitManager = new LearningUnitManager(agentMemory, profileName);
             report = await consolidator.reConsolidate(unitManager, learningUnitId, profileName);
+
+            // Show results
+            logger.info(`\n✅ Dream Cycle Complete`);
+            logger.info(`   Experiences processed: ${report.experiencesConsolidated}`);
+            logger.info(`   Few-shots created: ${report.fewShotsUpdated}`);
+            logger.info(`   Patterns extracted: ${report.patterns.successStrategies.length}`);
+
+            // Verify few-shots exist
+            const fewShots = await experienceStore.getFewShots(profileName, learningUnitId);
+            logger.info(`\n📚 Learning unit '${learningUnitId}' now has ${fewShots.length} few-shot examples\n`);
           } else {
             // Use standard consolidation for default unit
             report = await consolidator.consolidate(profileName);
+
+            // Show results
+            logger.info(`\n✅ Dream Cycle Complete`);
+            logger.info(`   Experiences processed: ${report.experiencesConsolidated}`);
+            logger.info(`   Few-shots created: ${report.fewShotsUpdated}`);
+            logger.info(`   Patterns extracted: ${report.patterns.successStrategies.length}`);
+
+            // Verify few-shots exist
+            const fewShots = await experienceStore.getFewShots(profileName, learningUnitId);
+            logger.info(`\n📚 Learning unit '${learningUnitId}' now has ${fewShots.length} few-shot examples\n`);
           }
-
-          // Show results
-          logger.info(`\n✅ Dream Cycle Complete`);
-          logger.info(`   Experiences processed: ${report.experiencesConsolidated}`);
-          logger.info(`   Few-shots created: ${report.fewShotsUpdated}`);
-          logger.info(`   Patterns extracted: ${report.patterns.successStrategies.length}`);
-
-          // Verify few-shots exist
-          const fewShots = await experienceStore.getFewShots(profileName, learningUnitId);
-          logger.info(`\n📚 Learning unit '${learningUnitId}' now has ${fewShots.length} few-shot examples\n`);
 
           // Save report if requested
           if (options.output) {
@@ -2083,41 +2699,87 @@ export function registerLLMCommand(program: Command): void {
   learning
     .command('list')
     .description('List all learning units')
-    .option('--profile <name>', 'LLM profile to list units for (default: active profile)')
+    .option('--profile <name>', 'Filter by LLM profile (default: show all profiles)')
     .option('--format <format>', 'Output format (table|json)', 'table')
     .action(async (options) => {
       try {
-        const profileManager = new LLMProfileManager();
         const agentMemory = new AgentMemory(createDefaultMemoryConfig());
+        const { LLM_STORAGE_KEYS } = await import('../../llm/storage-keys.js');
 
-        // Get profile name
-        const profileName = options.profile || profileManager.getActive()?.name;
-        if (!profileName) {
-          throw new CLIError('No active profile. Use --profile or set an active profile.', 1);
+        // Query all learning units across all profiles
+        const allUnits = await agentMemory.reasoningBank.queryMetadata(
+          LLM_STORAGE_KEYS.LEARNING_UNIT_TYPE,
+          {}
+        ) as any[];
+
+        // Filter by profile if specified
+        let filteredUnits = allUnits;
+        if (options.profile) {
+          filteredUnits = allUnits.filter((u) => u.profileName === options.profile);
         }
 
-        const unitManager = new LearningUnitManager(agentMemory, profileName);
-        const units = await unitManager.list();
+        // Group by profile
+        const unitsByProfile = new Map<string, any[]>();
+        for (const unit of filteredUnits) {
+          const profile = unit.profileName || 'unknown';
+          if (!unitsByProfile.has(profile)) {
+            unitsByProfile.set(profile, []);
+          }
+          unitsByProfile.get(profile)!.push(unit);
+        }
+
+        // Sort profiles alphabetically
+        const sortedProfiles = Array.from(unitsByProfile.keys()).sort();
 
         if (options.format === 'json') {
-          console.log(JSON.stringify(units, null, 2));
+          // For JSON, include profile grouping
+          const result: Record<string, any[]> = {};
+          for (const profile of sortedProfiles) {
+            result[profile] = unitsByProfile.get(profile)!;
+          }
+          console.log(JSON.stringify(result, null, 2));
         } else {
-          logger.info(`\n📚 Learning Units for Profile: ${profileName}\n`);
+          const totalUnits = filteredUnits.length;
+          const profileCount = sortedProfiles.length;
 
-          if (units.length === 0) {
+          if (options.profile) {
+            logger.info(`\n📚 Learning Units for Profile: ${options.profile}\n`);
+          } else {
+            logger.info(`\n📚 Learning Units (${totalUnits} total across ${profileCount} profiles)\n`);
+          }
+
+          if (totalUnits === 0) {
             logger.info('  No learning units found.');
             logger.info('  Create one with: machine-dream llm learning create <id>');
             return;
           }
 
-          for (const unit of units) {
-            logger.info(`  ${unit.id === DEFAULT_LEARNING_UNIT_ID ? '▶' : ' '} ${unit.id}`);
-            logger.info(`     Name: ${unit.name}`);
-            if (unit.description) {
-              logger.info(`     Description: ${unit.description}`);
+          for (const profile of sortedProfiles) {
+            const units = unitsByProfile.get(profile)!;
+            logger.info(`  ┌─ ${profile} (${units.length} units)`);
+
+            // Sort units by name within each profile
+            units.sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
+
+            for (let i = 0; i < units.length; i++) {
+              const unit = units[i];
+              const isLast = i === units.length - 1;
+              const prefix = isLast ? '  └─' : '  ├─';
+
+              // Get strategy count from few-shots if available
+              const unitManager = new LearningUnitManager(agentMemory, profile);
+              const fullUnit = await unitManager.get(unit.id);
+              const strategyCount = fullUnit?.fewShots?.length || 0;
+              const expCount = unit.metadata?.totalExperiences || 0;
+
+              logger.info(`${prefix} ${unit.id}`);
+              logger.info(`  ${isLast ? ' ' : '│'}    Strategies: ${strategyCount} | Experiences: ${expCount}`);
+
+              const updatedAt = unit.lastUpdatedAt ? new Date(unit.lastUpdatedAt) : null;
+              if (updatedAt) {
+                logger.info(`  ${isLast ? ' ' : '│'}    Updated: ${formatTimestamp(updatedAt.getTime())}`);
+              }
             }
-            logger.info(`     Strategies: ${unit.strategyCount} | Experiences: ${unit.experienceCount}`);
-            logger.info(`     Last updated: ${formatTimestamp(unit.lastUpdatedAt.getTime())}`);
             logger.info('');
           }
         }
@@ -2165,7 +2827,7 @@ export function registerLLMCommand(program: Command): void {
     .command('show')
     .description('Show details of a learning unit')
     .argument('<id>', 'Learning unit ID')
-    .option('--profile <name>', 'LLM profile (default: active profile)')
+    .option('--profile <name>', 'LLM profile (searches all profiles if not specified)')
     .option('--compact', 'Show compact summary instead of full details')
     .option('--format <format>', 'Output format (table|json)', 'table')
     .action(async (id, options) => {
@@ -2173,13 +2835,32 @@ export function registerLLMCommand(program: Command): void {
         const profileManager = new LLMProfileManager();
         const agentMemory = new AgentMemory(createDefaultMemoryConfig());
 
-        const profileName = options.profile || profileManager.getActive()?.name;
-        if (!profileName) {
-          throw new CLIError('No active profile. Use --profile or set an active profile.', 1);
-        }
+        let profileName = options.profile;
+        let unit = null;
 
-        const unitManager = new LearningUnitManager(agentMemory, profileName);
-        const unit = await unitManager.get(id);
+        if (profileName) {
+          // Profile specified - search only in that profile
+          const unitManager = new LearningUnitManager(agentMemory, profileName);
+          unit = await unitManager.get(id);
+        } else {
+          // No profile specified - search across ALL profiles to find the unit
+          const { LLM_STORAGE_KEYS } = await import('../../llm/storage-keys.js');
+          const allUnits = await agentMemory.reasoningBank.queryMetadata(
+            LLM_STORAGE_KEYS.LEARNING_UNIT_TYPE,
+            {}
+          ) as any[];
+
+          // Find unit by ID across all profiles
+          const matchingUnit = allUnits.find((u) => u.id === id);
+          if (matchingUnit) {
+            profileName = matchingUnit.profileName;
+            const unitManager = new LearningUnitManager(agentMemory, profileName);
+            unit = await unitManager.get(id);
+          } else {
+            // Fallback to active profile for error message
+            profileName = profileManager.getActive()?.name || 'unknown';
+          }
+        }
 
         if (!unit) {
           throw new CLIError(`Learning unit not found: ${id}`, 1);
@@ -2294,6 +2975,17 @@ export function registerLLMCommand(program: Command): void {
                 logger.info(`      Example: (${fs.move.row},${fs.move.col}) = ${fs.move.value}`);
               }
 
+              // Spec 16: Show AISP-encoded version if present
+              if (fs.aispEncoded) {
+                logger.info(`      𝔸 AISP:`);
+                const aispLines = fs.aispEncoded.split('\n');
+                aispLines.forEach((line: string) => {
+                  if (line.trim()) {
+                    logger.info(`         ${line}`);
+                  }
+                });
+              }
+
               logger.info('');
             });
           }
@@ -2328,20 +3020,41 @@ export function registerLLMCommand(program: Command): void {
     .command('delete')
     .description('Delete a learning unit')
     .argument('<id>', 'Learning unit ID')
-    .option('--profile <name>', 'LLM profile (default: active profile)')
+    .option('--profile <name>', 'LLM profile (searches all profiles if not specified)')
     .option('--yes', 'Skip confirmation')
     .action(async (id, options) => {
       try {
-        const profileManager = new LLMProfileManager();
         const agentMemory = new AgentMemory(createDefaultMemoryConfig());
 
-        const profileName = options.profile || profileManager.getActive()?.name;
-        if (!profileName) {
-          throw new CLIError('No active profile. Use --profile or set an active profile.', 1);
-        }
+        let profileName = options.profile;
+        let unit = null;
+        let unitManager: LearningUnitManager;
 
-        const unitManager = new LearningUnitManager(agentMemory, profileName);
-        const unit = await unitManager.get(id);
+        if (profileName) {
+          // Profile specified - search only in that profile
+          unitManager = new LearningUnitManager(agentMemory, profileName);
+          unit = await unitManager.get(id);
+        } else {
+          // No profile specified - search across ALL profiles to find the unit
+          const { LLM_STORAGE_KEYS } = await import('../../llm/storage-keys.js');
+          const allUnits = await agentMemory.reasoningBank.queryMetadata(
+            LLM_STORAGE_KEYS.LEARNING_UNIT_TYPE,
+            {}
+          ) as any[];
+
+          // Find unit by ID across all profiles
+          const matchingUnit = allUnits.find((u) => u.id === id);
+          if (matchingUnit) {
+            profileName = matchingUnit.profileName;
+            unitManager = new LearningUnitManager(agentMemory, profileName);
+            unit = await unitManager.get(id);
+          } else {
+            // Fallback for error message
+            const profileManager = new LLMProfileManager();
+            profileName = profileManager.getActive()?.name || 'unknown';
+            unitManager = new LearningUnitManager(agentMemory, profileName);
+          }
+        }
 
         if (!unit) {
           throw new CLIError(`Learning unit not found: ${id}`, 1);
@@ -2662,9 +3375,15 @@ export function registerLLMCommand(program: Command): void {
         }
 
         // Header - Unit column is variable width (not truncated)
+        // Show "(none)" for sessions without learning unit, "default" for default unit
+        const getDisplayUnit = (unitId: string | null | undefined): string => {
+          if (unitId === null || unitId === undefined) return NO_LEARNING_UNIT_DISPLAY;
+          return unitId || DEFAULT_LEARNING_UNIT_ID;
+        };
         const maxUnitLen = Math.max(
           4, // minimum "Unit" header width
-          ...sessionsToShow.map(s => (s.learningUnitId || 'default').length)
+          NO_LEARNING_UNIT_DISPLAY.length,
+          ...sessionsToShow.map(s => getDisplayUnit(s.learningUnitId).length)
         );
         const unitHeader = 'Unit'.padEnd(maxUnitLen);
         logger.info(`ID                                    Profile           ${unitHeader}  Puzzle            Done%  Moves   Acc%   Exit        Learning    Date`);
@@ -2673,7 +3392,7 @@ export function registerLLMCommand(program: Command): void {
         sessionsToShow.forEach(s => {
           const sessionIdShort = s.sessionId.substring(0, 36).padEnd(36);
           const profile = s.profileName.substring(0, 16).padEnd(16);
-          const unit = (s.learningUnitId || 'default').padEnd(maxUnitLen);
+          const unit = getDisplayUnit(s.learningUnitId).padEnd(maxUnitLen);
           const puzzle = s.puzzleId.substring(0, 16).padEnd(16);
           const donePct = `${s.completionPct.toFixed(0)}%`.padStart(5);
           const moves = s.totalMoves.toString().padStart(5);
