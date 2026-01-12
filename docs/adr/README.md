@@ -2,9 +2,12 @@
 
 This directory contains Architecture Decision Records for the Machine Dream project, documenting key architectural and design decisions that shape the system.
 
+> **📋 Specification Reference:** [Spec 17: ADR Implementation](../specs/17-adr-implementation-spec.md)
+> Defines the ADR system, WH(Y) format, governance, and review processes.
+
 ## What are ADRs?
 
-Architecture Decision Records capture important architectural decisions along with their context and consequences. Each ADR follows the **WH(Y) framework**:
+Architecture Decision Records capture important architectural decisions along with their context and consequences. Each ADR follows the **WH(Y) framework** as defined in Spec 17:
 
 - **W**hat: The decision made
 - **H**ow: Implementation approach
@@ -139,6 +142,8 @@ Puzzle state is immutable. Experience records are append-only. This ensures repr
 ## ADR Template
 
 Use [000-adr-template.md](000-adr-template.md) when creating new ADRs. The template follows the WH(Y) framework and includes sections for context, decision, consequences, rationale, dependencies, and spec references.
+
+See [Spec 17: ADR Implementation](../specs/17-adr-implementation-spec.md) for the full ADR format specification and governance process.
 
 ## Status Definitions
 
