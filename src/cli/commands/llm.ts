@@ -87,10 +87,12 @@ function generateUniqueProfileName(baseName: string, manager: LLMProfileManager)
 
 /**
  * Generate unique learning unit name with algorithm identifier
- * Format: profileName_(mode)_(algo)v(version)_YYYYMMDD[_2x][_(XX)]
+ * Format: profileName_(mode)_(algo)v(version)_YYYYMMDD[_2x]_(N)
  *
- * Example: qwen3_standard_fastclusterv2_20260113
- * Example: qwen3_aisp_deepclusterv1_20260113_2x
+ * Always includes an incremental number starting from 1.
+ *
+ * Example: qwen3_standard_fastclusterv2_20260113_1
+ * Example: qwen3_aisp_deepclusterv1_20260113_2x_2
  */
 function generateUniqueLearningUnitNameWithAlgorithm(
   profileName: string,
@@ -127,21 +129,15 @@ function generateUniqueLearningUnitNameWithAlgorithm(
     baseName += '_2x';
   }
 
-  // Check if this name already exists
-  if (!existingUnits.includes(baseName)) {
-    return baseName;
-  }
-
-  // Find next available increment
-  for (let i = 1; i <= 99; i++) {
-    const increment = String(i).padStart(2, '0');
-    const candidateName = `${baseName}_${increment}`;
+  // ALWAYS find the next available increment (starting from 1)
+  for (let i = 1; i <= 999; i++) {
+    const candidateName = `${baseName}_${i}`;
     if (!existingUnits.includes(candidateName)) {
       return candidateName;
     }
   }
 
-  // Fallback: use timestamp
+  // Fallback: use timestamp (should never reach here)
   return `${baseName}_${Date.now()}`;
 }
 

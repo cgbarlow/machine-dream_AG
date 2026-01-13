@@ -144,7 +144,8 @@ for PROFILE in $PROFILES; do
   npx machine-dream llm memory clear --unconsolidated --profile "$PROFILE" --confirm 2>/dev/null || true
 
   for MODE in $MODES; do
-    UNIT_NAME="${PROFILE}_${PUZZLE_NAME}_${MODE}_${DATE_STR}"
+    # Base name for log files (without algorithm identifier)
+    LOG_BASE="${PROFILE}_${PUZZLE_NAME}_${MODE}_${DATE_STR}"
     MODE_OPTS=""
 
     case "$MODE" in
@@ -154,20 +155,20 @@ for PROFILE in $PROFILES; do
     esac
 
     echo ""
-    echo ">>> Mode: $MODE (unit: $UNIT_NAME)"
+    echo ">>> Mode: $MODE"
     echo "-------------------------------------------"
+    echo "  (Learning units will be auto-generated with algorithm identifiers)"
 
-    # Training runs
+    # Training runs (no learning unit - generates fresh experiences)
     for i in $(seq 1 $RUNS); do
       echo "  Run $i/$RUNS..."
       TOTAL_RUNS=$((TOTAL_RUNS + 1))
 
-      LOG_FILE="$RESULTS_DIR/${UNIT_NAME}_run${i}.log"
+      LOG_FILE="$RESULTS_DIR/${LOG_BASE}_run${i}.log"
 
       # Run with tee to show output live and save to log
       npx machine-dream llm play "$PUZZLE" \
         --profile "$PROFILE" \
-        --learning-unit "$UNIT_NAME" \
         --visualize-basic \
         $MODE_OPTS \
         $NO_SAVE_REASONING \
@@ -185,7 +186,7 @@ for PROFILE in $PROFILES; do
     # Dream consolidation (dual mode is default, creates BOTH standard and -2x units)
     if [[ "$SKIP_DREAM" != "true" ]]; then
       echo ""
-      echo "  Running dream consolidation for $UNIT_NAME..."
+      echo "  Running dream consolidation (auto-generating learning units)..."
       DREAM_OPTS=""
       [[ -n "$NO_DUAL" ]] && DREAM_OPTS="$DREAM_OPTS $NO_DUAL"
       # Pass AISP mode flags to dream consolidation
@@ -203,10 +204,9 @@ for PROFILE in $PROFILES; do
 
       npx machine-dream llm dream run \
         --profile "$PROFILE" \
-        --learning-unit "$UNIT_NAME" \
         $DREAM_OPTS \
         $ALGO_OPTS \
-        2>&1 | tee "$RESULTS_DIR/${UNIT_NAME}_dream.log"
+        2>&1 | tee "$RESULTS_DIR/${LOG_BASE}_dream.log"
 
       # Clear any remaining unconsolidated experiences after dream cycle
       UNCONSOLIDATED_COUNT=$(npx machine-dream llm memory clear --unconsolidated --profile "$PROFILE" --confirm 2>&1 | grep -oP 'Deleted \K\d+' || echo "0")
@@ -214,35 +214,51 @@ for PROFILE in $PROFILES; do
         echo "  Cleared $UNCONSOLIDATED_COUNT unconsolidated experiences"
       fi
 
-      # Validation runs using -2x learning unit (if dual mode enabled)
+      # Validation runs using -2x learning units (if dual mode enabled)
       if [[ -z "$NO_DUAL" ]]; then
-        UNIT_2X="${UNIT_NAME}-2x"
         echo ""
-        echo "  >>> Validation runs with -2x unit: $UNIT_2X"
+        echo "  >>> Finding -2x learning units for validation..."
 
-        for i in $(seq 1 $RUNS); do
-          echo "    Validation run $i/$RUNS..."
-          TOTAL_RUNS=$((TOTAL_RUNS + 1))
+        # Query learning units matching this profile/mode/date with -2x suffix
+        UNITS_2X=$(npx machine-dream llm learning list --profile "$PROFILE" --format json 2>/dev/null | \
+          jq -r --arg base "$LOG_BASE" '.[] | select(.id | (startswith($base) and endswith("-2x"))) | .id' | \
+          tr '\n' ' ')
 
-          LOG_FILE="$RESULTS_DIR/${UNIT_2X}_validation_${i}.log"
+        if [[ -z "$UNITS_2X" ]]; then
+          echo "    ⚠️  No -2x units found (dual mode may have been disabled)"
+        else
+          echo "    Found units: $UNITS_2X"
 
-          # Run with tee to show output live and save to log
-          npx machine-dream llm play "$PUZZLE" \
-            --profile "$PROFILE" \
-            --learning-unit "$UNIT_2X" \
-            --visualize-basic \
-            $MODE_OPTS \
-            $NO_SAVE_REASONING \
-            2>&1 | tee "$LOG_FILE"
+          # Run validation for each -2x unit found
+          for UNIT_2X in $UNITS_2X; do
+            echo ""
+            echo "    Testing with: $UNIT_2X"
 
-          # Check log file for result
-          if grep -q "SOLVED" "$LOG_FILE" 2>/dev/null; then
-            TOTAL_SOLVED=$((TOTAL_SOLVED + 1))
-            echo "      Result: SOLVED"
-          else
-            echo "      Result: Not solved"
-          fi
-        done
+            for i in $(seq 1 $RUNS); do
+              echo "      Validation run $i/$RUNS..."
+              TOTAL_RUNS=$((TOTAL_RUNS + 1))
+
+              LOG_FILE="$RESULTS_DIR/${UNIT_2X}_validation_${i}.log"
+
+              # Run with tee to show output live and save to log
+              npx machine-dream llm play "$PUZZLE" \
+                --profile "$PROFILE" \
+                --learning-unit "$UNIT_2X" \
+                --visualize-basic \
+                $MODE_OPTS \
+                $NO_SAVE_REASONING \
+                2>&1 | tee "$LOG_FILE"
+
+              # Check log file for result
+              if grep -q "SOLVED" "$LOG_FILE" 2>/dev/null; then
+                TOTAL_SOLVED=$((TOTAL_SOLVED + 1))
+                echo "        Result: SOLVED"
+              else
+                echo "        Result: Not solved"
+              fi
+            done
+          done
+        fi
       fi
     fi
   done
@@ -270,12 +286,12 @@ echo "Profile,Mode,Phase,Unit,Runs,Solved,Rate" > "$SUMMARY_FILE"
 
 for PROFILE in $PROFILES; do
   for MODE in $MODES; do
-    UNIT_NAME="${PROFILE}_${PUZZLE_NAME}_${MODE}_${DATE_STR}"
+    LOG_BASE="${PROFILE}_${PUZZLE_NAME}_${MODE}_${DATE_STR}"
 
     # Training runs
     RUNS_COUNT=0
     SOLVED_COUNT=0
-    for LOG in "$RESULTS_DIR/${UNIT_NAME}_run"*.log; do
+    for LOG in "$RESULTS_DIR/${LOG_BASE}_run"*.log; do
       if [[ -f "$LOG" ]]; then
         RUNS_COUNT=$((RUNS_COUNT + 1))
         if grep -q "SOLVED" "$LOG" 2>/dev/null; then
@@ -285,24 +301,36 @@ for PROFILE in $PROFILES; do
     done
     if [[ $RUNS_COUNT -gt 0 ]]; then
       RATE=$(echo "scale=1; $SOLVED_COUNT * 100 / $RUNS_COUNT" | bc)
-      echo "$PROFILE,$MODE,training,$UNIT_NAME,$RUNS_COUNT,$SOLVED_COUNT,$RATE%" >> "$SUMMARY_FILE"
+      echo "$PROFILE,$MODE,training,N/A,$RUNS_COUNT,$SOLVED_COUNT,$RATE%" >> "$SUMMARY_FILE"
     fi
 
-    # Validation runs (-2x unit)
-    UNIT_2X="${UNIT_NAME}-2x"
-    RUNS_COUNT=0
-    SOLVED_COUNT=0
-    for LOG in "$RESULTS_DIR/${UNIT_2X}_validation"*.log; do
-      if [[ -f "$LOG" ]]; then
-        RUNS_COUNT=$((RUNS_COUNT + 1))
-        if grep -q "SOLVED" "$LOG" 2>/dev/null; then
-          SOLVED_COUNT=$((SOLVED_COUNT + 1))
+    # Validation runs (all -2x units for this profile/mode/date)
+    # Find all validation logs matching the pattern
+    VALIDATION_LOGS=$(find "$RESULTS_DIR" -name "*${LOG_BASE}*-2x_validation_*.log" 2>/dev/null | wc -l)
+
+    if [[ $VALIDATION_LOGS -gt 0 ]]; then
+      # Group by unique learning unit
+      for UNIT_LOG_PREFIX in $(find "$RESULTS_DIR" -name "*${LOG_BASE}*-2x_validation_*.log" 2>/dev/null | \
+        sed 's/_validation_[0-9]*\.log$//' | sort -u); do
+
+        UNIT_NAME=$(basename "$UNIT_LOG_PREFIX")
+        RUNS_COUNT=0
+        SOLVED_COUNT=0
+
+        for LOG in "${UNIT_LOG_PREFIX}_validation_"*.log; do
+          if [[ -f "$LOG" ]]; then
+            RUNS_COUNT=$((RUNS_COUNT + 1))
+            if grep -q "SOLVED" "$LOG" 2>/dev/null; then
+              SOLVED_COUNT=$((SOLVED_COUNT + 1))
+            fi
+          fi
+        done
+
+        if [[ $RUNS_COUNT -gt 0 ]]; then
+          RATE=$(echo "scale=1; $SOLVED_COUNT * 100 / $RUNS_COUNT" | bc)
+          echo "$PROFILE,$MODE,validation,$UNIT_NAME,$RUNS_COUNT,$SOLVED_COUNT,$RATE%" >> "$SUMMARY_FILE"
         fi
-      fi
-    done
-    if [[ $RUNS_COUNT -gt 0 ]]; then
-      RATE=$(echo "scale=1; $SOLVED_COUNT * 100 / $RUNS_COUNT" | bc)
-      echo "$PROFILE,$MODE,validation,$UNIT_2X,$RUNS_COUNT,$SOLVED_COUNT,$RATE%" >> "$SUMMARY_FILE"
+      done
     fi
   done
 done
