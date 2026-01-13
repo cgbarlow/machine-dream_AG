@@ -115,6 +115,12 @@ export class LLMClusterV1 extends BaseClusteringAlgorithm {
     try {
       patterns = await this.identifyPatterns(sampled, patternCount, config);
       console.log(`   ✓ LLM identified ${patterns.length} patterns`);
+
+      // If LLM returned 0 patterns (parsing failed), use fallback
+      if (patterns.length === 0) {
+        console.warn(`   ⚠️  LLM returned 0 patterns, using fallback patterns`);
+        patterns = this.getFallbackPatterns();
+      }
     } catch (error) {
       console.warn(`   ⚠️  LLM pattern identification failed, using fallback`);
       patterns = this.getFallbackPatterns();
@@ -190,7 +196,22 @@ export class LLMClusterV1 extends BaseClusteringAlgorithm {
       },
     ]);
 
-    return this.parsePatterns(response.content);
+    // Debug: log first 500 chars of LLM response
+    if (response.content.length > 0) {
+      console.log(`   📝 LLM response preview: ${response.content.substring(0, 500)}...`);
+    } else {
+      console.warn(`   ⚠️  LLM returned empty response`);
+    }
+
+    const patterns = this.parsePatterns(response.content);
+
+    // If parsing failed, log the full response for debugging
+    if (patterns.length === 0) {
+      console.warn(`   ⚠️  Failed to parse any patterns from LLM response`);
+      console.warn(`   Full response length: ${response.content.length} chars`);
+    }
+
+    return patterns;
   }
 
   /**
@@ -367,29 +388,43 @@ Provide ${targetCount} distinct patterns now:`;
         id: 'P1',
         name: 'Single candidate elimination',
         description: 'Only one possible value remains after elimination',
-        keywords: ['only candidate', 'only option', 'must be', 'last remaining'],
+        keywords: ['only', 'candidate', 'option', 'possible', 'remaining'],
         characteristics: ['deterministic', 'single-step'],
       },
       {
         id: 'P2',
-        name: 'Constraint-based deduction',
-        description: 'Value forced by constraint analysis',
-        keywords: ['constraint', 'forced', 'elimination', 'impossible'],
+        name: 'Constraint intersection',
+        description: 'Multiple constraints intersect to force a value',
+        keywords: ['constraint', 'intersection', 'forced', 'impossible'],
         characteristics: ['logical', 'multi-constraint'],
       },
       {
         id: 'P3',
-        name: 'Pattern recognition',
-        description: 'Recognizing common Sudoku patterns',
-        keywords: ['pattern', 'naked', 'hidden', 'pair', 'triple'],
-        characteristics: ['advanced', 'pattern-based'],
+        name: 'Box-focused analysis',
+        description: 'Analyzing box constraints to identify candidates',
+        keywords: ['box', 'square', 'region', 'contains'],
+        characteristics: ['spatial', 'box-focused'],
       },
       {
         id: 'P4',
-        name: 'General reasoning',
-        description: 'General problem-solving approach',
-        keywords: ['think', 'analyze', 'consider', 'check'],
-        characteristics: ['exploratory', 'general'],
+        name: 'Row-column interaction',
+        description: 'Interaction between row and column constraints',
+        keywords: ['row', 'column', 'line', 'intersect'],
+        characteristics: ['cross-unit', 'spatial'],
+      },
+      {
+        id: 'P5',
+        name: 'Unique candidate in unit',
+        description: 'Value appears only once in a row, column, or box',
+        keywords: ['unique', 'only appears', 'single occurrence'],
+        characteristics: ['deterministic', 'unit-analysis'],
+      },
+      {
+        id: 'P6',
+        name: 'General deductive reasoning',
+        description: 'General logical deduction and problem-solving',
+        keywords: ['must', 'therefore', 'because', 'since', 'thus'],
+        characteristics: ['exploratory', 'general', 'deductive'],
       },
     ];
   }
