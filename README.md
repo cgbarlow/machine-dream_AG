@@ -203,6 +203,72 @@ machine-dream puzzle from-seed 12345 --size 9 --difficulty hard
 
 ---
 
+## 🧠 Dreaming Algorithms
+
+Machine Dream supports multiple clustering algorithms for experience consolidation during dream cycles. Each algorithm offers different trade-offs between speed, quality, and semantic depth.
+
+### Available Algorithms
+
+| Algorithm | Speed | Approach | Use Case |
+|-----------|-------|----------|----------|
+| **FastCluster v2** | Fast (<5s) | Keyword clustering + forced subdivision | Default, production use |
+| **DeepCluster v1** | Medium (<60s) | Two-phase: keyword + LLM semantic | Better semantic quality (future) |
+| **LLMCluster v1** | Slow (<180s) | Fully LLM-driven | Research, maximum quality (future) |
+
+> **Note**: Currently only FastCluster v2 is implemented. DeepCluster v1 and LLMCluster v1 are planned for future releases.
+
+### Algorithm Selection
+
+```bash
+# Use specific algorithm (FastCluster v2 is default)
+machine-dream llm dream run --algorithm fastcluster
+
+# Explicit algorithm selection
+machine-dream llm dream run \
+  --profile qwen3-coder \
+  --learning-unit my-unit \
+  --algorithm fastcluster
+
+# Use with comprehensive test suite
+./scripts/comprehensive-test-suite.sh --algorithm fastcluster --runs 3
+```
+
+### FastCluster v2 Algorithm
+
+**Key Features**:
+- **Keyword-based clustering** - Groups experiences by reasoning patterns
+- **Dominant cluster detection** - Identifies when any cluster exceeds 40% of total experiences
+- **Forced subdivision** - Splits large clusters even when target count is met
+- **Spatial subdivision** - Uses grid position to further split large clusters
+
+**Bug Fix**: FastCluster v2 fixes a critical issue where AISP doubled mode (target=10 strategies) would create the same 3 strategies as standard mode (target=5). The dominant cluster fix forces subdivision when "general_reasoning" or other patterns dominate (>40% of experiences).
+
+### Learning Unit Naming
+
+Learning units now include algorithm identifiers in their names:
+
+**Format**: `{profile}_{mode}_{algo}v{version}_{date}[_2x]`
+
+**Examples**:
+- `qwen3_standard_fastclusterv2_20260113` - Standard consolidation with FastCluster v2
+- `qwen3_aisp_fastclusterv2_20260113_2x` - Doubled strategies with AISP mode
+- `qwen3_aisp-full_fastclusterv2_20260113` - AISP Full mode
+
+**Backward Compatibility**: Legacy learning units without algorithm identifiers are automatically mapped to `fastclusterv2` when loaded.
+
+### Algorithm Versioning
+
+Machine Dream tracks algorithm versions to ensure reproducibility:
+
+- **Version tracking** - Each algorithm has a version number and code hash
+- **Learning unit metadata** - Records which algorithm created each unit
+- **Automatic versioning** - Code changes trigger new version numbers
+- **Historical comparison** - Compare learning outcomes across algorithm versions
+
+See [Spec 18: Algorithm Versioning System](docs/specs/18-algorithm-versioning-system.md) and [ADR-011: Versioned Algorithms](docs/adr/011-versioned-algorithms.md) for complete details.
+
+---
+
 ## 🤖 LLM Integration
 
 ### AI Model Profiles (Spec 13)

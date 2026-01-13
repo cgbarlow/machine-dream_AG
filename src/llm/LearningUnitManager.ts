@@ -18,6 +18,7 @@ import type {
 } from './types.js';
 import { DEFAULT_LEARNING_UNIT_ID } from './types.js';
 import { LLM_STORAGE_KEYS } from './storage-keys.js';
+import { AlgorithmRegistry } from './clustering/AlgorithmRegistry.js';
 
 /**
  * Learning Unit Manager
@@ -82,6 +83,24 @@ export class LearningUnitManager {
     );
 
     if (!metadata) {
+      // Try mapping legacy unit name (Spec 18: Algorithm Versioning)
+      const registry = AlgorithmRegistry.getInstance();
+      const mappedId = registry.mapLegacyUnit(id);
+
+      if (mappedId !== id) {
+        console.log(`📦 Mapping legacy unit "${id}" → "${mappedId}"`);
+        const mappedKey = LLM_STORAGE_KEYS.getLearningUnitKey(this.profileName, mappedId);
+        const mappedMetadata = await this.agentMemory.reasoningBank.getMetadata(
+          mappedKey,
+          LLM_STORAGE_KEYS.LEARNING_UNIT_TYPE
+        );
+
+        if (mappedMetadata) {
+          // Recursively call get() with mapped ID to avoid code duplication
+          return this.get(mappedId);
+        }
+      }
+
       // Check for legacy few-shots without explicit learning unit
       if (id === DEFAULT_LEARNING_UNIT_ID) {
         return this.getOrCreateDefaultUnit();

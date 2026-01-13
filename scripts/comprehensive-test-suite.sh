@@ -22,6 +22,8 @@ NO_SAVE_REASONING=""
 SKIP_DREAM=false
 PROFILE_FILTER=""
 PROFILE_EXCLUDE=""
+ALGORITHM=""
+ALGORITHM_LIST=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -33,6 +35,8 @@ while [[ $# -gt 0 ]]; do
     --skip-dream) SKIP_DREAM=true; shift ;;
     --profiles) PROFILE_FILTER="$2"; shift 2 ;;
     --exclude) PROFILE_EXCLUDE="$2"; shift 2 ;;
+    --algorithm) ALGORITHM="$2"; shift 2 ;;
+    --algorithms) ALGORITHM_LIST="$2"; shift 2 ;;
     -h|--help)
       echo "Usage: $0 [options]"
       echo ""
@@ -44,6 +48,8 @@ while [[ $# -gt 0 ]]; do
       echo "  --skip-dream       Skip dreaming consolidation"
       echo "  --profiles <list>  Comma-separated list of profiles (default: all)"
       echo "  --exclude <list>   Comma-separated list of profiles to exclude"
+      echo "  --algorithm <name> Use specific clustering algorithm"
+      echo "  --algorithms <list> Comma-separated algorithm list (default: fastcluster)"
       echo "  -h, --help         Show help"
       exit 0
       ;;
@@ -179,10 +185,21 @@ for PROFILE in $PROFILES; do
       [[ "$MODE" == "aisp" ]] && DREAM_OPTS="$DREAM_OPTS --aisp"
       [[ "$MODE" == "aisp-full" ]] && DREAM_OPTS="$DREAM_OPTS --aisp-full"
 
+      # Build algorithm options
+      ALGO_OPTS=""
+      if [[ -n "$ALGORITHM" ]]; then
+        ALGO_OPTS="--algorithm $ALGORITHM"
+      elif [[ -n "$ALGORITHM_LIST" ]]; then
+        ALGO_OPTS="--algorithms $ALGORITHM_LIST"
+      else
+        ALGO_OPTS="--algorithm fastcluster"
+      fi
+
       npx machine-dream llm dream run \
         --profile "$PROFILE" \
         --learning-unit "$UNIT_NAME" \
         $DREAM_OPTS \
+        $ALGO_OPTS \
         2>&1 | tee "$RESULTS_DIR/${UNIT_NAME}_dream.log"
 
       # Clear any remaining unconsolidated experiences after dream cycle
@@ -201,7 +218,7 @@ for PROFILE in $PROFILES; do
           echo "    Validation run $i/$RUNS..."
           TOTAL_RUNS=$((TOTAL_RUNS + 1))
 
-          LOG_FILE="$RESULTS_DIR/${UNIT_2X}_validation${i}.log"
+          LOG_FILE="$RESULTS_DIR/${UNIT_2X}_validation_${i}.log"
 
           # Run with tee to show output live and save to log
           npx machine-dream llm play "$PUZZLE" \

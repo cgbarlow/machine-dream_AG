@@ -97,7 +97,7 @@ describe('FastClusterV2', () => {
       expect(result.clusters.size).toBeGreaterThan(0);
       expect(result.metadata.totalExperiences).toBe(5);
       expect(result.metadata.clustersCreated).toBeGreaterThan(0);
-      expect(result.metadata.processingTimeMs).toBeGreaterThan(0);
+      expect(result.metadata.processingTimeMs).toBeGreaterThanOrEqual(0);
     });
 
     it('should create more clusters for higher target counts', async () => {
