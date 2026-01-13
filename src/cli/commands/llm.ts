@@ -2454,6 +2454,25 @@ export function registerLLMCommand(program: Command): void {
               writeFileSync(reportPath, JSON.stringify(report, null, 2));
               logger.info(`💾 Report saved to: ${reportPath}`);
             }
+
+            // CRITICAL: Reset consolidated status for next algorithm (if not last algorithm)
+            if (algorithmsToUse.indexOf(algorithm) < algorithmsToUse.length - 1) {
+              logger.info(`🔄 Resetting consolidated status for next algorithm...`);
+              const allExperiences = await agentMemory.reasoningBank.queryMetadata('llm_experience', {}) as LLMExperience[];
+              const profileExperiences = allExperiences.filter((exp: any) => exp.profileName === profileName);
+              let resetCount = 0;
+              for (const exp of profileExperiences) {
+                if ((exp as any).consolidated === true) {
+                  await agentMemory.reasoningBank.storeMetadata(
+                    exp.id,
+                    'llm_experience',
+                    { ...exp, consolidated: false }
+                  );
+                  resetCount++;
+                }
+              }
+              logger.info(`   Reset ${resetCount} experiences to unconsolidated\n`);
+            }
           } // End algorithm loop
 
           // Summary for all algorithms
