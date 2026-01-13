@@ -157,7 +157,9 @@ for PROFILE in $PROFILES; do
     echo ""
     echo ">>> Mode: $MODE"
     echo "-------------------------------------------"
-    echo "  (Learning units will be auto-generated with algorithm identifiers)"
+    echo "  Training runs will use: default (no learned strategies)"
+    echo "  Dream consolidation will create units like: ${PROFILE}_${MODE}_*_${DATE_STR}_1"
+    echo ""
 
     # Training runs (no learning unit - generates fresh experiences)
     for i in $(seq 1 $RUNS); do
@@ -186,7 +188,26 @@ for PROFILE in $PROFILES; do
     # Dream consolidation (dual mode is default, creates BOTH standard and -2x units)
     if [[ "$SKIP_DREAM" != "true" ]]; then
       echo ""
-      echo "  Running dream consolidation (auto-generating learning units)..."
+      echo "  Running dream consolidation..."
+
+      # Determine which algorithms will be used
+      if [[ -n "$ALGORITHM" ]]; then
+        echo "    Algorithm: $ALGORITHM"
+        echo "    Will create: ${PROFILE}_${MODE}_${ALGORITHM}*_${DATE_STR}_N"
+      elif [[ -n "$ALGORITHM_LIST" ]]; then
+        echo "    Algorithms: $ALGORITHM_LIST"
+        echo "    Will create units for each algorithm (pattern: ${PROFILE}_${MODE}_<algo>_${DATE_STR}_N)"
+      else
+        echo "    Using all algorithms (default)"
+        echo "    Will create: ${PROFILE}_${MODE}_fastclusterv2_${DATE_STR}_1"
+        echo "                 ${PROFILE}_${MODE}_deepclusterv1_${DATE_STR}_1"
+        echo "                 ${PROFILE}_${MODE}_llmclusterv1_${DATE_STR}_1"
+        if [[ -z "$NO_DUAL" ]]; then
+          echo "    Plus -2x variants for validation"
+        fi
+      fi
+      echo ""
+
       DREAM_OPTS=""
       [[ -n "$NO_DUAL" ]] && DREAM_OPTS="$DREAM_OPTS $NO_DUAL"
       # Pass AISP mode flags to dream consolidation
