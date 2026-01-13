@@ -25,6 +25,9 @@ export interface LLMConfig {
   // Per-profile customization (Spec 13)
   profileSystemPrompt?: string; // Additional system prompt from profile
 
+  // Debugging
+  debug?: boolean; // Show detailed debug output (e.g., LLM responses, pattern parsing)
+
   // No hints, no fallback - these are NOT configurable
 }
 

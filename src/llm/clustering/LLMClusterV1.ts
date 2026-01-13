@@ -196,17 +196,19 @@ export class LLMClusterV1 extends BaseClusteringAlgorithm {
       },
     ]);
 
-    // Debug: log first 500 chars of LLM response
-    if (response.content.length > 0) {
-      console.log(`   📝 LLM response preview: ${response.content.substring(0, 500)}...`);
-    } else {
-      console.warn(`   ⚠️  LLM returned empty response`);
+    // Debug: log first 500 chars of LLM response (if debug enabled)
+    if (_config.debug) {
+      if (response.content.length > 0) {
+        console.log(`   📝 LLM response preview: ${response.content.substring(0, 500)}...`);
+      } else {
+        console.warn(`   ⚠️  LLM returned empty response`);
+      }
     }
 
     const patterns = this.parsePatterns(response.content);
 
-    // If parsing failed, log the full response for debugging
-    if (patterns.length === 0) {
+    // If parsing failed, log the full response for debugging (if debug enabled)
+    if (patterns.length === 0 && _config.debug) {
       console.warn(`   ⚠️  Failed to parse any patterns from LLM response`);
       console.warn(`   Full response length: ${response.content.length} chars`);
     }

@@ -2196,6 +2196,7 @@ export function registerLLMCommand(program: Command): void {
     .option('--profile <name>', 'LLM profile to consolidate (default: active profile)')
     .option('--all', 'Consolidate all profiles separately')
     .option('--learning-unit <id>', 'Update specific learning unit (auto-generates if not specified)')
+    .option('--rerun <unit-id>', 'Re-run consolidation using experiences from an existing learning unit')
     .option('--reset', 'Reset consolidated status and reprocess all experiences')
     .option('--no-anonymous-patterns', 'Disable anonymous pattern format (use named strategies)')
     .option('--double-strategies', 'Double the number of strategies created (6-10 few-shots, 10-14 merged)')
@@ -2204,18 +2205,53 @@ export function registerLLMCommand(program: Command): void {
     .option('--no-dual-unit', 'Create only single learning unit (default: creates BOTH standard AND -2x)')
     .option('--algorithm <name>', 'Clustering algorithm: fastcluster, deepcluster, llmcluster')
     .option('--algorithms <list>', 'Comma-separated list (default: all latest versions)')
+    .option('--debug', 'Show detailed debug output including LLM responses and pattern parsing')
     .option('--output <file>', 'Save consolidation report')
     .action(async (options) => {
       try {
         const manager = new LLMProfileManager();
         const agentMemory = new AgentMemory(createDefaultMemoryConfig());
 
+        // If --rerun is specified, infer profile from the learning unit
+        let inferredProfile: string | null = null;
+        if (options.rerun) {
+          // Extract profile name from unit ID (e.g., "gpt-oss-120b_standard_llmclusterv1_20260113_1" → "gpt-oss-120b")
+          // Pattern: {profile}_{mode}_{algo}v{version}_{date}_{N}[_2x]
+          const parts = options.rerun.split('_');
+          if (parts.length < 5) {
+            throw new CLIError(`Invalid learning unit ID format: ${options.rerun}`, 1);
+          }
+
+          // Profile is everything before the first mode keyword (standard, aisp, aisp-full)
+          const modeKeywords = ['standard', 'aisp', 'aisp-full'];
+          let profileParts: string[] = [];
+          for (const part of parts) {
+            if (modeKeywords.includes(part) || modeKeywords.some(k => part.startsWith(k))) {
+              break;
+            }
+            profileParts.push(part);
+          }
+          inferredProfile = profileParts.join('_');
+
+          if (!inferredProfile) {
+            throw new CLIError(`Cannot infer profile from learning unit ID: ${options.rerun}`, 1);
+          }
+
+          logger.info(`📦 Inferred profile from learning unit: ${inferredProfile}\n`);
+        }
+
         // Determine which profiles to consolidate
         let profilesToProcess: string[] = [];
         if (options.all) {
+          if (options.rerun) {
+            throw new CLIError('Cannot use --all with --rerun', 1);
+          }
           profilesToProcess = manager.list().map(p => p.name);
         } else if (options.profile) {
           profilesToProcess = [options.profile];
+        } else if (inferredProfile) {
+          // Use inferred profile from --rerun
+          profilesToProcess = [inferredProfile];
         } else {
           const activeProfile = manager.getActive();
           if (!activeProfile) {
@@ -2232,6 +2268,7 @@ export function registerLLMCommand(program: Command): void {
 
           // Get profile config and record usage
           const config = getLLMConfig(profileName);
+          config.debug = options.debug || false; // Add debug flag from CLI options
           manager.recordUsage(profileName);
 
           // Ensure the required model is loaded in LM Studio (auto-loads if needed)
@@ -2304,6 +2341,74 @@ export function registerLLMCommand(program: Command): void {
               }
             }
             logger.info(`   Reset ${resetCount} experiences to unconsolidated`);
+          }
+
+          // Handle --rerun: re-run consolidation with experiences from existing unit
+          if (options.rerun) {
+            logger.info(`\n🔄 Re-running consolidation for learning unit: ${options.rerun}`);
+            logger.info('─'.repeat(50));
+
+            const { LearningUnitManager } = await import('../../llm/LearningUnitManager.js');
+            const unitManager = new LearningUnitManager(agentMemory, profileName);
+
+            // Load the existing learning unit
+            const existingUnit = await unitManager.get(options.rerun);
+            if (!existingUnit) {
+              throw new CLIError(`Learning unit not found: ${options.rerun}`, 1);
+            }
+
+            logger.info(`📦 Found learning unit: ${existingUnit.name}`);
+            logger.info(`   Created: ${existingUnit.createdAt.toISOString()}`);
+            logger.info(`   Strategies: ${existingUnit.fewShots.length}`);
+            logger.info(`   Absorbed experiences: ${existingUnit.absorbedExperienceIds.length}`);
+
+            // Extract algorithm from unit ID (e.g., "gpt-oss-120b_standard_llmclusterv1_20260113_1" → "llmcluster")
+            // Pattern: {profile}_{mode}_{algo}v{version}_{date}_{N}[_2x]
+            const algoMatch = options.rerun.match(/_([a-z]+cluster)v\d+_/i);
+            if (!algoMatch) {
+              throw new CLIError(`Cannot extract algorithm from unit ID: ${options.rerun}`, 1);
+            }
+            const algoNameRaw = algoMatch[1].toLowerCase();
+            logger.info(`   Algorithm: ${algoNameRaw}`);
+
+            // Convert algorithm name to proper case (e.g., "llmcluster" → "LLMCluster")
+            const algoNameMap: Record<string, string> = {
+              'fastcluster': 'FastCluster',
+              'deepcluster': 'DeepCluster',
+              'llmcluster': 'LLMCluster'
+            };
+            const algoName = algoNameMap[algoNameRaw];
+            if (!algoName) {
+              throw new CLIError(`Unknown algorithm: ${algoNameRaw}`, 1);
+            }
+
+            // Get the algorithm
+            const algo = registry.getAlgorithm(algoName);
+            if (!algo) {
+              throw new CLIError(`Algorithm not found: ${algoName}`, 1);
+            }
+
+            // Override algorithm selection to use only this algorithm
+            algorithmsToUse = [algo];
+            logger.info(`\n🔧 Using algorithm: ${algo.getIdentifier()} (from unit)`);
+
+            // Mark experiences as unconsolidated
+            logger.info(`\n🔄 Marking ${existingUnit.absorbedExperienceIds.length} experiences as unconsolidated...`);
+            const allExperiences = await agentMemory.reasoningBank.queryMetadata('llm_experience', {}) as LLMExperience[];
+            const experiencesToReset = allExperiences.filter((exp: any) =>
+              existingUnit.absorbedExperienceIds.includes(exp.id)
+            );
+
+            let resetCount = 0;
+            for (const exp of experiencesToReset) {
+              await agentMemory.reasoningBank.storeMetadata(
+                exp.id,
+                'llm_experience',
+                { ...exp, consolidated: false }
+              );
+              resetCount++;
+            }
+            logger.info(`   ✓ Marked ${resetCount} experiences as unconsolidated\n`);
           }
 
           // Get learning unit manager and existing units (shared)
