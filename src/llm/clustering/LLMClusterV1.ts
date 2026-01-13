@@ -241,7 +241,8 @@ Examples of distinct patterns:
 - "Naked pairs" - Two cells in a unit can only contain two values
 - "Pointing pairs" - Candidates in a box point to elimination in row/column
 
-Output format:
+IMPORTANT: Output in PLAIN TEXT format (no markdown, no bold, no formatting):
+
 PATTERN: P1
 NAME: [name]
 DESC: [description]
@@ -262,11 +263,12 @@ ${sampled
 
 ${sampled.length > 50 ? `... and ${sampled.length - 50} more experiences` : ''}
 
-Provide ${targetCount} distinct patterns now:`;
+Provide ${targetCount} distinct patterns now in PLAIN TEXT (no markdown):`;
   }
 
   /**
    * Parse patterns from LLM response
+   * Handles both plain text and markdown formatting (strips ** bold **)
    */
   private parsePatterns(response: string): ReasoningPattern[] {
     const patterns: ReasoningPattern[] = [];
@@ -275,7 +277,8 @@ Provide ${targetCount} distinct patterns now:`;
     let currentPattern: Partial<ReasoningPattern> = {};
 
     for (const line of lines) {
-      const trimmed = line.trim();
+      // Strip markdown bold formatting (** at start/end) and trim
+      const trimmed = line.trim().replace(/^\*\*|\*\*$/g, '').trim();
 
       if (trimmed.startsWith('PATTERN:')) {
         // Save previous pattern
@@ -383,50 +386,65 @@ Provide ${targetCount} distinct patterns now:`;
 
   /**
    * Fallback patterns when LLM fails
+   * Keywords made more specific to avoid dominant cluster (80% in P1)
    */
   private getFallbackPatterns(): ReasoningPattern[] {
     return [
       {
         id: 'P1',
-        name: 'Single candidate elimination',
-        description: 'Only one possible value remains after elimination',
-        keywords: ['only', 'candidate', 'option', 'possible', 'remaining'],
+        name: 'Direct naked single',
+        description: 'Cell has only one candidate after basic elimination',
+        keywords: ['naked single', 'sole candidate', 'last remaining', 'only value'],
         characteristics: ['deterministic', 'single-step'],
       },
       {
         id: 'P2',
-        name: 'Constraint intersection',
-        description: 'Multiple constraints intersect to force a value',
-        keywords: ['constraint', 'intersection', 'forced', 'impossible'],
-        characteristics: ['logical', 'multi-constraint'],
+        name: 'Hidden single in unit',
+        description: 'Value appears only once in a row, column, or box',
+        keywords: ['hidden single', 'only place', 'only spot', 'must go'],
+        characteristics: ['deterministic', 'unit-scanning'],
       },
       {
         id: 'P3',
-        name: 'Box-focused analysis',
-        description: 'Analyzing box constraints to identify candidates',
-        keywords: ['box', 'square', 'region', 'contains'],
-        characteristics: ['spatial', 'box-focused'],
+        name: 'Constraint-based deduction',
+        description: 'Multiple constraints eliminate all but one possibility',
+        keywords: ['constraint', 'eliminate', 'ruled out', 'cannot be'],
+        characteristics: ['logical', 'multi-constraint'],
       },
       {
         id: 'P4',
-        name: 'Row-column interaction',
-        description: 'Interaction between row and column constraints',
-        keywords: ['row', 'column', 'line', 'intersect'],
-        characteristics: ['cross-unit', 'spatial'],
+        name: 'Box analysis',
+        description: 'Analyzing 3x3 box constraints to identify placements',
+        keywords: ['box', 'square', 'region', '3x3'],
+        characteristics: ['spatial', 'box-focused'],
       },
       {
         id: 'P5',
-        name: 'Unique candidate in unit',
-        description: 'Value appears only once in a row, column, or box',
-        keywords: ['unique', 'only appears', 'single occurrence'],
-        characteristics: ['deterministic', 'unit-analysis'],
+        name: 'Row analysis',
+        description: 'Analyzing row constraints to identify placements',
+        keywords: ['row', 'horizontal', 'across'],
+        characteristics: ['spatial', 'row-focused'],
       },
       {
         id: 'P6',
-        name: 'General deductive reasoning',
-        description: 'General logical deduction and problem-solving',
-        keywords: ['must', 'therefore', 'because', 'since', 'thus'],
-        characteristics: ['exploratory', 'general', 'deductive'],
+        name: 'Column analysis',
+        description: 'Analyzing column constraints to identify placements',
+        keywords: ['column', 'vertical', 'down'],
+        characteristics: ['spatial', 'column-focused'],
+      },
+      {
+        id: 'P7',
+        name: 'Multi-unit intersection',
+        description: 'Interaction between multiple units (row+column+box)',
+        keywords: ['intersection', 'overlap', 'both', 'all three'],
+        characteristics: ['cross-unit', 'complex'],
+      },
+      {
+        id: 'P8',
+        name: 'Process of elimination',
+        description: 'Systematic elimination of impossible values',
+        keywords: ['process', 'elimination', 'checking', 'trying'],
+        characteristics: ['systematic', 'exploratory'],
       },
     ];
   }
