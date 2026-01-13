@@ -2237,6 +2237,12 @@ export function registerLLMCommand(program: Command): void {
           // Import required classes
           const { ExperienceStore } = await import('../../llm/ExperienceStore.js');
           const { DreamingConsolidator } = await import('../../llm/DreamingConsolidator.js');
+          const { LMStudioClient } = await import('../../llm/LMStudioClient.js');
+          const { initializeAlgorithmRegistry } = await import('../../llm/clustering/index.js');
+
+          // Re-initialize algorithm registry with LLM client to enable all algorithms
+          const llmClient = new LMStudioClient(config);
+          initializeAlgorithmRegistry(llmClient);
 
           // Create store and consolidator
           const experienceStore = new ExperienceStore(agentMemory, config, profileName);

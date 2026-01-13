@@ -212,25 +212,24 @@ Machine Dream supports multiple clustering algorithms for experience consolidati
 | Algorithm | Speed | Approach | Use Case |
 |-----------|-------|----------|----------|
 | **FastCluster v2** | Fast (<5s) | Keyword clustering + forced subdivision | Default, production use |
-| **DeepCluster v1** | Medium (<60s) | Two-phase: keyword + LLM semantic | Better semantic quality (future) |
-| **LLMCluster v1** | Slow (<180s) | Fully LLM-driven | Research, maximum quality (future) |
-
-> **Note**: Currently only FastCluster v2 is implemented. DeepCluster v1 and LLMCluster v1 are planned for future releases.
+| **DeepCluster v1** | Medium (<60s) | Two-phase: keyword + LLM semantic | Better semantic quality |
+| **LLMCluster v1** | Slow (<180s) | Fully LLM-driven | Research, maximum quality |
 
 ### Algorithm Selection
 
 ```bash
-# Use specific algorithm (FastCluster v2 is default)
-machine-dream llm dream run --algorithm fastcluster
+# Use default algorithm (FastCluster v2)
+machine-dream llm dream run --profile qwen3-coder
 
-# Explicit algorithm selection
-machine-dream llm dream run \
-  --profile qwen3-coder \
-  --learning-unit my-unit \
-  --algorithm fastcluster
+# Use specific algorithm
+machine-dream llm dream run --algorithm fastcluster --profile qwen3-coder
+machine-dream llm dream run --algorithm deepcluster --profile qwen3-coder
+machine-dream llm dream run --algorithm llmcluster --profile qwen3-coder
 
 # Use with comprehensive test suite
 ./scripts/comprehensive-test-suite.sh --algorithm fastcluster --runs 3
+./scripts/comprehensive-test-suite.sh --algorithm deepcluster --runs 3
+./scripts/comprehensive-test-suite.sh --algorithm llmcluster --runs 3
 ```
 
 ### FastCluster v2 Algorithm
@@ -243,6 +242,26 @@ machine-dream llm dream run \
 
 **Bug Fix**: FastCluster v2 fixes a critical issue where AISP doubled mode (target=10 strategies) would create the same 3 strategies as standard mode (target=5). The dominant cluster fix forces subdivision when "general_reasoning" or other patterns dominate (>40% of experiences).
 
+### DeepCluster v1 Algorithm
+
+**Key Features**:
+- **Two-phase clustering** - Combines keyword clustering with LLM semantic analysis
+- **LLM semantic split** - Uses AI to identify semantic patterns in large clusters (>50 experiences)
+- **Stratified sampling** - Samples representative experiences across difficulty levels
+- **Pattern identification** - LLM identifies 4-8 distinct semantic reasoning approaches
+
+**When to Use**: Choose DeepCluster v1 when you need better semantic quality than FastCluster but don't want the full cost of LLMCluster. Ideal for medium-sized datasets (100-500 experiences) where understanding reasoning nuances matters.
+
+### LLMCluster v1 Algorithm
+
+**Key Features**:
+- **Fully LLM-driven** - No keyword-based heuristics, pure AI pattern identification
+- **Balanced sampling** - Samples 100-150 experiences balanced by puzzle difficulty
+- **Rich pattern structure** - Identifies 10-15 patterns with descriptions, keywords, and characteristics
+- **Comprehensive categorization** - Categorizes all experiences using identified patterns
+
+**When to Use**: Choose LLMCluster v1 for research and maximum quality. Best for datasets where you want the deepest understanding of reasoning patterns, and processing time is not a constraint. Ideal for final consolidation after extensive training runs.
+
 ### Learning Unit Naming
 
 Learning units now include algorithm identifiers in their names:
@@ -251,8 +270,10 @@ Learning units now include algorithm identifiers in their names:
 
 **Examples**:
 - `qwen3_standard_fastclusterv2_20260113` - Standard consolidation with FastCluster v2
-- `qwen3_aisp_fastclusterv2_20260113_2x` - Doubled strategies with AISP mode
-- `qwen3_aisp-full_fastclusterv2_20260113` - AISP Full mode
+- `qwen3_standard_deepclusterv1_20260113` - Standard consolidation with DeepCluster v1
+- `qwen3_standard_llmclusterv1_20260113` - Standard consolidation with LLMCluster v1
+- `qwen3_aisp_fastclusterv2_20260113_2x` - Doubled strategies with AISP mode and FastCluster
+- `qwen3_aisp-full_deepclusterv1_20260113` - AISP Full mode with DeepCluster
 
 **Backward Compatibility**: Legacy learning units without algorithm identifiers are automatically mapped to `fastclusterv2` when loaded.
 
