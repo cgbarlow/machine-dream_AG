@@ -37,8 +37,9 @@ export function initializeAlgorithmRegistry(llmClient?: LMStudioClient, silent =
   const registry = AlgorithmRegistry.getInstance();
 
   // Register FastCluster v2 as default (no LLM client needed)
-  registry.register(new FastClusterV2(), true);
-  registry.setDefaultAlgorithm('FastCluster');
+  const fastCluster = new FastClusterV2();
+  registry.register(fastCluster, true);
+  registry.setDefaultAlgorithm(fastCluster.getName());
 
   if (!silent) {
     console.log('✅ Registered fastclusterv2 (default)');
@@ -46,8 +47,12 @@ export function initializeAlgorithmRegistry(llmClient?: LMStudioClient, silent =
 
   // Register LLM-based algorithms if client provided
   if (llmClient) {
-    registry.register(new DeepClusterV1(llmClient));
-    registry.register(new LLMClusterV1(llmClient));
+    const deepCluster = new DeepClusterV1(llmClient);
+    const llmCluster = new LLMClusterV1(llmClient);
+
+    registry.register(deepCluster);
+    registry.register(llmCluster);
+
     if (!silent) {
       console.log('✅ Registered deepclusterv1');
       console.log('✅ Registered llmclusterv1');
