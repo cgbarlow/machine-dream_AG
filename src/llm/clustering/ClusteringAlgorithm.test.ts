@@ -20,7 +20,7 @@ class TestAlgorithm extends BaseClusteringAlgorithm {
 
   async cluster(
     experiences: LLMExperience[],
-    targetCount: number,
+    _targetCount: number,
     _config: LLMConfig
   ): Promise<ClusteringResult> {
     // Simple test implementation: create one cluster per experience

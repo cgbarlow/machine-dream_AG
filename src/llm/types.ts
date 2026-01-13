@@ -211,6 +211,13 @@ export interface ConsolidationReport {
   experiencesConsolidated: number;
   compressionRatio?: number;       // experiences / patterns (target: 10:1)
   abstractionLevels?: number;      // Number of hierarchy levels built
+
+  // Algorithm used for clustering (Spec 18: Algorithm Versioning)
+  algorithmUsed?: {
+    name: string;
+    version: number;
+    identifier: string;
+  };
 }
 
 /**

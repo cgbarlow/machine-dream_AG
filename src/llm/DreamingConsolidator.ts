@@ -38,6 +38,7 @@ import { ExperienceStore } from './ExperienceStore.js';
 import { LearningUnitManager } from './LearningUnitManager.js';
 import { AISPBuilder, type AISPMode } from './AISPBuilder.js';
 import { AISPStrategyEncoder } from './AISPStrategyEncoder.js';
+import { AlgorithmRegistry, type ClusteringAlgorithm } from './clustering/index.js';
 
 /**
  * Dreaming Consolidator
@@ -52,19 +53,27 @@ import { AISPStrategyEncoder } from './AISPStrategyEncoder.js';
  */
 export class DreamingConsolidator {
   private llmClient: LMStudioClient;
+  private llmConfig: LLMConfig;
   private generateAnonymousPatterns = false;
   private consolidationOptions: Required<Omit<ConsolidationOptions, 'doubleStrategies'>> = { ...DEFAULT_CONSOLIDATION_COUNTS };
   private aispMode: AISPMode = 'off';
   private aispBuilder: AISPBuilder;
   private aispEncoder: AISPStrategyEncoder;
+  private clusteringAlgorithm: ClusteringAlgorithm;
 
   constructor(
     private experienceStore: ExperienceStore,
-    config: LLMConfig
+    config: LLMConfig,
+    clusteringAlgorithm?: ClusteringAlgorithm
   ) {
+    this.llmConfig = config;
     this.llmClient = new LMStudioClient(config);
     this.aispBuilder = new AISPBuilder();
     this.aispEncoder = new AISPStrategyEncoder();
+
+    // Use provided algorithm or get default from registry
+    this.clusteringAlgorithm = clusteringAlgorithm || AlgorithmRegistry.getInstance().getDefaultAlgorithm();
+    console.log(`🔧 Using clustering algorithm: ${this.clusteringAlgorithm.getIdentifier()}`);
   }
 
   /**
@@ -154,8 +163,14 @@ export class DreamingConsolidator {
     console.log(`   Successful: ${successful.length}, Invalid: ${invalid.length}, Wrong: ${wrong.length}`);
 
     // Phase 3: COMPRESSION - Cluster similar experiences
-    console.log(`🔍 Clustering by reasoning approach...`);
-    const clusters = this.clusterByReasoning(successful);
+    console.log(`🔍 Clustering ${successful.length} experiences with ${this.clusteringAlgorithm.getIdentifier()}...`);
+    const clusterResult = await this.clusteringAlgorithm.cluster(
+      successful,
+      this.consolidationOptions.fewShotMax,
+      this.llmConfig
+    );
+    const clusters = clusterResult.clusters;
+    console.log(`✅ Created ${clusters.size} clusters in ${clusterResult.metadata.processingTimeMs}ms`);
 
     // Phase 3b: LLM SYNTHESIZES pattern for each cluster
     const synthesizedPatterns: SynthesizedPattern[] = [];
@@ -237,130 +252,12 @@ export class DreamingConsolidator {
       experiencesConsolidated: experiences.length,
       compressionRatio,
       abstractionLevels: hierarchy?.levels.length,
+      algorithmUsed: {
+        name: this.clusteringAlgorithm.getName(),
+        version: this.clusteringAlgorithm.getVersion(),
+        identifier: this.clusteringAlgorithm.getIdentifier(),
+      },
     };
-  }
-
-  /**
-   * Cluster experiences by reasoning approach
-   * Uses keyword extraction to group similar reasoning patterns
-   *
-   * @param experiences - Experiences to cluster
-   * @param targetClusterCount - Optional target number of clusters (defaults to fewShotMax)
-   *                            When higher, uses finer-grained clustering
-   */
-  private clusterByReasoning(
-    experiences: LLMExperience[],
-    targetClusterCount?: number
-  ): Map<string, LLMExperience[]> {
-    const target = targetClusterCount ?? this.consolidationOptions.fewShotMax;
-    const clusters = new Map<string, LLMExperience[]>();
-
-    // Determine signature granularity based on target cluster count
-    // More keywords = finer-grained clustering = more clusters
-    const keywordDepth = target >= 6 ? 4 : target >= 4 ? 3 : 2;
-
-    for (const exp of experiences) {
-      const signature = this.extractReasoningSignature(exp.move.reasoning, keywordDepth);
-
-      if (!clusters.has(signature)) {
-        clusters.set(signature, []);
-      }
-      clusters.get(signature)!.push(exp);
-    }
-
-    // If we still don't have enough clusters, subdivide large ones
-    if (clusters.size < target && clusters.size > 0) {
-      return this.subdivideClustersByContent(clusters, target);
-    }
-
-    return clusters;
-  }
-
-  /**
-   * Subdivide large clusters to meet target cluster count
-   * Uses content-based heuristics to split clusters
-   */
-  private subdivideClustersByContent(
-    clusters: Map<string, LLMExperience[]>,
-    targetCount: number
-  ): Map<string, LLMExperience[]> {
-    const result = new Map<string, LLMExperience[]>();
-
-    // Sort clusters by size (largest first) to prioritize splitting
-    const sortedClusters = Array.from(clusters.entries())
-      .sort((a, b) => b[1].length - a[1].length);
-
-    let currentCount = 0;
-
-    for (const [name, experiences] of sortedClusters) {
-      // How many more clusters do we need?
-      const needed = targetCount - currentCount;
-
-      if (needed <= 1 || experiences.length < 6) {
-        // Don't split if we've met target or cluster is too small
-        result.set(name, experiences);
-        currentCount++;
-      } else {
-        // Split this cluster into sub-clusters based on grid context
-        const subClusters = this.splitByGridContext(experiences, name, Math.min(needed, 3));
-        for (const [subName, subExps] of subClusters) {
-          result.set(subName, subExps);
-          currentCount++;
-        }
-      }
-    }
-
-    return result;
-  }
-
-  /**
-   * Split a cluster into sub-clusters based on grid context
-   * (row density, column density, box position)
-   */
-  private splitByGridContext(
-    experiences: LLMExperience[],
-    baseName: string,
-    targetSplits: number
-  ): Map<string, LLMExperience[]> {
-    const result = new Map<string, LLMExperience[]>();
-
-    // Simple heuristic: split by move position (row region)
-    const gridSize = experiences[0]?.gridState?.length || 9;
-    const regionSize = Math.ceil(gridSize / targetSplits);
-
-    for (const exp of experiences) {
-      const rowRegion = Math.floor((exp.move.row - 1) / regionSize);
-      const subName = `${baseName}_region${rowRegion}`;
-
-      if (!result.has(subName)) {
-        result.set(subName, []);
-      }
-      result.get(subName)!.push(exp);
-    }
-
-    // Filter out any sub-clusters that are too small (< 2 experiences)
-    const filtered = new Map<string, LLMExperience[]>();
-    const tooSmall: LLMExperience[] = [];
-
-    for (const [name, exps] of result) {
-      if (exps.length >= 2) {
-        filtered.set(name, exps);
-      } else {
-        tooSmall.push(...exps);
-      }
-    }
-
-    // Add too-small experiences to the largest sub-cluster
-    if (tooSmall.length > 0 && filtered.size > 0) {
-      const largest = Array.from(filtered.entries())
-        .sort((a, b) => b[1].length - a[1].length)[0];
-      largest[1].push(...tooSmall);
-    } else if (tooSmall.length > 0) {
-      // No valid sub-clusters, return original
-      filtered.set(baseName, experiences);
-    }
-
-    return filtered;
   }
 
   /**
@@ -1051,41 +948,6 @@ Identify at most 3 anti-patterns.`;
   // ============================================================================
 
   /**
-   * Extract reasoning signature for clustering
-   *
-   * @param reasoning - The reasoning text to analyze
-   * @param keywordDepth - How many keywords to include in signature (default 2)
-   *                       Higher values = finer-grained clustering
-   */
-  private extractReasoningSignature(reasoning: string, keywordDepth: number = 2): string {
-    const keywords = [
-      'only candidate',
-      'missing from row',
-      'missing from column',
-      'missing from box',
-      'last remaining',
-      'process of elimination',
-      'constraint',
-      'elimination',
-      'naked single',
-      'hidden single',
-      'only option',
-      'must be',
-      'intersection',
-      'subset',
-      'unique',
-      'forced',
-      'pair',
-      'triple',
-    ];
-
-    const lower = reasoning.toLowerCase();
-    const found = keywords.filter((kw) => lower.includes(kw));
-
-    return found.length > 0 ? found.slice(0, keywordDepth).join('_') : 'general_reasoning';
-  }
-
-  /**
    * Describe grid context around a move
    */
   private describeGridContext(
@@ -1257,9 +1119,15 @@ Identify at most 3 anti-patterns.`;
 
     // 3. Synthesize patterns from new experiences
     const successful = importantExperiences.filter((e) => e.validation.isCorrect);
-    console.log(`🔍 Clustering ${successful.length} successful experiences...`);
+    console.log(`🔍 Clustering ${successful.length} experiences with ${this.clusteringAlgorithm.getIdentifier()}...`);
 
-    const clusters = this.clusterByReasoning(successful);
+    const clusterResult = await this.clusteringAlgorithm.cluster(
+      successful,
+      this.consolidationOptions.fewShotMax,
+      this.llmConfig
+    );
+    const clusters = clusterResult.clusters;
+    console.log(`✅ Created ${clusters.size} clusters in ${clusterResult.metadata.processingTimeMs}ms`);
     const newPatterns: SynthesizedPattern[] = [];
 
     for (const [clusterName, cluster] of clusters.entries()) {
