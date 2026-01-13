@@ -1,5 +1,5 @@
 #!/bin/bash
-# Comprehensive Test Suite - All profiles, all modes
+# Comprehensive Test Suite - All profiles, selected modes
 # Specification: docs/specs/15-batch-testing-spec.md
 #
 # Usage: ./scripts/comprehensive-test-suite.sh [options]
@@ -10,6 +10,9 @@
 #   --skip-dream       Skip dreaming consolidation
 #   --profiles <list>  Comma-separated list of profiles (default: all)
 #   --exclude <list>   Comma-separated list of profiles to exclude
+#   --modes <list>     Space-separated mode list (default: 'standard aisp-full')
+#   --algorithm <name> Use specific clustering algorithm
+#   --algorithms <list> Comma-separated algorithm list (default: all)
 #   -h, --help         Show help
 
 set -e
@@ -24,6 +27,7 @@ PROFILE_FILTER=""
 PROFILE_EXCLUDE=""
 ALGORITHM=""
 ALGORITHM_LIST=""
+MODES="standard aisp-full"  # Default: exclude aisp mode
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -35,6 +39,7 @@ while [[ $# -gt 0 ]]; do
     --skip-dream) SKIP_DREAM=true; shift ;;
     --profiles) PROFILE_FILTER="$2"; shift 2 ;;
     --exclude) PROFILE_EXCLUDE="$2"; shift 2 ;;
+    --modes) MODES="$2"; shift 2 ;;
     --algorithm) ALGORITHM="$2"; shift 2 ;;
     --algorithms) ALGORITHM_LIST="$2"; shift 2 ;;
     -h|--help)
@@ -48,8 +53,9 @@ while [[ $# -gt 0 ]]; do
       echo "  --skip-dream       Skip dreaming consolidation"
       echo "  --profiles <list>  Comma-separated list of profiles (default: all)"
       echo "  --exclude <list>   Comma-separated list of profiles to exclude"
+      echo "  --modes <list>     Space-separated mode list (default: 'standard aisp-full')"
       echo "  --algorithm <name> Use specific clustering algorithm"
-      echo "  --algorithms <list> Comma-separated algorithm list (default: fastcluster)"
+      echo "  --algorithms <list> Comma-separated algorithm list (default: all)"
       echo "  -h, --help         Show help"
       exit 0
       ;;
@@ -65,6 +71,7 @@ echo "Comprehensive Test Suite"
 echo "=============================================="
 echo "Runs per mode: $RUNS"
 echo "Puzzle: $PUZZLE"
+echo "Modes: $MODES"
 if [[ -n "$NO_DUAL" ]]; then echo "Dual mode: disabled"; else echo "Dual mode: enabled (default)"; fi
 if [[ -n "$NO_SAVE_REASONING" ]]; then echo "Save reasoning: disabled"; else echo "Save reasoning: enabled (default)"; fi
 echo "Results dir: $RESULTS_DIR"
@@ -136,7 +143,7 @@ for PROFILE in $PROFILES; do
   echo "Clearing unconsolidated experiences..."
   npx machine-dream llm memory clear --unconsolidated --profile "$PROFILE" --confirm 2>/dev/null || true
 
-  for MODE in "standard" "aisp" "aisp-full"; do
+  for MODE in $MODES; do
     UNIT_NAME="${PROFILE}_${PUZZLE_NAME}_${MODE}_${DATE_STR}"
     MODE_OPTS=""
 
@@ -262,7 +269,7 @@ SUMMARY_FILE="$RESULTS_DIR/summary.csv"
 echo "Profile,Mode,Phase,Unit,Runs,Solved,Rate" > "$SUMMARY_FILE"
 
 for PROFILE in $PROFILES; do
-  for MODE in "standard" "aisp" "aisp-full"; do
+  for MODE in $MODES; do
     UNIT_NAME="${PROFILE}_${PUZZLE_NAME}_${MODE}_${DATE_STR}"
 
     # Training runs
