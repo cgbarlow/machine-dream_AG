@@ -16,12 +16,16 @@
 
 import crypto from 'crypto';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 import {
   BaseClusteringAlgorithm,
   type AlgorithmMetadata,
   type ClusteringResult,
 } from './ClusteringAlgorithm.js';
 import type { LLMExperience, LLMConfig } from '../types.js';
+
+// ES module equivalent of __filename
+const __filename = fileURLToPath(import.meta.url);
 
 /**
  * Compute SHA-256 hash of file content (first 8 chars)

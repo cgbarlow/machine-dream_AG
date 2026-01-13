@@ -16,6 +16,10 @@ const { version } = pkg;
 import { configureGlobalOptions } from './global-options.js';
 import { registerCommands } from './commands/index.js';
 import { logger } from './logger.js';
+import { initializeAlgorithmRegistry } from '../llm/clustering/index.js';
+
+// Initialize algorithm registry (Spec 18: Algorithm Versioning System)
+initializeAlgorithmRegistry();
 
 // CLI Entry Point
 export async function runCLI() {
