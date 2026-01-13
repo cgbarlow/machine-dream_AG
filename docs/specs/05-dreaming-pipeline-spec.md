@@ -1585,7 +1585,250 @@ The trade-off is larger prompts and potentially more redundant strategies.
 
 ---
 
-## 9. References
+## 9. Algorithm Versioning System
+
+### 9.1 Overview
+
+Phase 3 (COMPRESSION) delegates clustering to pluggable algorithms, enabling scientific A/B testing and algorithm evolution. The system supports multiple clustering algorithms with automatic version tracking.
+
+**Key Features**:
+- **Pluggable Architecture**: Common `ClusteringAlgorithm` interface
+- **Automatic Versioning**: Version tracked via code hash
+- **Multiple Algorithms**: FastCluster, DeepCluster, LLMCluster
+- **A/B Testing**: Run all algorithms simultaneously for comparison
+- **Backward Compatibility**: Legacy learning units map to default algorithm
+
+### 9.2 Algorithm Interface
+
+```typescript
+export interface ClusteringAlgorithm {
+  cluster(
+    experiences: LLMExperience[],
+    targetCount: number,
+    config: LLMConfig
+  ): Promise<ClusteringResult>;
+
+  getMetadata(): AlgorithmMetadata;
+  getName(): string;
+  getVersion(): number;
+  getIdentifier(): string;  // "fastclusterv2"
+}
+
+export interface ClusteringResult {
+  clusters: Map<string, LLMExperience[]>;
+  metadata: {
+    totalExperiences: number;
+    clustersCreated: number;
+    processingTimeMs: number;
+  };
+}
+```
+
+### 9.3 Available Algorithms
+
+| Algorithm | Version | Speed | Approach | Use Case |
+|-----------|---------|-------|----------|----------|
+| **FastCluster** | v2 | Fast (<5s) | Keyword + forced subdivision | Production default |
+| **DeepCluster** | v1 | Medium (<60s) | Two-phase: keyword + LLM semantic | Better quality |
+| **LLMCluster** | v1 | Slow (<180s) | Fully LLM-driven | Research |
+
+#### FastCluster v2 (Default)
+
+**Approach**:
+1. Keyword-based clustering using reasoning signatures
+2. Check for dominant cluster (>40% of experiences)
+3. Force subdivision if needed
+
+**Key Improvement from v1**:
+- Fixes bug where dominant "general_reasoning" cluster (71%) prevented doubled mode from creating more strategies
+- Forces subdivision when any cluster >40% even if cluster count meets target
+
+#### DeepCluster v1
+
+**Approach**:
+1. **Phase 1**: Keyword clustering (FastCluster v2 logic)
+2. **Phase 2**: LLM semantic split for clusters >50 experiences
+   - Sample 30-50 representative experiences
+   - Ask LLM to identify 4-8 semantic patterns
+   - Categorize all cluster experiences by patterns
+
+**Benefits**: Semantic diversity (reasoning structure) not spatial diversity (grid position)
+
+#### LLMCluster v1
+
+**Approach**:
+1. Sample 100-150 experiences (balanced by difficulty)
+2. Ask LLM to identify 10-15 reasoning patterns
+3. Categorize ALL experiences using LLM-identified patterns
+
+**Benefits**: Maximum LLM leverage, no keyword heuristics
+
+### 9.4 CLI Algorithm Selection
+
+```bash
+# Default: Run ALL algorithms (latest versions)
+npx machine-dream llm dream run --profile <name>
+# Creates: <name>_fastclusterv2_<date>, <name>_deepclusterv1_<date>, <name>_llmclusterv1_<date>
+
+# Single algorithm
+npx machine-dream llm dream run --profile <name> --algorithm fastcluster
+
+# Multiple specific algorithms
+npx machine-dream llm dream run --profile <name> --algorithms fastcluster,deepcluster
+
+# Specific version
+npx machine-dream llm dream run --profile <name> --algorithm fastcluster --algorithm-version 1
+```
+
+### 9.5 Learning Unit Naming
+
+**New Format**:
+```
+{profile}_{mode}_{algo}v{version}_{date}[_2x][_collision]
+```
+
+**Examples**:
+```
+gpt-oss-120b_standard_fastclusterv2_20260113
+gpt-oss-120b_aisp_deepclusterv1_20260113_2x
+qwen3-8b_standard_llmclusterv1_20260113
+```
+
+**Legacy Format Support**:
+```
+gpt-oss-120b_aisp_20260113
+  → maps to: gpt-oss-120b_aisp_fastclusterv2_20260113
+```
+
+### 9.6 DreamingConsolidator Integration
+
+**Constructor**:
+```typescript
+constructor(
+  experienceStore: ExperienceStore,
+  config: LLMConfig,
+  clusteringAlgorithm?: ClusteringAlgorithm  // Optional: defaults to FastCluster v2
+) {
+  this.clusteringAlgorithm = clusteringAlgorithm ||
+    AlgorithmRegistry.getInstance().getDefaultAlgorithm();
+}
+```
+
+**Phase 3 Clustering** (replaces `clusterByReasoning()`):
+```typescript
+// Delegate to clustering algorithm
+const clusterResult = await this.clusteringAlgorithm.cluster(
+  successful,
+  this.consolidationOptions.fewShotMax,
+  config
+);
+const clusters = clusterResult.clusters;
+```
+
+**Consolidation Report**:
+```typescript
+return {
+  patterns: { successStrategies, commonErrors, wrongPathPatterns },
+  hierarchy,
+  insights,
+  fewShotsUpdated: fewShots.length,
+  experiencesConsolidated: experiences.length,
+  compressionRatio: fewShots.length / experiences.length,
+  abstractionLevels: hierarchy?.levels.length,
+  algorithmUsed: {  // NEW
+    name: this.clusteringAlgorithm.getName(),
+    version: this.clusteringAlgorithm.getVersion(),
+    identifier: this.clusteringAlgorithm.getIdentifier(),
+  },
+};
+```
+
+### 9.7 Algorithm Registry
+
+**Singleton Pattern**:
+```typescript
+export class AlgorithmRegistry {
+  private static instance: AlgorithmRegistry;
+  private algorithms: Map<string, AlgorithmEntry[]>;  // name -> versions
+  private defaultAlgorithm: string = 'FastCluster';
+
+  static getInstance(): AlgorithmRegistry;
+  register(algorithm: ClusteringAlgorithm, isDefault?: boolean): void;
+  getAlgorithm(name: string, version?: number): ClusteringAlgorithm | null;
+  getAllAlgorithms(): ClusteringAlgorithm[];
+  mapLegacyUnit(unitName: string): string;
+}
+```
+
+**Initialization**:
+```typescript
+import { initializeAlgorithmRegistry } from './llm/clustering/index.js';
+
+// Initialize once at application startup
+const llmClient = new LMStudioClient(config);
+initializeAlgorithmRegistry(llmClient);
+
+// Registry is now available globally
+const registry = AlgorithmRegistry.getInstance();
+```
+
+### 9.8 Performance Implications
+
+**Dream Cycle Duration** (with default: all algorithms):
+- FastCluster v2: ~5 seconds (both standard and doubled)
+- DeepCluster v1: ~60 seconds (both standard and doubled)
+- LLMCluster v1: ~180 seconds (both standard and doubled)
+- **Total**: ~490 seconds (~8 minutes)
+
+**Mitigation**: Users can select specific algorithms via `--algorithm` flag
+
+### 9.9 A/B Testing Workflow
+
+**Step 1: Generate Experiences**
+```bash
+npx machine-dream llm solve --profile qwen3-8b --count 50
+```
+
+**Step 2: Run Consolidation with All Algorithms**
+```bash
+npx machine-dream llm dream run --profile qwen3-8b --dual-unit
+# Creates 6 learning units:
+#   qwen3-8b_standard_fastclusterv2_20260113
+#   qwen3-8b_standard_fastclusterv2_20260113_2x
+#   qwen3-8b_standard_deepclusterv1_20260113
+#   qwen3-8b_standard_deepclusterv1_20260113_2x
+#   qwen3-8b_standard_llmclusterv1_20260113
+#   qwen3-8b_standard_llmclusterv1_20260113_2x
+```
+
+**Step 3: Validate Each Learning Unit**
+```bash
+npx machine-dream llm validate --profile qwen3-8b \
+  --learning-unit qwen3-8b_standard_fastclusterv2_20260113 \
+  --runs 5
+
+npx machine-dream llm validate --profile qwen3-8b \
+  --learning-unit qwen3-8b_standard_deepclusterv1_20260113 \
+  --runs 5
+
+npx machine-dream llm validate --profile qwen3-8b \
+  --learning-unit qwen3-8b_standard_llmclusterv1_20260113 \
+  --runs 5
+```
+
+**Step 4: Compare Results**
+```bash
+# Compare solve accuracy, move efficiency, and strategy application
+```
+
+### 9.10 Related Specifications
+
+- **[Spec 18: Algorithm Versioning System](./18-algorithm-versioning-system.md)** - Full algorithm specification
+- **[ADR-011: Versioned Algorithms](../adr/011-versioned-algorithms.md)** - Architecture decision
+
+---
+
+## 10. References
 
 - POC Strategy Report: `/workspaces/machine-dream/docs/poc-strategy-report.md` (Section 4.2)
 - Continuous Thinking Research: `/workspaces/machine-dream/docs/continuous-machine-thinking-research.md`

@@ -33,6 +33,7 @@ Machine-Dream is an AI learning research platform that uses Sudoku as a controll
 | ADR-008 | Dreaming Pipeline Design | accepted | Core Architecture |
 | ADR-009 | CLI-First Interface | accepted | Interface |
 | ADR-010 | Immutable Puzzle Engine | accepted | Foundation |
+| ADR-011 | Versioned Dreaming Algorithms | accepted | Core Architecture |
 
 ---
 
@@ -55,7 +56,13 @@ Core Architecture:
 
   ADR-008 (Dreaming Pipeline)
     ├── Depends on: ADR-003, ADR-006
-    └── Produces: ADR-005 (Learning Units)
+    ├── Produces: ADR-005 (Learning Units)
+    └── Extended by: ADR-011 (Versioned Algorithms)
+
+  ADR-011 (Versioned Algorithms)
+    ├── Depends on: ADR-008 (Phase 3 clustering)
+    ├── Depends on: ADR-003 (Algorithm metadata storage)
+    └── Extends: ADR-005 (Learning unit naming)
 
 Integration:
   ADR-007 (Event-Driven)
@@ -84,7 +91,7 @@ Process:
 | 02 | Memory System | ADR-003 |
 | 03 | GRASP Loop | ADR-006 |
 | 04 | Attention Mechanism | ADR-006 |
-| 05 | Dreaming Pipeline | ADR-008 |
+| 05 | Dreaming Pipeline | ADR-008, ADR-011 |
 | 06 | Benchmarking | ADR-004, ADR-006 |
 | 07 | Integration | ADR-007 |
 | 08 | AgentDB Integration | ADR-003 |
@@ -97,6 +104,7 @@ Process:
 | 15 | Batch Testing | ADR-004, ADR-001 |
 | 16 | AISP Mode | ADR-001, ADR-007 |
 | 17 | ADR Implementation | ADR-004 |
+| 18 | Algorithm Versioning System | ADR-011 |
 
 ---
 
@@ -136,3 +144,4 @@ Puzzle state is immutable. Experience records are append-only. This ensures repr
 | Date | Change | Author |
 |------|--------|--------|
 | 2026-01-12 | Initial version | Project Team |
+| 2026-01-13 | Added ADR-011 (Versioned Algorithms), updated decision graph, added Spec 18 mapping | Project Team |
