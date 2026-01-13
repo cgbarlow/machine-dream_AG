@@ -86,28 +86,32 @@ function generateUniqueProfileName(baseName: string, manager: LLMProfileManager)
 }
 
 /**
- * Generate a unique learning unit name based on profile and options
- * Format: profileName_(AISP/AISP-full)_(2x)_YYYYMMDD_(XX)
+ * Generate unique learning unit name with algorithm identifier
+ * Format: profileName_(mode)_(algo)v(version)_YYYYMMDD[_2x][_(XX)]
+ *
+ * Example: qwen3_standard_fastclusterv2_20260113
+ * Example: qwen3_aisp_deepclusterv1_20260113_2x
  */
-function generateUniqueLearningUnitName(
+function generateUniqueLearningUnitNameWithAlgorithm(
   profileName: string,
+  algorithm: any,
   options: { aisp?: boolean; aispFull?: boolean; doubleStrategies?: boolean },
   existingUnits: string[]
 ): string {
-  // Build base name from profile and mode options
+  // Build base name: profile_mode
   let baseName = profileName;
 
-  // Add mode suffix (only one)
+  // Add mode
   if (options.aispFull) {
-    baseName += '_AISP-full';
+    baseName += '_aisp-full';
   } else if (options.aisp) {
-    baseName += '_AISP';
+    baseName += '_aisp';
+  } else {
+    baseName += '_standard';
   }
 
-  // Add 2x suffix if double strategies
-  if (options.doubleStrategies) {
-    baseName += '_2x';
-  }
+  // Add algorithm identifier (e.g., "fastclusterv2")
+  baseName += `_${algorithm.getIdentifier()}`;
 
   // Add date
   const now = new Date();
@@ -116,24 +120,29 @@ function generateUniqueLearningUnitName(
   const day = String(now.getDate()).padStart(2, '0');
   const dateStr = `${year}${month}${day}`;
 
-  const nameWithDate = `${baseName}_${dateStr}`;
+  baseName += `_${dateStr}`;
+
+  // Add -2x suffix if double strategies
+  if (options.doubleStrategies) {
+    baseName += '_2x';
+  }
 
   // Check if this name already exists
-  if (!existingUnits.includes(nameWithDate)) {
-    return nameWithDate;
+  if (!existingUnits.includes(baseName)) {
+    return baseName;
   }
 
   // Find next available increment
   for (let i = 1; i <= 99; i++) {
     const increment = String(i).padStart(2, '0');
-    const candidateName = `${nameWithDate}_${increment}`;
+    const candidateName = `${baseName}_${increment}`;
     if (!existingUnits.includes(candidateName)) {
       return candidateName;
     }
   }
 
   // Fallback: use timestamp
-  return `${nameWithDate}_${Date.now()}`;
+  return `${baseName}_${Date.now()}`;
 }
 
 /**
@@ -2197,6 +2206,8 @@ export function registerLLMCommand(program: Command): void {
     .option('--aisp', 'Mark learning unit as AISP mode (for naming)')
     .option('--aisp-full', 'Mark learning unit as AISP-full mode (for naming)')
     .option('--no-dual-unit', 'Create only single learning unit (default: creates BOTH standard AND -2x)')
+    .option('--algorithm <name>', 'Clustering algorithm: fastcluster, deepcluster, llmcluster')
+    .option('--algorithms <list>', 'Comma-separated list (default: all latest versions)')
     .option('--output <file>', 'Save consolidation report')
     .action(async (options) => {
       try {
@@ -2238,38 +2249,49 @@ export function registerLLMCommand(program: Command): void {
           const { ExperienceStore } = await import('../../llm/ExperienceStore.js');
           const { DreamingConsolidator } = await import('../../llm/DreamingConsolidator.js');
           const { LMStudioClient } = await import('../../llm/LMStudioClient.js');
-          const { initializeAlgorithmRegistry } = await import('../../llm/clustering/index.js');
+          const { initializeAlgorithmRegistry, AlgorithmRegistry } = await import('../../llm/clustering/index.js');
 
           // Re-initialize algorithm registry with LLM client to enable all algorithms
           const llmClient = new LMStudioClient(config);
           initializeAlgorithmRegistry(llmClient);
 
-          // Create store and consolidator
+          // Determine which algorithms to use (DEFAULT: all latest versions)
+          const registry = AlgorithmRegistry.getInstance();
+          let algorithmsToUse: any[] = [];
+
+          if (options.algorithm) {
+            // Single algorithm specified
+            const algo = registry.getAlgorithm(options.algorithm);
+            if (!algo) {
+              throw new CLIError(`Algorithm not found: ${options.algorithm}`, 1);
+            }
+            algorithmsToUse = [algo];
+            logger.info(`🔧 Using algorithm: ${algo.getIdentifier()}`);
+          } else if (options.algorithms) {
+            // Multiple specific algorithms
+            const algoNames = options.algorithms.split(',').map((n: string) => n.trim().toLowerCase());
+            for (const name of algoNames) {
+              const algo = registry.getAlgorithm(name);
+              if (algo) {
+                algorithmsToUse.push(algo);
+              } else {
+                logger.warn(`⚠️  Algorithm not found: ${name}`);
+              }
+            }
+          } else {
+            // DEFAULT: Use all algorithms (latest versions)
+            algorithmsToUse = registry.getAllAlgorithms();
+            logger.info(`🔧 Using all algorithms (${algorithmsToUse.length}): ${algorithmsToUse.map(a => a.getIdentifier()).join(', ')}`);
+          }
+
+          if (algorithmsToUse.length === 0) {
+            throw new CLIError('No algorithms available', 1);
+          }
+
+          // Create store (shared across all algorithms)
           const experienceStore = new ExperienceStore(agentMemory, config, profileName);
-          const consolidator = new DreamingConsolidator(experienceStore, config);
 
-          // Enable anonymous pattern mode by default (unless --no-anonymous-patterns)
-          if (options.anonymousPatterns !== false) {
-            consolidator.setAnonymousPatternMode(true);
-            logger.info('📋 Anonymous pattern mode enabled');
-          }
-
-          // Spec 16: Set AISP mode for dreaming consolidation
-          if (options.aispFull) {
-            consolidator.setAISPMode('aisp-full');
-            logger.info('𝔸 AISP-Full mode enabled (strategies stored in AISP format)');
-          } else if (options.aisp) {
-            consolidator.setAISPMode('aisp');
-            logger.info('𝔸 AISP mode enabled');
-          }
-
-          // Set consolidation options (strategy counts)
-          if (options.doubleStrategies) {
-            consolidator.setConsolidationOptions({ doubleStrategies: true });
-            logger.info('📊 Double strategies mode enabled (6-10 few-shots, 10-14 merged)');
-          }
-
-          // Reset consolidated status if requested
+          // Reset consolidated status if requested (do once before all algorithms)
           if (options.reset) {
             logger.info(`🔄 Resetting consolidated status for all experiences...`);
             const allExperiences = await agentMemory.reasoningBank.queryMetadata('llm_experience', {}) as LLMExperience[];
@@ -2288,45 +2310,83 @@ export function registerLLMCommand(program: Command): void {
             logger.info(`   Reset ${resetCount} experiences to unconsolidated`);
           }
 
-          // Get or generate learning unit ID
+          // Get learning unit manager and existing units (shared)
           const unitManager = new LearningUnitManager(agentMemory, profileName);
-          let learningUnitId: string;
+          const existingUnitsList = await unitManager.list();
+          const existingUnits = existingUnitsList.map(u => u.id);
 
-          if (options.learningUnit) {
-            // Use specified learning unit
-            learningUnitId = options.learningUnit;
-            // Auto-append -2x suffix for double-strategies in single-unit mode
-            if (options.doubleStrategies && options.dualUnit === false && !learningUnitId.endsWith(DOUBLE_STRATEGY_SUFFIX)) {
-              learningUnitId = `${learningUnitId}${DOUBLE_STRATEGY_SUFFIX}`;
-              logger.info(`📊 Double strategies mode: auto-appending suffix → "${learningUnitId}"`);
-            }
-          } else {
-            // Auto-generate learning unit name: profile_(AISP/AISP-full)_(2x)_YYYYMMDD_(XX)
-            const existingUnitsList = await unitManager.list();
-            const existingUnits = existingUnitsList.map(u => u.id);
-            learningUnitId = generateUniqueLearningUnitName(
-              profileName,
-              {
-                aisp: options.aisp,
-                aispFull: options.aispFull,
-                doubleStrategies: options.doubleStrategies && options.dualUnit === false,
-              },
-              existingUnits
-            );
-            logger.info(`📝 Auto-generated learning unit: ${learningUnitId}`);
-          }
-
-          // Get unconsolidated count before
+          // Get unconsolidated experiences (same for all algorithms)
           const before = await experienceStore.getUnconsolidated(profileName);
           logger.info(`📦 Found ${before.length} unconsolidated experiences`);
-          if (options.dualUnit === false) {
-            logger.info(`📚 Learning unit: ${learningUnitId}`);
-          }
 
           if (before.length === 0) {
             logger.info('💤 No experiences to consolidate');
             continue;
           }
+
+          // Results tracking for all algorithms
+          const allResults: Array<{ algorithm: string; report: any }> = [];
+
+          // Loop through each algorithm
+          for (const algorithm of algorithmsToUse) {
+            logger.info(`\n${'='.repeat(60)}`);
+            logger.info(`🧠 Consolidation with: ${algorithm.getIdentifier()}`);
+            logger.info(`${'='.repeat(60)}\n`);
+
+            // Create consolidator with this algorithm
+            const consolidator = new DreamingConsolidator(experienceStore, config, algorithm);
+
+            // Enable anonymous pattern mode by default (unless --no-anonymous-patterns)
+            if (options.anonymousPatterns !== false) {
+              consolidator.setAnonymousPatternMode(true);
+              logger.info('📋 Anonymous pattern mode enabled');
+            }
+
+            // Spec 16: Set AISP mode for dreaming consolidation
+            if (options.aispFull) {
+              consolidator.setAISPMode('aisp-full');
+              logger.info('𝔸 AISP-Full mode enabled (strategies stored in AISP format)');
+            } else if (options.aisp) {
+              consolidator.setAISPMode('aisp');
+              logger.info('𝔸 AISP mode enabled');
+            }
+
+            // Set consolidation options (strategy counts)
+            if (options.doubleStrategies) {
+              consolidator.setConsolidationOptions({ doubleStrategies: true });
+              logger.info('📊 Double strategies mode enabled (6-10 few-shots, 10-14 merged)');
+            }
+
+            // Generate learning unit ID with algorithm identifier
+            let learningUnitId: string;
+
+            if (options.learningUnit) {
+              // Use specified learning unit (user must include algorithm identifier manually)
+              learningUnitId = options.learningUnit;
+              // Auto-append -2x suffix for double-strategies in single-unit mode
+              if (options.doubleStrategies && options.dualUnit === false && !learningUnitId.endsWith(DOUBLE_STRATEGY_SUFFIX)) {
+                learningUnitId = `${learningUnitId}${DOUBLE_STRATEGY_SUFFIX}`;
+                logger.info(`📊 Double strategies mode: auto-appending suffix → "${learningUnitId}"`);
+              }
+            } else {
+              // Auto-generate learning unit name with algorithm identifier
+              learningUnitId = generateUniqueLearningUnitNameWithAlgorithm(
+                profileName,
+                algorithm,
+                {
+                  aisp: options.aisp,
+                  aispFull: options.aispFull,
+                  doubleStrategies: options.doubleStrategies && options.dualUnit === false,
+                },
+                existingUnits
+              );
+              logger.info(`📝 Auto-generated learning unit: ${learningUnitId}`);
+            }
+
+            logger.info(`📚 Learning unit: ${learningUnitId}`);
+            if (options.dualUnit !== false) {
+              logger.info(`📚 Doubled unit: ${learningUnitId}${DOUBLE_STRATEGY_SUFFIX}`);
+            }
 
           // Run consolidation - use reConsolidate for specific learning units (iterative learning)
           let report;
@@ -2383,11 +2443,37 @@ export function registerLLMCommand(program: Command): void {
             logger.info(`\n📚 Learning unit '${learningUnitId}' now has ${fewShots.length} few-shot examples\n`);
           }
 
-          // Save report if requested
-          if (options.output) {
-            const reportPath = resolve(options.output);
-            writeFileSync(reportPath, JSON.stringify(report, null, 2));
-            logger.info(`💾 Report saved to: ${reportPath}`);
+            // Track results for this algorithm
+            allResults.push({ algorithm: algorithm.getIdentifier(), report });
+
+            // Add to existing units to avoid collisions in next algorithm
+            existingUnits.push(learningUnitId);
+            if (options.dualUnit !== false) {
+              existingUnits.push(`${learningUnitId}${DOUBLE_STRATEGY_SUFFIX}`);
+            }
+
+            // Save report if requested (only for first algorithm)
+            if (options.output && allResults.length === 1) {
+              const reportPath = resolve(options.output);
+              writeFileSync(reportPath, JSON.stringify(report, null, 2));
+              logger.info(`💾 Report saved to: ${reportPath}`);
+            }
+          } // End algorithm loop
+
+          // Summary for all algorithms
+          if (allResults.length > 1) {
+            logger.info(`\n${'='.repeat(60)}`);
+            logger.info(`🎉 All Algorithms Complete (${allResults.length})`);
+            logger.info(`${'='.repeat(60)}`);
+
+            for (const { algorithm, report } of allResults) {
+              if ('standard' in report) {
+                logger.info(`  ${algorithm}: ${report.standard.fewShotsUpdated}/${report.doubled.fewShotsUpdated} strategies (standard/doubled)`);
+              } else {
+                logger.info(`  ${algorithm}: ${report.fewShotsUpdated} strategies`);
+              }
+            }
+            logger.info('');
           }
         }
 

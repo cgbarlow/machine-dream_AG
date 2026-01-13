@@ -185,15 +185,14 @@ for PROFILE in $PROFILES; do
       [[ "$MODE" == "aisp" ]] && DREAM_OPTS="$DREAM_OPTS --aisp"
       [[ "$MODE" == "aisp-full" ]] && DREAM_OPTS="$DREAM_OPTS --aisp-full"
 
-      # Build algorithm options
+      # Build algorithm options (default: all algorithms)
       ALGO_OPTS=""
       if [[ -n "$ALGORITHM" ]]; then
         ALGO_OPTS="--algorithm $ALGORITHM"
       elif [[ -n "$ALGORITHM_LIST" ]]; then
         ALGO_OPTS="--algorithms $ALGORITHM_LIST"
-      else
-        ALGO_OPTS="--algorithm fastcluster"
       fi
+      # If neither specified, don't pass any option (uses all algorithms)
 
       npx machine-dream llm dream run \
         --profile "$PROFILE" \
