@@ -39,11 +39,22 @@ export class AlgorithmRegistry {
   /** Name of the default algorithm */
   private defaultAlgorithm: string = 'FastCluster';
 
+  /** Suppress console output for registration (useful for JSON output) */
+  private static silent = false;
+
   /**
    * Private constructor (singleton pattern)
    */
   private constructor() {
     this.algorithms = new Map();
+  }
+
+  /**
+   * Set silent mode (suppresses console output)
+   * @param value - Whether to suppress output
+   */
+  static setSilent(value: boolean): void {
+    AlgorithmRegistry.silent = value;
   }
 
   /**
@@ -94,9 +105,11 @@ export class AlgorithmRegistry {
     // Sort by version descending (latest first)
     entries.sort((a, b) => b.algorithm.getVersion() - a.algorithm.getVersion());
 
-    console.log(
-      `✅ Registered ${algorithm.getIdentifier()} ${isDefault ? '(default)' : ''}`
-    );
+    if (!AlgorithmRegistry.silent) {
+      console.log(
+        `✅ Registered ${algorithm.getIdentifier()} ${isDefault ? '(default)' : ''}`
+      );
+    }
   }
 
   /**
@@ -165,7 +178,9 @@ export class AlgorithmRegistry {
       throw new Error(`Algorithm "${name}" is not registered`);
     }
     this.defaultAlgorithm = name;
-    console.log(`✅ Set default algorithm: ${name}`);
+    if (!AlgorithmRegistry.silent) {
+      console.log(`✅ Set default algorithm: ${name}`);
+    }
   }
 
   /**

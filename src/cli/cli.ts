@@ -16,10 +16,15 @@ const { version } = pkg;
 import { configureGlobalOptions } from './global-options.js';
 import { registerCommands } from './commands/index.js';
 import { logger } from './logger.js';
-import { initializeAlgorithmRegistry } from '../llm/clustering/index.js';
+import { initializeAlgorithmRegistry, AlgorithmRegistry } from '../llm/clustering/index.js';
 
 // Initialize algorithm registry (Spec 18: Algorithm Versioning System)
-initializeAlgorithmRegistry();
+// Suppress output if JSON format requested to avoid breaking JSON parsing
+const isJsonFormat = process.argv.includes('--format') && process.argv.includes('json');
+if (isJsonFormat) {
+  AlgorithmRegistry.setSilent(true);
+}
+initializeAlgorithmRegistry(undefined, isJsonFormat);
 
 // CLI Entry Point
 export async function runCLI() {

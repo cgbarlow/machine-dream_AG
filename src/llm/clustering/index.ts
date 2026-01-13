@@ -31,23 +31,30 @@ import type { LMStudioClient } from '../LMStudioClient.js';
  * - LLMCluster v1 - Fully LLM-driven pattern identification
  *
  * @param llmClient - Optional LLM client for LLM-based algorithms
+ * @param silent - Suppress console output (default: false)
  */
-export function initializeAlgorithmRegistry(llmClient?: LMStudioClient): void {
+export function initializeAlgorithmRegistry(llmClient?: LMStudioClient, silent = false): void {
   const registry = AlgorithmRegistry.getInstance();
 
   // Register FastCluster v2 as default (no LLM client needed)
   registry.register(new FastClusterV2(), true);
   registry.setDefaultAlgorithm('FastCluster');
 
-  console.log('✅ Registered fastclusterv2 (default)');
+  if (!silent) {
+    console.log('✅ Registered fastclusterv2 (default)');
+  }
 
   // Register LLM-based algorithms if client provided
   if (llmClient) {
     registry.register(new DeepClusterV1(llmClient));
     registry.register(new LLMClusterV1(llmClient));
-    console.log('✅ Registered deepclusterv1');
-    console.log('✅ Registered llmclusterv1');
+    if (!silent) {
+      console.log('✅ Registered deepclusterv1');
+      console.log('✅ Registered llmclusterv1');
+    }
   }
 
-  console.log('✅ Algorithm registry initialized');
+  if (!silent) {
+    console.log('✅ Algorithm registry initialized');
+  }
 }
