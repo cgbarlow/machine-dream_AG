@@ -2408,9 +2408,8 @@ export function registerLLMCommand(program: Command): void {
             logger.info(`   "${learningUnitId}": ${standardFewShots.length} few-shot examples`);
             logger.info(`   "${learningUnitId}${DOUBLE_STRATEGY_SUFFIX}": ${doubledFewShots.length} few-shot examples\n`);
 
-            // Use standard report for output file (contains both in insights)
-            report = dualResult.standard;
-            report.insights = `Dual consolidation: Standard=${dualResult.standard.fewShotsUpdated} strategies, Doubled=${dualResult.doubled.fewShotsUpdated} strategies`;
+            // Store full dual result for summary
+            report = dualResult as any;
           } else if (options.learningUnit) {
             // Use reConsolidate for iterative learning on a specific unit
             report = await consolidator.reConsolidate(unitManager, learningUnitId, profileName);
@@ -2451,7 +2450,9 @@ export function registerLLMCommand(program: Command): void {
             // Save report if requested (only for first algorithm)
             if (options.output && allResults.length === 1) {
               const reportPath = resolve(options.output);
-              writeFileSync(reportPath, JSON.stringify(report, null, 2));
+              // For dual mode, save the standard report (or both if needed)
+              const reportToSave = ('standard' in report) ? report.standard : report;
+              writeFileSync(reportPath, JSON.stringify(reportToSave, null, 2));
               logger.info(`💾 Report saved to: ${reportPath}`);
             }
 
@@ -2477,13 +2478,23 @@ export function registerLLMCommand(program: Command): void {
 
           // Summary for all algorithms
           if (allResults.length > 1) {
+            // Count total learning units created
+            const totalUnits = allResults.reduce((sum, { report }) => {
+              if ('standard' in report) {
+                return sum + 2; // standard + doubled
+              }
+              return sum + 1; // single unit
+            }, 0);
+
             logger.info(`\n${'='.repeat(60)}`);
-            logger.info(`🎉 All Algorithms Complete (${allResults.length})`);
+            logger.info(`🎉 All Learning Units Created (${totalUnits})`);
             logger.info(`${'='.repeat(60)}`);
 
             for (const { algorithm, report } of allResults) {
               if ('standard' in report) {
-                logger.info(`  ${algorithm}: ${report.standard.fewShotsUpdated}/${report.doubled.fewShotsUpdated} strategies (standard/doubled)`);
+                logger.info(`  ${algorithm}:`);
+                logger.info(`     Standard: ${report.standard.fewShotsUpdated} strategies`);
+                logger.info(`     Doubled (-2x): ${report.doubled.fewShotsUpdated} strategies`);
               } else {
                 logger.info(`  ${algorithm}: ${report.fewShotsUpdated} strategies`);
               }
