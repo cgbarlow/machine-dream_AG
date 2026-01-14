@@ -1046,6 +1046,37 @@ Enhanced learning with doubled strategy counts:
 machine-dream llm dream run --learning-unit my-unit --double-strategies
 ```
 
+#### Failure Learning
+
+The dreaming system learns from both successes AND failures (Spec 19):
+
+**Anti-Patterns** (from invalid moves):
+- Clustered invalid move experiences are analyzed
+- Common mistake patterns are synthesized
+- Prevention strategies are generated
+
+**Reasoning Corrections** (from valid-but-wrong moves):
+- LLM analyzes WHY reasoning led to wrong answers
+- Flawed reasoning steps are identified
+- Correct approaches are documented
+
+```bash
+# Dream with failure learning (default)
+machine-dream llm dream run --profile qwen3-coder
+
+# Disable failure learning for faster consolidation
+machine-dream llm dream run --profile qwen3-coder --no-failure-learning
+
+# View failure learning data
+machine-dream llm learning show <unit-id>
+# Shows: Strategies, Anti-Patterns, Reasoning Corrections
+```
+
+**How it helps:**
+- Anti-patterns are injected as "COMMON MISTAKES TO AVOID" in prompts
+- Reasoning corrections appear as "REASONING TRAPS TO AVOID"
+- Over time, the LLM avoids known mistake patterns
+
 ---
 
 ## 🎯 Terminal User Interface (TUI)

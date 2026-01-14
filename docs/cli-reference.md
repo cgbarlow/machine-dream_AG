@@ -577,10 +577,24 @@ machine-dream llm learning list [options]
 ```
 
 **Options:**
-| Option | Description |
-|--------|-------------|
-| `--profile <name>` | Filter by profile |
-| `--format <format>` | Output format: text\|json |
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--profile <name>` | Filter by profile | all profiles |
+| `--format <format>` | Output format: table\|json | table |
+| `--sort <order>` | Sort order: name\|created\|updated | name |
+| `--reverse` | Reverse sort order | false |
+
+**Examples:**
+```bash
+# List all learning units sorted by name
+machine-dream llm learning list
+
+# List units for a specific profile, newest first
+machine-dream llm learning list --profile gpt-oss-120b --sort created --reverse
+
+# JSON output sorted by last update
+machine-dream llm learning list --format json --sort updated --reverse
+```
 
 #### llm learning show
 
@@ -588,7 +602,11 @@ machine-dream llm learning list [options]
 machine-dream llm learning show <unit-id>
 ```
 
-Show learning unit details.
+Show learning unit details including:
+- Unit metadata (profile, creation date, last update)
+- Strategies synthesized from successful moves
+- **Anti-patterns** from clustered invalid moves (if failure learning enabled)
+- **Reasoning corrections** from valid-but-wrong move analysis (if failure learning enabled)
 
 #### llm learning delete
 
@@ -639,12 +657,16 @@ machine-dream llm dream run [options]
 | `--all` | Consolidate all profiles | false |
 | `--learning-unit <id>` | Target learning unit | auto-generated |
 | `--reset` | Reset and reprocess | false |
+| `--rerun <unit-id>` | Re-run consolidation on an existing unit | - |
+| `--algorithm <name>` | Clustering algorithm: legacy\|llm-cluster-v1 | llm-cluster-v1 |
 | `--anonymous-patterns` | Use anonymous format | false |
 | `--double-strategies` | Double strategy count (6-10) | false |
 | `--aisp` | Mark unit as AISP mode (for naming) | false |
 | `--aisp-full` | Mark unit as AISP-full mode (for naming) | false |
 | `--no-dual-unit` | Create only single unit (default: creates BOTH standard and -2x) | false (dual enabled) |
+| `--no-failure-learning` | Disable failure learning (anti-patterns & reasoning corrections) | false (enabled) |
 | `--output <file>` | Save report to file | - |
+| `--debug` | Show detailed debug output | false |
 
 **Auto-generated Learning Unit Names:**
 When `--learning-unit` is not specified, a unique name is generated:
@@ -668,7 +690,20 @@ machine-dream llm dream run --profile qwen3-coder --learning-unit my-training
 
 # Single unit mode (disable dual)
 machine-dream llm dream run --profile qwen3-coder --learning-unit training --no-dual-unit
+
+# Re-run consolidation on existing unit with different algorithm
+machine-dream llm dream run --rerun my-training --algorithm llm-cluster-v1 --debug
+
+# Disable failure learning (skip anti-patterns and reasoning corrections)
+machine-dream llm dream run --profile qwen3-coder --no-failure-learning
 ```
+
+**Failure Learning:**
+By default, consolidation includes failure learning which generates:
+- **Anti-patterns**: Synthesized from clustered invalid moves, describing what NOT to do
+- **Reasoning corrections**: Analysis of valid-but-wrong moves, explaining flawed reasoning
+
+Use `--no-failure-learning` to disable this if you want faster consolidation without failure analysis.
 
 #### llm dream show
 

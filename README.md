@@ -8,6 +8,7 @@ Machine Dream is a **research platform** exploring continuous machine cognition 
 - **Pure LLM Reasoning** - No deterministic fallbacks, AI models learn through struggle
 - **Learning Units** - Discrete knowledge packages created through experience consolidation
 - **Dual Consolidation** - Standard (3-5 strategies) and enhanced -2x (6-10 strategies) units
+- **Failure Learning** - Anti-patterns from invalid moves + reasoning corrections from wrong moves
 - **Batch Testing Framework** - Comprehensive testing across multiple AI models and configurations
 - **AISP Integration** - Low-ambiguity AI-to-AI communication protocol
 - **Persistent Memory** - AgentDB-powered experience storage across sessions
@@ -287,6 +288,23 @@ Machine Dream tracks algorithm versions to ensure reproducibility:
 - **Historical comparison** - Compare learning outcomes across algorithm versions
 
 See [Spec 18: Algorithm Versioning System](docs/specs/18-algorithm-versioning-system.md) and [ADR-011: Versioned Algorithms](docs/adr/011-versioned-algorithms.md) for complete details.
+
+### Failure Learning (Spec 19)
+
+Machine Dream learns from both successes AND failures during consolidation:
+
+- **Anti-Patterns** - Synthesized from clustered invalid moves (what NOT to do)
+- **Reasoning Corrections** - LLM analysis of valid-but-wrong moves (why reasoning failed)
+
+```bash
+# Dream with failure learning (default)
+machine-dream llm dream run --profile qwen3-coder
+
+# Disable failure learning for faster consolidation
+machine-dream llm dream run --profile qwen3-coder --no-failure-learning
+```
+
+See [Spec 19: Failure Learning](docs/specs/19-failure-learning-spec.md) and [ADR-012: Failure Learning](docs/adr/012-failure-learning.md) for implementation details.
 
 ---
 
