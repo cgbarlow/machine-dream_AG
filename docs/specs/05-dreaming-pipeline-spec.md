@@ -1583,6 +1583,63 @@ Doubling strategy counts is useful when:
 
 The trade-off is larger prompts and potentially more redundant strategies.
 
+### 8.5 Strategy Metadata (Added 2026-01-14)
+
+Each synthesized strategy includes metadata for display and tracking:
+
+#### Metadata Fields
+
+```typescript
+interface FewShotExample {
+  // ... existing fields ...
+
+  // Display metadata
+  friendlyName?: string;    // Human-readable name (e.g., "Row-Column Intersection")
+  category?: string;        // Classification: "basic", "intermediate", "advanced"
+
+  // Usage tracking
+  trainingCount?: number;   // Experiences that contributed to this strategy
+  playCount?: number;       // Times used during play (successful moves)
+}
+```
+
+#### Category Assignment
+
+Categories are assigned based on abstraction level during consolidation:
+
+| Abstraction Level | Category | Description |
+|-------------------|----------|-------------|
+| 0 (Instance) | basic | Specific cell position and value |
+| 1 (Technique) | basic | Named solving technique |
+| 2 (Category) | intermediate | Strategy category |
+| 3+ (Principle) | advanced | General problem-solving principle |
+
+#### Friendly Name Generation
+
+The `friendlyName` is generated from the strategy name or cluster name:
+- Underscores converted to spaces
+- Title case applied
+- Example: `naked_single_elimination` → `Naked Single Elimination`
+
+#### Usage Tracking
+
+- **trainingCount**: Set during consolidation to the number of experiences that contributed to the cluster from which this strategy was synthesized
+- **playCount**: Incremented each time the strategy is used for a successful move during play
+
+#### CLI Display
+
+```
+📚 Learned Strategies (3):
+
+   1. "Row-Column Intersection"
+      Category: intermediate
+      Level: 2 (Category)
+      Training count: 150
+      Play count: 23
+      When: ...
+      Reasoning: ...
+```
+
 ---
 
 ## 9. Algorithm Versioning System

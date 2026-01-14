@@ -15,6 +15,8 @@ import type {
   LearningUnitSummary,
   FewShotExample,
   AbstractionHierarchy,
+  SynthesizedAntiPattern,
+  ReasoningCorrection,
 } from './types.js';
 import { DEFAULT_LEARNING_UNIT_ID } from './types.js';
 import { LLM_STORAGE_KEYS } from './storage-keys.js';
@@ -260,6 +262,84 @@ export class LearningUnitManager {
   }
 
   /**
+   * Increment playCount for a strategy based on matching reasoning
+   * Spec 05 Section 8.5: Strategy usage tracking
+   *
+   * @param unitId - Learning unit ID
+   * @param reasoning - The reasoning text from the successful move
+   * @returns The matched strategy name or null if no match found
+   */
+  async incrementStrategyPlayCount(unitId: string, reasoning: string): Promise<string | null> {
+    const fewShots = await this.getFewShots(unitId);
+    if (fewShots.length === 0) return null;
+
+    // Find best matching strategy using keyword/phrase matching
+    const matchedStrategy = this.findBestMatchingStrategy(fewShots, reasoning);
+    if (!matchedStrategy) return null;
+
+    // Increment playCount
+    matchedStrategy.playCount = (matchedStrategy.playCount || 0) + 1;
+
+    // Save updated few-shots
+    await this.saveFewShots(unitId, fewShots);
+
+    return matchedStrategy.friendlyName || matchedStrategy.strategy || 'Unknown Strategy';
+  }
+
+  /**
+   * Find the best matching strategy based on reasoning similarity
+   * Uses keyword matching from strategy's situation/analysis
+   */
+  private findBestMatchingStrategy(
+    fewShots: FewShotExample[],
+    reasoning: string
+  ): FewShotExample | null {
+    const reasoningLower = reasoning.toLowerCase();
+    let bestMatch: { strategy: FewShotExample; score: number } | null = null;
+
+    for (const fs of fewShots) {
+      let score = 0;
+
+      // Match against situation keywords
+      if (fs.situation) {
+        const situationWords = fs.situation.toLowerCase().split(/\s+/);
+        for (const word of situationWords) {
+          if (word.length > 3 && reasoningLower.includes(word)) {
+            score += 1;
+          }
+        }
+      }
+
+      // Match against analysis/reasoning steps
+      if (fs.analysis) {
+        const analysisWords = fs.analysis.toLowerCase().split(/\s+/);
+        for (const word of analysisWords) {
+          if (word.length > 3 && reasoningLower.includes(word)) {
+            score += 0.5;
+          }
+        }
+      }
+
+      // Match against strategy name
+      if (fs.strategy) {
+        const strategyWords = fs.strategy.toLowerCase().split(/[_\s]+/);
+        for (const word of strategyWords) {
+          if (word.length > 2 && reasoningLower.includes(word)) {
+            score += 2;
+          }
+        }
+      }
+
+      // Keep best match (minimum score of 3 required)
+      if (score >= 3 && (!bestMatch || score > bestMatch.score)) {
+        bestMatch = { strategy: fs, score };
+      }
+    }
+
+    return bestMatch?.strategy || null;
+  }
+
+  /**
    * Get abstraction hierarchy from a learning unit
    * @param unitId - Learning unit ID
    * @returns Abstraction hierarchy or null
@@ -289,6 +369,92 @@ export class LearningUnitManager {
         learningUnitId: unitId,
       }
     );
+  }
+
+  // ============================================================================
+  // Failure Learning Methods (Spec 19)
+  // ============================================================================
+
+  /**
+   * Get anti-patterns from a learning unit
+   * @param unitId - Learning unit ID
+   * @returns Array of anti-patterns or empty array
+   */
+  async getAntiPatterns(unitId: string): Promise<SynthesizedAntiPattern[]> {
+    const key = LLM_STORAGE_KEYS.getAntiPatternsKey(this.profileName, unitId);
+    const data = await this.agentMemory.reasoningBank.getMetadata(
+      key,
+      LLM_STORAGE_KEYS.ANTIPATTERNS_TYPE
+    );
+
+    if (!data || !Array.isArray((data as any).antiPatterns)) {
+      return [];
+    }
+
+    return (data as any).antiPatterns as SynthesizedAntiPattern[];
+  }
+
+  /**
+   * Save anti-patterns to a learning unit
+   * @param unitId - Learning unit ID
+   * @param antiPatterns - Anti-patterns to save
+   */
+  async saveAntiPatterns(unitId: string, antiPatterns: SynthesizedAntiPattern[]): Promise<void> {
+    const key = LLM_STORAGE_KEYS.getAntiPatternsKey(this.profileName, unitId);
+    await this.agentMemory.reasoningBank.storeMetadata(
+      key,
+      LLM_STORAGE_KEYS.ANTIPATTERNS_TYPE,
+      {
+        antiPatterns,
+        updated: new Date(),
+        profileName: this.profileName,
+        learningUnitId: unitId,
+      }
+    );
+
+    // Update unit metadata
+    await this.updateUnitTimestamp(unitId);
+  }
+
+  /**
+   * Get reasoning corrections from a learning unit
+   * @param unitId - Learning unit ID
+   * @returns Array of reasoning corrections or empty array
+   */
+  async getReasoningCorrections(unitId: string): Promise<ReasoningCorrection[]> {
+    const key = LLM_STORAGE_KEYS.getCorrectionsKey(this.profileName, unitId);
+    const data = await this.agentMemory.reasoningBank.getMetadata(
+      key,
+      LLM_STORAGE_KEYS.CORRECTIONS_TYPE
+    );
+
+    if (!data || !Array.isArray((data as any).corrections)) {
+      return [];
+    }
+
+    return (data as any).corrections as ReasoningCorrection[];
+  }
+
+  /**
+   * Save reasoning corrections to a learning unit
+   * @param unitId - Learning unit ID
+   * @param corrections - Reasoning corrections to save
+   */
+  async saveReasoningCorrections(unitId: string, corrections: ReasoningCorrection[]): Promise<void> {
+    const key = LLM_STORAGE_KEYS.getCorrectionsKey(this.profileName, unitId);
+    await this.agentMemory.reasoningBank.storeMetadata(
+      key,
+      LLM_STORAGE_KEYS.CORRECTIONS_TYPE,
+      {
+        corrections,
+        updated: new Date(),
+        profileName: this.profileName,
+        learningUnitId: unitId,
+      }
+    );
+
+    // Update unit metadata
+    await this.updateUnitTimestamp(unitId);
   }
 
   /**

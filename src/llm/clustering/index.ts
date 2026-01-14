@@ -18,11 +18,20 @@ export * from './LLMClusterV1.js';
 import { AlgorithmRegistry } from './AlgorithmRegistry.js';
 import { FastClusterV2 } from './FastClusterV2.js';
 import { DeepClusterV1 } from './DeepClusterV1.js';
-import { LLMClusterV1 } from './LLMClusterV1.js';
+import { LLMClusterV1, type LLMClusterConfig } from './LLMClusterV1.js';
 import type { LMStudioClient } from '../LMStudioClient.js';
 
 // Track whether registry has been initialized
 let registryInitialized = false;
+
+/**
+ * Options for initializing the algorithm registry
+ */
+export interface AlgorithmRegistryOptions {
+  llmClient?: LMStudioClient;
+  llmClusterConfig?: Partial<LLMClusterConfig>;
+  silent?: boolean;
+}
 
 /**
  * Initialize the algorithm registry with available algorithms
@@ -35,8 +44,13 @@ let registryInitialized = false;
  *
  * @param llmClient - Optional LLM client for LLM-based algorithms
  * @param silent - Suppress console output (default: false)
+ * @param llmClusterConfig - Optional config for LLMCluster (Spec 18 Section 3.3.4)
  */
-export function initializeAlgorithmRegistry(llmClient?: LMStudioClient, silent = false): void {
+export function initializeAlgorithmRegistry(
+  llmClient?: LMStudioClient,
+  silent = false,
+  llmClusterConfig?: Partial<LLMClusterConfig>
+): void {
   const registry = AlgorithmRegistry.getInstance();
 
   // If already initialized with LLM client, don't re-register base algorithms
@@ -54,7 +68,7 @@ export function initializeAlgorithmRegistry(llmClient?: LMStudioClient, silent =
   // Register LLM-based algorithms if client provided and not already registered
   if (llmClient && !hasLLMAlgorithms) {
     const deepCluster = new DeepClusterV1(llmClient);
-    const llmCluster = new LLMClusterV1(llmClient);
+    const llmCluster = new LLMClusterV1(llmClient, llmClusterConfig);
 
     registry.register(deepCluster);
     registry.register(llmCluster);

@@ -27,6 +27,8 @@ import type {
   AbstractionHierarchy,
   HierarchyLevel,
   ConsolidationOptions,
+  SynthesizedAntiPattern,
+  ReasoningCorrection,
 } from './types.js';
 import {
   DEFAULT_CONSOLIDATION_COUNTS,
@@ -190,6 +192,30 @@ export class DreamingConsolidator {
 
     console.log(`✅ Created ${synthesizedPatterns.length} synthesized strategies`);
 
+    // Phase 3.5: FAILURE LEARNING (Spec 19)
+    console.log(`\n📛 Phase 3.5: Failure Learning`);
+
+    let antiPatterns: SynthesizedAntiPattern[] = [];
+    let reasoningCorrections: ReasoningCorrection[] = [];
+
+    // 3.5a: Cluster invalid moves and synthesize anti-patterns
+    if (invalid.length >= 3) {
+      console.log(`   Clustering ${invalid.length} invalid moves by error type...`);
+      antiPatterns = await this.synthesizeAntiPatternsFromClusters(invalid);
+      console.log(`   ↳ Generated ${antiPatterns.length} anti-patterns`);
+    } else {
+      console.log(`   ⚠️  Only ${invalid.length} invalid moves (need >= 3 for anti-patterns)`);
+    }
+
+    // 3.5b: Analyze valid-but-wrong moves for reasoning corrections
+    if (wrong.length >= 2) {
+      console.log(`   Analyzing ${wrong.length} valid-but-wrong moves...`);
+      reasoningCorrections = await this.analyzeWrongReasoning(wrong);
+      console.log(`   ↳ Generated ${reasoningCorrections.length} reasoning corrections`);
+    } else {
+      console.log(`   ⚠️  Only ${wrong.length} valid-but-wrong moves (need >= 2 for corrections)`);
+    }
+
     // Phase 4: ABSTRACTION - Build hierarchy
     let hierarchy: AbstractionHierarchy | undefined;
     if (synthesizedPatterns.length >= 2) {
@@ -247,6 +273,9 @@ export class DreamingConsolidator {
         wrongPathPatterns,
       },
       hierarchy,
+      // Failure Learning (Spec 19)
+      antiPatterns,
+      reasoningCorrections,
       insights,
       fewShotsUpdated: fewShots.length,
       experiencesConsolidated: experiences.length,
@@ -580,11 +609,14 @@ IMPORTANT: Do NOT give this pattern a name. Focus on situation and action.`;
   /**
    * Extract a field value from LLM response
    * Handles both single and double newlines before the next field marker
+   * Strips markdown bold formatting (**) before parsing
    */
   private extractField(response: string, fieldName: string): string | null {
+    // Strip markdown bold markers before matching
+    const cleanedResponse = response.replace(/\*\*/g, '');
     // Match field content until we hit another FIELD: marker (allowing blank lines before it)
     const regex = new RegExp(`${fieldName}:\\s*(.+?)(?=\\n\\s*[A-Z_]+:|$)`, 's');
-    const match = response.match(regex);
+    const match = cleanedResponse.match(regex);
     return match ? match[1].trim() : null;
   }
 
@@ -749,8 +781,18 @@ Be concise. Each item should be a short phrase or sentence.`;
    * Convert a SynthesizedPattern to a FewShotExample
    *
    * Spec 16: Includes aispEncoded field when present
+   * Spec 05 Section 8.5: Includes friendlyName, category, trainingCount metadata
    */
   private patternToFewShot(pattern: SynthesizedPattern): FewShotExample {
+    // Generate friendly name from strategy name or cluster name
+    const friendlyName = this.generateFriendlyName(
+      pattern.strategyName || pattern.clusterName || 'Strategy'
+    );
+
+    // Assign category based on abstraction level (Spec 05 Section 8.5)
+    const level = pattern.abstractionLevel.level;
+    const category = level <= 1 ? 'basic' : level === 2 ? 'intermediate' : 'advanced';
+
     return {
       strategy: pattern.strategyName,
       abstractionLevel: pattern.abstractionLevel.level,
@@ -763,7 +805,25 @@ Be concise. Each item should be a short phrase or sentence.`;
       isAnonymous: pattern.isAnonymous,
       // Spec 16: Include AISP encoding when available
       aispEncoded: pattern.aispEncoded,
+      // Spec 05 Section 8.5: Strategy metadata
+      friendlyName,
+      category,
+      trainingCount: pattern.sourceExperienceCount,
+      playCount: 0, // Initialize to 0, incremented during play
     };
+  }
+
+  /**
+   * Generate a human-readable friendly name from a strategy identifier
+   *
+   * Converts underscores to spaces and applies title case.
+   * Example: "naked_single_elimination" → "Naked Single Elimination"
+   */
+  private generateFriendlyName(name: string): string {
+    return name
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+      .trim();
   }
 
   /**
@@ -912,6 +972,238 @@ Identify at most 3 anti-patterns.`;
       console.warn(`   ⚠️ LLM anti-pattern synthesis failed:`, error);
       return '';
     }
+  }
+
+  // ============================================================================
+  // Failure Learning Methods (Spec 19)
+  // ============================================================================
+
+  /**
+   * Synthesize structured anti-patterns from clustered invalid moves
+   *
+   * Groups invalid moves by error type and asks LLM to synthesize
+   * anti-patterns for each cluster.
+   *
+   * Spec 19 Section 3
+   */
+  async synthesizeAntiPatternsFromClusters(
+    invalid: LLMExperience[]
+  ): Promise<SynthesizedAntiPattern[]> {
+    if (invalid.length < 3) {
+      return [];
+    }
+
+    // Group by error type
+    const errorGroups = new Map<string, LLMExperience[]>();
+    for (const exp of invalid) {
+      const errorType = this.categorizeError(exp.validation.error || '');
+      const group = errorGroups.get(errorType) || [];
+      group.push(exp);
+      errorGroups.set(errorType, group);
+    }
+
+    const antiPatterns: SynthesizedAntiPattern[] = [];
+
+    for (const [errorType, experiences] of errorGroups) {
+      if (experiences.length < 2) continue;
+
+      console.log(`   🔍 Synthesizing anti-pattern for "${errorType}" (${experiences.length} errors)...`);
+
+      try {
+        const antiPattern = await this.synthesizeSingleAntiPattern(errorType, experiences);
+        if (antiPattern) {
+          antiPatterns.push(antiPattern);
+        }
+      } catch (error) {
+        console.warn(`   ⚠️  Failed to synthesize anti-pattern for "${errorType}":`, error);
+      }
+    }
+
+    return antiPatterns;
+  }
+
+  /**
+   * Synthesize a single anti-pattern from a cluster of similar errors
+   */
+  private async synthesizeSingleAntiPattern(
+    errorType: string,
+    experiences: LLMExperience[]
+  ): Promise<SynthesizedAntiPattern | null> {
+    const examples = experiences.slice(0, 5).map((exp, i) => `
+${i + 1}. Move (${exp.move.row},${exp.move.col})=${exp.move.value}
+   Error: ${exp.validation.error}
+   Your reasoning: ${exp.move.reasoning.substring(0, 300)}...`).join('\n');
+
+    const prompt = `You made ${experiences.length} invalid moves that violated the ${errorType.replace(/_/g, ' ')} rule.
+
+Examples:
+${examples}
+
+Analyze these mistakes and synthesize an ANTI-PATTERN.
+
+Respond in this exact format:
+ANTI_PATTERN_NAME: [short descriptive name, 2-4 words]
+WHAT_GOES_WRONG: [describe the common mistake pattern in 1-2 sentences]
+WHY_IT_FAILS: [explain the root cause in 1-2 sentences]
+PREVENTION_STEP_1: [specific action to avoid this]
+PREVENTION_STEP_2: [another preventive action]
+PREVENTION_STEP_3: [optional third step]`;
+
+    const result = await this.llmClient.chat([
+      {
+        role: 'system',
+        content: 'You are analyzing your Sudoku solving mistakes to identify and prevent error patterns.',
+      },
+      { role: 'user', content: prompt },
+    ]);
+
+    return this.parseAntiPatternResponse(result.content, errorType, experiences);
+  }
+
+  /**
+   * Parse LLM response into a SynthesizedAntiPattern
+   */
+  private parseAntiPatternResponse(
+    response: string,
+    errorType: string,
+    experiences: LLMExperience[]
+  ): SynthesizedAntiPattern | null {
+    const cleanResponse = response.replace(/\*\*/g, '');
+
+    const nameMatch = cleanResponse.match(/ANTI_PATTERN_NAME:\s*(.+?)(?=\n|$)/i);
+    const whatMatch = cleanResponse.match(/WHAT_GOES_WRONG:\s*(.+?)(?=\n\s*[A-Z_]+:|$)/is);
+    const whyMatch = cleanResponse.match(/WHY_IT_FAILS:\s*(.+?)(?=\n\s*[A-Z_]+:|$)/is);
+
+    const preventionSteps: string[] = [];
+    for (let i = 1; i <= 3; i++) {
+      const stepMatch = cleanResponse.match(new RegExp(`PREVENTION_STEP_${i}:\\s*(.+?)(?=\\n|$)`, 'i'));
+      if (stepMatch) {
+        preventionSteps.push(stepMatch[1].trim());
+      }
+    }
+
+    if (!nameMatch || !whatMatch || !whyMatch || preventionSteps.length === 0) {
+      console.warn(`   ⚠️  Failed to parse anti-pattern response`);
+      return null;
+    }
+
+    return {
+      id: `ap-${errorType}-${Date.now()}`,
+      antiPatternName: nameMatch[1].trim(),
+      clusterName: errorType,
+      whatGoesWrong: whatMatch[1].trim(),
+      whyItFails: whyMatch[1].trim(),
+      preventionSteps,
+      examples: experiences.slice(0, 3).map(exp => ({
+        move: exp.move,
+        error: exp.validation.error || '',
+      })),
+      frequency: experiences.length,
+      sourceExperienceCount: experiences.length,
+    };
+  }
+
+  /**
+   * Analyze valid-but-wrong moves to extract reasoning corrections
+   *
+   * Asks LLM to analyze each wrong move and identify the flawed
+   * reasoning step.
+   *
+   * Spec 19 Section 4
+   */
+  async analyzeWrongReasoning(
+    wrong: LLMExperience[]
+  ): Promise<ReasoningCorrection[]> {
+    if (wrong.length < 2) {
+      return [];
+    }
+
+    const corrections: ReasoningCorrection[] = [];
+
+    // Limit to 10 to control LLM costs
+    const batch = wrong.slice(0, 10);
+
+    for (const exp of batch) {
+      try {
+        const correction = await this.analyzeSingleWrongReasoning(exp);
+        if (correction) {
+          corrections.push(correction);
+        }
+      } catch (error) {
+        console.warn(`   ⚠️  Failed to analyze reasoning for move (${exp.move.row},${exp.move.col}):`, error);
+      }
+    }
+
+    return corrections;
+  }
+
+  /**
+   * Analyze a single valid-but-wrong move
+   */
+  private async analyzeSingleWrongReasoning(
+    exp: LLMExperience
+  ): Promise<ReasoningCorrection | null> {
+    const gridContext = this.describeGridContext(exp.gridState, exp.move);
+
+    const prompt = `You made a valid but WRONG move in Sudoku.
+
+Grid context: ${gridContext}
+Your move: (${exp.move.row},${exp.move.col}) = ${exp.move.value}
+This value was wrong (violates solution).
+
+Your reasoning was:
+${exp.move.reasoning}
+
+Analyze what went wrong in your reasoning.
+
+Respond in this exact format:
+FLAWED_STEP: [the specific step in your reasoning that was wrong]
+CORRECTION: [how you should have reasoned instead]
+GENERAL_PRINCIPLE: [a general rule to remember, 1 sentence]
+CONFIDENCE: [0.0-1.0 how confident you are in this analysis]`;
+
+    const result = await this.llmClient.chat([
+      {
+        role: 'system',
+        content: 'You are analyzing your own Sudoku solving reasoning to identify where you went wrong.',
+      },
+      { role: 'user', content: prompt },
+    ]);
+
+    return this.parseReasoningCorrectionResponse(result.content, exp);
+  }
+
+  /**
+   * Parse LLM response into a ReasoningCorrection
+   */
+  private parseReasoningCorrectionResponse(
+    response: string,
+    exp: LLMExperience
+  ): ReasoningCorrection | null {
+    const cleanResponse = response.replace(/\*\*/g, '');
+
+    const flawedMatch = cleanResponse.match(/FLAWED_STEP:\s*(.+?)(?=\n\s*[A-Z_]+:|$)/is);
+    const correctionMatch = cleanResponse.match(/CORRECTION:\s*(.+?)(?=\n\s*[A-Z_]+:|$)/is);
+    const principleMatch = cleanResponse.match(/GENERAL_PRINCIPLE:\s*(.+?)(?=\n\s*[A-Z_]+:|$)/is);
+    const confidenceMatch = cleanResponse.match(/CONFIDENCE:\s*([\d.]+)/i);
+
+    if (!flawedMatch || !correctionMatch || !principleMatch) {
+      console.warn(`   ⚠️  Failed to parse reasoning correction response`);
+      return null;
+    }
+
+    const confidence = confidenceMatch ? parseFloat(confidenceMatch[1]) : 0.5;
+
+    return {
+      id: `rc-${exp.id}-${Date.now()}`,
+      gridContext: this.describeGridContext(exp.gridState, exp.move),
+      wrongMove: exp.move,
+      correctValue: 0, // We don't have the correct value without the solution
+      flawedReasoningStep: flawedMatch[1].trim(),
+      correction: correctionMatch[1].trim(),
+      generalPrinciple: principleMatch[1].trim(),
+      confidence: Math.min(1, Math.max(0, confidence)),
+    };
   }
 
   /**
@@ -1106,6 +1398,11 @@ Identify at most 3 anti-patterns.`;
       .sort((a, b) => (b.importance ?? 0.5) - (a.importance ?? 0.5))
       .filter((e) => (e.importance ?? 0.5) >= 0.5);
 
+    const lowImportanceCount = newExperiences.length - importantExperiences.length;
+    if (lowImportanceCount > 0) {
+      console.log(`   ↳ Filtered ${lowImportanceCount} low-importance experiences (< 0.5)`);
+    }
+
     if (importantExperiences.length < 3) {
       console.log(`⚠️  Only ${importantExperiences.length} important experiences - need at least 3`);
       // Still mark them as absorbed even if not enough to synthesize
@@ -1119,6 +1416,10 @@ Identify at most 3 anti-patterns.`;
 
     // 3. Synthesize patterns from new experiences
     const successful = importantExperiences.filter((e) => e.validation.isCorrect);
+    const invalid = importantExperiences.filter((e) => !e.validation.isValid);
+    const validButWrong = importantExperiences.filter((e) => e.validation.isValid && !e.validation.isCorrect);
+
+    console.log(`   ↳ Correct: ${successful.length}, Invalid: ${invalid.length}, Valid-but-wrong: ${validButWrong.length}`);
     console.log(`🔍 Clustering ${successful.length} experiences with ${this.clusteringAlgorithm.getIdentifier()}...`);
 
     const clusterResult = await this.clusteringAlgorithm.cluster(
@@ -1145,6 +1446,30 @@ Identify at most 3 anti-patterns.`;
     }
 
     console.log(`✅ Synthesized ${newPatterns.length} new patterns`);
+
+    // 3.5. FAILURE LEARNING (Spec 19)
+    console.log(`\n📛 Phase 3.5: Failure Learning`);
+
+    let antiPatterns: SynthesizedAntiPattern[] = [];
+    let reasoningCorrections: ReasoningCorrection[] = [];
+
+    // 3.5a: Cluster invalid moves and synthesize anti-patterns
+    if (invalid.length >= 3) {
+      console.log(`   Clustering ${invalid.length} invalid moves by error type...`);
+      antiPatterns = await this.synthesizeAntiPatternsFromClusters(invalid);
+      console.log(`   ↳ Generated ${antiPatterns.length} anti-patterns`);
+    } else {
+      console.log(`   ⚠️  Only ${invalid.length} invalid moves (need >= 3 for anti-patterns)`);
+    }
+
+    // 3.5b: Analyze valid-but-wrong moves for reasoning corrections
+    if (validButWrong.length >= 2) {
+      console.log(`   Analyzing ${validButWrong.length} valid-but-wrong moves...`);
+      reasoningCorrections = await this.analyzeWrongReasoning(validButWrong);
+      console.log(`   ↳ Generated ${reasoningCorrections.length} reasoning corrections`);
+    } else {
+      console.log(`   ⚠️  Only ${validButWrong.length} valid-but-wrong moves (need >= 2 for corrections)`);
+    }
 
     // 4. Use LLM to merge new patterns with existing
     let mergedFewShots: FewShotExample[];
@@ -1177,6 +1502,19 @@ Identify at most 3 anti-patterns.`;
       }
     }
 
+    // 5.6. Save failure learning data (Spec 19)
+    if (antiPatterns.length > 0 || reasoningCorrections.length > 0) {
+      console.log(`📛 Saving failure learning data...`);
+      if (antiPatterns.length > 0) {
+        await learningUnitManager.saveAntiPatterns(learningUnitId, antiPatterns);
+        console.log(`   ↳ Saved ${antiPatterns.length} anti-patterns`);
+      }
+      if (reasoningCorrections.length > 0) {
+        await learningUnitManager.saveReasoningCorrections(learningUnitId, reasoningCorrections);
+        console.log(`   ↳ Saved ${reasoningCorrections.length} reasoning corrections`);
+      }
+    }
+
     // 6. Mark experiences as absorbed
     const experienceIds = newExperiences.map((e) => e.id);
     await learningUnitManager.markExperiencesAbsorbed(
@@ -1196,6 +1534,9 @@ Identify at most 3 anti-patterns.`;
         commonErrors: [],
         wrongPathPatterns: [],
       },
+      // Failure Learning (Spec 19)
+      antiPatterns,
+      reasoningCorrections,
       insights: `Re-consolidated ${experienceIds.length} new experiences into learning unit "${learningUnitId}"`,
       fewShotsUpdated: mergedFewShots.length,
       experiencesConsolidated: experienceIds.length,

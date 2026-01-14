@@ -100,6 +100,18 @@ export const LLM_STORAGE_KEYS = {
   /** Type identifier for learning unit metadata */
   LEARNING_UNIT_TYPE: 'learning_unit' as const,
 
+  /** Prefix for anti-pattern storage keys (Spec 19) */
+  ANTIPATTERNS_PREFIX: 'llm_antipatterns:' as const,
+
+  /** Type identifier for anti-patterns metadata (Spec 19) */
+  ANTIPATTERNS_TYPE: 'anti_patterns' as const,
+
+  /** Prefix for reasoning corrections storage keys (Spec 19) */
+  CORRECTIONS_PREFIX: 'llm_corrections:' as const,
+
+  /** Type identifier for reasoning corrections metadata (Spec 19) */
+  CORRECTIONS_TYPE: 'reasoning_corrections' as const,
+
   /**
    * Generate few-shot storage key for a profile and learning unit
    * @param profileName - LLM profile name
@@ -118,6 +130,26 @@ export const LLM_STORAGE_KEYS = {
    */
   getLearningUnitKey: (profileName: string, learningUnitId: string): string => {
     return `llm_learning_unit:${profileName}:${learningUnitId}`;
+  },
+
+  /**
+   * Generate anti-patterns storage key (Spec 19)
+   * @param profileName - LLM profile name
+   * @param learningUnitId - Learning unit ID
+   * @returns Storage key (e.g., "llm_antipatterns:qwen3-coder:easy-puzzles")
+   */
+  getAntiPatternsKey: (profileName: string, learningUnitId: string): string => {
+    return `llm_antipatterns:${profileName}:${learningUnitId}`;
+  },
+
+  /**
+   * Generate reasoning corrections storage key (Spec 19)
+   * @param profileName - LLM profile name
+   * @param learningUnitId - Learning unit ID
+   * @returns Storage key (e.g., "llm_corrections:qwen3-coder:easy-puzzles")
+   */
+  getCorrectionsKey: (profileName: string, learningUnitId: string): string => {
+    return `llm_corrections:${profileName}:${learningUnitId}`;
   },
 
   /**

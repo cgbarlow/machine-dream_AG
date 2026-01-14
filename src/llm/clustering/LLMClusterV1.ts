@@ -47,6 +47,23 @@ interface ReasoningPattern {
 }
 
 /**
+ * Configuration options for LLMCluster v1 (Spec 18 Section 3.3.4)
+ */
+export interface LLMClusterConfig {
+  batchSize: number;        // Default: 50 - Experiences per LLM categorization batch
+  parallelBatches: number;  // Default: 3 - Number of concurrent batch requests
+  hybridMode: boolean;      // Default: false - Use keyword matching for high-confidence
+  useCache: boolean;        // Default: true - Cache pattern assignments
+}
+
+const DEFAULT_CONFIG: LLMClusterConfig = {
+  batchSize: 50,
+  parallelBatches: 3,
+  hybridMode: false,
+  useCache: true,
+};
+
+/**
  * LLMCluster v1 Algorithm
  *
  * Performance: <180s for 500 experiences
@@ -54,6 +71,8 @@ interface ReasoningPattern {
  */
 export class LLMClusterV1 extends BaseClusteringAlgorithm {
   private llmClient: LMStudioClient;
+  private config: LLMClusterConfig;
+  private patternCache: Map<string, string> = new Map();  // experienceId -> patternName
 
   /**
    * Sample size for pattern identification (100-150 experiences)
@@ -61,7 +80,7 @@ export class LLMClusterV1 extends BaseClusteringAlgorithm {
   private readonly SAMPLE_SIZE_MIN = 100;
   private readonly SAMPLE_SIZE_MAX = 150;
 
-  constructor(llmClient: LMStudioClient) {
+  constructor(llmClient: LMStudioClient, config?: Partial<LLMClusterConfig>) {
     const metadata: AlgorithmMetadata = {
       name: 'LLMCluster',
       version: 1,
@@ -72,6 +91,21 @@ export class LLMClusterV1 extends BaseClusteringAlgorithm {
     };
     super(metadata);
     this.llmClient = llmClient;
+    this.config = { ...DEFAULT_CONFIG, ...config };
+  }
+
+  /**
+   * Get current configuration (for debugging/inspection)
+   */
+  getConfig(): LLMClusterConfig {
+    return { ...this.config };
+  }
+
+  /**
+   * Clear the pattern cache (useful when patterns change)
+   */
+  clearCache(): void {
+    this.patternCache.clear();
   }
 
   /**
@@ -126,9 +160,9 @@ export class LLMClusterV1 extends BaseClusteringAlgorithm {
       patterns = this.getFallbackPatterns();
     }
 
-    // Step 3: Categorize all experiences by patterns
-    console.log(`   Step 3: Categorizing ${experiences.length} experiences...`);
-    const clusters = this.categorizeByPatterns(experiences, patterns);
+    // Step 3: Categorize all experiences by patterns (using LLM)
+    console.log(`   Step 3: LLM categorizing ${experiences.length} experiences...`);
+    const clusters = await this.categorizeByPatterns(experiences, patterns);
 
     console.log(`   Final clusters: ${clusters.size}`);
 
@@ -335,12 +369,14 @@ Provide ${targetCount} distinct patterns now in PLAIN TEXT (no markdown):`;
   }
 
   /**
-   * Categorize experiences by patterns
+   * Categorize experiences by patterns using LLM
+   * Supports configurable batch size, parallel processing, hybrid mode, and caching
+   * (Spec 18 Section 3.3.4)
    */
-  private categorizeByPatterns(
+  private async categorizeByPatterns(
     experiences: LLMExperience[],
     patterns: ReasoningPattern[]
-  ): Map<string, LLMExperience[]> {
+  ): Promise<Map<string, LLMExperience[]>> {
     const result = new Map<string, LLMExperience[]>();
 
     // Initialize clusters for each pattern
@@ -351,25 +387,56 @@ Provide ${targetCount} distinct patterns now in PLAIN TEXT (no markdown):`;
     // Add fallback cluster for unmatched experiences
     result.set('uncategorized', []);
 
-    // Categorize each experience
-    for (const exp of experiences) {
-      const reasoning = exp.move.reasoning.toLowerCase();
-      let matched = false;
+    // Use configurable batch size
+    const BATCH_SIZE = this.config.batchSize;
+    const PARALLEL = this.config.parallelBatches;
 
-      // Try to match with patterns (by keywords)
-      for (const pattern of patterns) {
-        const keywordMatch = pattern.keywords.some((kw) => reasoning.includes(kw));
+    // Split experiences into batches
+    const batches: LLMExperience[][] = [];
+    for (let i = 0; i < experiences.length; i += BATCH_SIZE) {
+      batches.push(experiences.slice(i, i + BATCH_SIZE));
+    }
 
-        if (keywordMatch) {
-          result.get(pattern.name)!.push(exp);
-          matched = true;
-          break;
-        }
+    const totalBatches = batches.length;
+    console.log(`   Categorizing ${experiences.length} experiences in ${totalBatches} batches (batch_size=${BATCH_SIZE}, parallel=${PARALLEL})...`);
+
+    // Process batches in parallel chunks
+    for (let i = 0; i < batches.length; i += PARALLEL) {
+      const chunk = batches.slice(i, i + PARALLEL);
+      const chunkStartNum = i + 1;
+      const chunkEndNum = Math.min(i + PARALLEL, totalBatches);
+
+      if (PARALLEL > 1 && chunk.length > 1) {
+        console.log(`   Batches ${chunkStartNum}-${chunkEndNum}/${totalBatches}: processing ${chunk.length} batches in parallel...`);
+      } else {
+        console.log(`   Batch ${chunkStartNum}/${totalBatches}: categorizing ${chunk[0].length} experiences...`);
       }
 
-      // Add to fallback cluster if no match
-      if (!matched) {
-        result.get('uncategorized')!.push(exp);
+      try {
+        // Process batch chunk in parallel
+        const promises = chunk.map((batch, idx) =>
+          this.processBatch(batch, patterns, i + idx, totalBatches)
+        );
+        const batchResults = await Promise.all(promises);
+
+        // Merge results into clusters
+        for (const batchResult of batchResults) {
+          for (const { exp, patternName } of batchResult) {
+            if (patternName && result.has(patternName)) {
+              result.get(patternName)!.push(exp);
+            } else {
+              result.get('uncategorized')!.push(exp);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`   ⚠️  Chunk ${chunkStartNum}-${chunkEndNum} categorization failed, using uncategorized`);
+        // If all batches in chunk fail, add all to uncategorized
+        for (const batch of chunk) {
+          for (const exp of batch) {
+            result.get('uncategorized')!.push(exp);
+          }
+        }
       }
     }
 
@@ -382,6 +449,160 @@ Provide ${targetCount} distinct patterns now in PLAIN TEXT (no markdown):`;
     }
 
     return filtered;
+  }
+
+  /**
+   * Process a single batch with hybrid mode and caching support
+   */
+  private async processBatch(
+    batch: LLMExperience[],
+    patterns: ReasoningPattern[],
+    _batchNum: number,
+    _totalBatches: number
+  ): Promise<{ exp: LLMExperience; patternName: string }[]> {
+    const results: { exp: LLMExperience; patternName: string }[] = [];
+
+    if (this.config.hybridMode) {
+      // Hybrid mode: try keyword matching first, LLM for uncertain
+      const uncertain: LLMExperience[] = [];
+
+      for (const exp of batch) {
+        // Check cache first
+        if (this.config.useCache && exp.id) {
+          const cached = this.patternCache.get(exp.id);
+          if (cached) {
+            results.push({ exp, patternName: cached });
+            continue;
+          }
+        }
+
+        // Try keyword matching
+        const keywordMatch = this.tryKeywordMatch(exp, patterns);
+        if (keywordMatch) {
+          results.push({ exp, patternName: keywordMatch });
+          if (this.config.useCache && exp.id) {
+            this.patternCache.set(exp.id, keywordMatch);
+          }
+        } else {
+          uncertain.push(exp);
+        }
+      }
+
+      // LLM categorize uncertain ones
+      if (uncertain.length > 0) {
+        const llmResults = await this.llmCategorizeBatch(uncertain, patterns);
+        for (let i = 0; i < uncertain.length; i++) {
+          const patternName = llmResults[i];
+          results.push({ exp: uncertain[i], patternName });
+          if (this.config.useCache && uncertain[i].id) {
+            this.patternCache.set(uncertain[i].id, patternName);
+          }
+        }
+      }
+    } else {
+      // Pure LLM categorization (default)
+      const llmResults = await this.llmCategorizeBatch(batch, patterns);
+      for (let i = 0; i < batch.length; i++) {
+        const patternName = llmResults[i];
+        results.push({ exp: batch[i], patternName });
+        if (this.config.useCache && batch[i].id) {
+          this.patternCache.set(batch[i].id, patternName);
+        }
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Try to match experience to pattern using keywords (for hybrid mode)
+   * Returns pattern name if confident match, null otherwise
+   */
+  private tryKeywordMatch(
+    exp: LLMExperience,
+    patterns: ReasoningPattern[]
+  ): string | null {
+    const reasoning = exp.move.reasoning.toLowerCase();
+
+    // Score each pattern based on keyword matches
+    let bestMatch: { pattern: ReasoningPattern; score: number } | null = null;
+
+    for (const pattern of patterns) {
+      let score = 0;
+      for (const keyword of pattern.keywords) {
+        if (reasoning.includes(keyword.toLowerCase())) {
+          score += 1;
+        }
+      }
+
+      // Need at least 2 keyword matches for confident classification
+      if (score >= 2 && (!bestMatch || score > bestMatch.score)) {
+        bestMatch = { pattern, score };
+      }
+    }
+
+    return bestMatch ? bestMatch.pattern.name : null;
+  }
+
+  /**
+   * Ask LLM to categorize a batch of experiences
+   */
+  private async llmCategorizeBatch(
+    batch: LLMExperience[],
+    patterns: ReasoningPattern[]
+  ): Promise<string[]> {
+    // Build pattern list for LLM
+    const patternList = patterns
+      .map((p, i) => `${i + 1}. ${p.name}: ${p.description}`)
+      .join('\n');
+
+    // Build experience list
+    const experienceList = batch
+      .map((exp, i) => `${i + 1}. "${exp.move.reasoning}"`)
+      .join('\n\n');
+
+    const prompt = `You are categorizing Sudoku solving reasoning into patterns.
+
+Available patterns:
+${patternList}
+
+For each reasoning statement below, respond with ONLY the pattern number (1-${patterns.length}) that best matches.
+If none match well, respond with "0" for uncategorized.
+
+Format: One number per line, no other text.
+
+Reasoning statements:
+${experienceList}
+
+Pattern numbers (one per line):`;
+
+    const response = await this.llmClient.chat([
+      {
+        role: 'system',
+        content: 'You categorize Sudoku reasoning into patterns. Output only numbers, one per line.',
+      },
+      {
+        role: 'user',
+        content: prompt,
+      },
+    ]);
+
+    // Parse response: expect one number per line
+    const lines = response.content.trim().split('\n');
+    const categorizations: string[] = [];
+
+    for (let i = 0; i < batch.length; i++) {
+      const line = lines[i]?.trim();
+      const patternNum = parseInt(line || '0', 10);
+
+      if (patternNum > 0 && patternNum <= patterns.length) {
+        categorizations.push(patterns[patternNum - 1].name);
+      } else {
+        categorizations.push('uncategorized');
+      }
+    }
+
+    return categorizations;
   }
 
   /**

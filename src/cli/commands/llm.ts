@@ -886,6 +886,11 @@ export function registerLLMCommand(program: Command): void {
         const learningUnitId = options.learningUnit || DEFAULT_LEARNING_UNIT_ID;
         const player = new LLMSudokuPlayer(config, memory, profileName, learningUnitId);
 
+        // Create unit manager for playCount tracking (Task 4: Strategy Usage Tracking)
+        const unitManager = config.memoryEnabled && options.learning !== false
+          ? new LearningUnitManager(memory, profileName)
+          : null;
+
         // Enable streaming by default (unless --no-streaming)
         // Also enable if debug or visualize is requested
         if (options.streaming !== false) {
@@ -1095,6 +1100,15 @@ export function registerLLMCommand(program: Command): void {
             cumulativeStats.totalMoves++;
             if (experience.validation.isCorrect) {
               cumulativeStats.correctMoves++;
+              // Track strategy usage (Task 4: playCount)
+              if (unitManager && experience.move.reasoning) {
+                unitManager.incrementStrategyPlayCount(learningUnitId, experience.move.reasoning)
+                  .catch((err: Error) => {
+                    if (options.debug) {
+                      logger.warn(`   ⚠️  Failed to track strategy usage: ${err.message}`);
+                    }
+                  });
+              }
             } else if (experience.validation.isValid) {
               cumulativeStats.validButWrongMoves++;
             } else {
@@ -2207,6 +2221,12 @@ export function registerLLMCommand(program: Command): void {
     .option('--algorithms <list>', 'Comma-separated list (default: all latest versions)')
     .option('--debug', 'Show detailed debug output including LLM responses and pattern parsing')
     .option('--output <file>', 'Save consolidation report')
+    // Spec 18 Section 3.3.4: LLMCluster performance options
+    .option('--batch-size <n>', 'Experiences per LLM batch (default: 50)', parseInt)
+    .option('--parallel-batches <n>', 'Concurrent batch requests (default: 3)', parseInt)
+    .option('--hybrid', 'Use hybrid keyword/LLM categorization for LLMCluster')
+    .option('--no-cache', 'Disable pattern caching for LLMCluster')
+    .option('--no-failure-learning', 'Disable failure learning phase (Spec 19)')
     .action(async (options) => {
       try {
         const manager = new LLMProfileManager();
@@ -2286,7 +2306,16 @@ export function registerLLMCommand(program: Command): void {
 
           // Re-initialize algorithm registry with LLM client to enable all algorithms
           const llmClient = new LMStudioClient(config);
-          initializeAlgorithmRegistry(llmClient);
+
+          // Spec 18 Section 3.3.4: Build LLMCluster config from CLI options
+          // Only include explicitly set options; LLMClusterV1 provides defaults
+          const llmClusterConfig: Record<string, number | boolean> = {};
+          if (options.batchSize) llmClusterConfig.batchSize = options.batchSize;
+          if (options.parallelBatches) llmClusterConfig.parallelBatches = options.parallelBatches;
+          if (options.hybrid) llmClusterConfig.hybridMode = true;
+          if (options.cache === false) llmClusterConfig.useCache = false;
+
+          initializeAlgorithmRegistry(llmClient, false, llmClusterConfig);
 
           // Determine which algorithms to use (DEFAULT: all latest versions)
           const registry = AlgorithmRegistry.getInstance();
@@ -2362,35 +2391,35 @@ export function registerLLMCommand(program: Command): void {
             logger.info(`   Strategies: ${existingUnit.fewShots.length}`);
             logger.info(`   Absorbed experiences: ${existingUnit.absorbedExperienceIds.length}`);
 
-            // Extract algorithm from unit ID (e.g., "gpt-oss-120b_standard_llmclusterv1_20260113_1" → "llmcluster")
+            // Extract algorithm from unit ID for logging (e.g., "gpt-oss-120b_standard_llmclusterv1_20260113_1" → "llmcluster")
             // Pattern: {profile}_{mode}_{algo}v{version}_{date}_{N}[_2x]
             const algoMatch = options.rerun.match(/_([a-z]+cluster)v\d+_/i);
-            if (!algoMatch) {
-              throw new CLIError(`Cannot extract algorithm from unit ID: ${options.rerun}`, 1);
-            }
-            const algoNameRaw = algoMatch[1].toLowerCase();
-            logger.info(`   Algorithm: ${algoNameRaw}`);
-
-            // Convert algorithm name to proper case (e.g., "llmcluster" → "LLMCluster")
-            const algoNameMap: Record<string, string> = {
-              'fastcluster': 'FastCluster',
-              'deepcluster': 'DeepCluster',
-              'llmcluster': 'LLMCluster'
-            };
-            const algoName = algoNameMap[algoNameRaw];
-            if (!algoName) {
-              throw new CLIError(`Unknown algorithm: ${algoNameRaw}`, 1);
+            if (algoMatch) {
+              const algoNameRaw = algoMatch[1].toLowerCase();
+              logger.info(`   Original algorithm: ${algoNameRaw}`);
             }
 
-            // Get the algorithm
-            const algo = registry.getAlgorithm(algoName);
-            if (!algo) {
-              throw new CLIError(`Algorithm not found: ${algoName}`, 1);
+            // Only override algorithm if --algorithm was explicitly specified
+            // Otherwise, use all algorithms (default behavior, same as normal dream)
+            if (!options.algorithm && !options.algorithms) {
+              logger.info(`\n🔧 Using all algorithms (${algorithmsToUse.length}): ${algorithmsToUse.map((a: any) => a.getIdentifier()).join(', ')}`);
             }
 
-            // Override algorithm selection to use only this algorithm
-            algorithmsToUse = [algo];
-            logger.info(`\n🔧 Using algorithm: ${algo.getIdentifier()} (from unit)`);
+            // Extract mode from unit ID (e.g., "gpt-oss-120b_aisp-full_fastclusterv2_..." → "aisp-full")
+            // Pattern: {profile}_{mode}_{algo}v{version}_{date}_{N}[_2x]
+            const modeMatch = options.rerun.match(/_(?:standard|aisp-full|aisp)_/);
+            if (modeMatch) {
+              const mode = modeMatch[0].replace(/_/g, ''); // "aisp-full", "aisp", or "standard"
+              if (mode === 'aisp-full' && !options.aispFull) {
+                options.aispFull = true;
+                logger.info(`   Mode: aisp-full (detected from unit ID)`);
+              } else if (mode === 'aisp' && !options.aisp) {
+                options.aisp = true;
+                logger.info(`   Mode: aisp (detected from unit ID)`);
+              } else if (mode === 'standard') {
+                logger.info(`   Mode: standard (detected from unit ID)`);
+              }
+            }
 
             // Mark experiences as unconsolidated
             logger.info(`\n🔄 Marking ${existingUnit.absorbedExperienceIds.length} experiences as unconsolidated...`);
@@ -2765,14 +2794,28 @@ export function registerLLMCommand(program: Command): void {
             logger.info(`\n📚 Learned Strategies (${fewShots.length}):\n`);
 
             fewShots.forEach((fs: any, i: number) => {
-              // Display synthesized strategy format
-              const strategyName = fs.strategy || `Strategy ${i + 1}`;
+              // Spec 05 Section 8.5: Use friendlyName if available, otherwise strategy name
+              const displayName = fs.friendlyName || fs.strategy || `Strategy ${i + 1}`;
               const level = fs.abstractionLevel;
               const levelNames = ['Instance', 'Technique', 'Category', 'Principle'];
               const levelName = level !== undefined && levelNames[level] ? levelNames[level] : 'Technique';
 
-              logger.info(`   ${i + 1}. "${strategyName}"`);
+              logger.info(`   ${i + 1}. "${displayName}"`);
+
+              // Spec 05 Section 8.5: Show category if available
+              if (fs.category) {
+                logger.info(`      Category: ${fs.category}`);
+              }
+
               logger.info(`      Level: ${level ?? 1} (${levelName})`);
+
+              // Spec 05 Section 8.5: Show usage tracking if available
+              if (fs.trainingCount !== undefined) {
+                logger.info(`      Training count: ${fs.trainingCount}`);
+              }
+              if (fs.playCount !== undefined && fs.playCount > 0) {
+                logger.info(`      Play count: ${fs.playCount}`);
+              }
 
               if (fs.situation) {
                 logger.info(`      When: ${fs.situation}`);
@@ -2957,6 +3000,8 @@ export function registerLLMCommand(program: Command): void {
     .description('List all learning units')
     .option('--profile <name>', 'Filter by LLM profile (default: show all profiles)')
     .option('--format <format>', 'Output format (table|json)', 'table')
+    .option('--sort <order>', 'Sort order: name, created, updated (default: name)', 'name')
+    .option('--reverse', 'Reverse sort order (e.g., oldest first becomes newest first)')
     .action(async (options) => {
       try {
         const agentMemory = new AgentMemory(createDefaultMemoryConfig());
@@ -3014,8 +3059,23 @@ export function registerLLMCommand(program: Command): void {
             const units = unitsByProfile.get(profile)!;
             logger.info(`  ┌─ ${profile} (${units.length} units)`);
 
-            // Sort units by name within each profile
-            units.sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
+            // Sort units based on --sort option
+            units.sort((a, b) => {
+              let cmp = 0;
+              if (options.sort === 'created') {
+                const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                cmp = aDate - bDate; // oldest first by default
+              } else if (options.sort === 'updated') {
+                const aDate = a.lastUpdatedAt ? new Date(a.lastUpdatedAt).getTime() : 0;
+                const bDate = b.lastUpdatedAt ? new Date(b.lastUpdatedAt).getTime() : 0;
+                cmp = aDate - bDate; // oldest first by default
+              } else {
+                // Default: sort by name/id
+                cmp = (a.name || a.id).localeCompare(b.name || b.id);
+              }
+              return options.reverse ? -cmp : cmp;
+            });
 
             for (let i = 0; i < units.length; i++) {
               const unit = units[i];
@@ -3205,13 +3265,28 @@ export function registerLLMCommand(program: Command): void {
             logger.info(`\n📚 Learned Strategies (${unit.fewShots.length}):\n`);
 
             unit.fewShots.forEach((fs, i) => {
-              const strategyName = fs.strategy || `Strategy ${i + 1}`;
+              // Spec 05 Section 8.5: Use friendlyName if available, otherwise strategy name
+              const displayName = fs.friendlyName || fs.strategy || `Strategy ${i + 1}`;
               const level = fs.abstractionLevel;
               const levelNames = ['Instance', 'Technique', 'Category', 'Principle'];
               const levelName = level !== undefined && levelNames[level] ? levelNames[level] : 'Technique';
 
-              logger.info(`   ${i + 1}. "${strategyName}"`);
+              logger.info(`   ${i + 1}. "${displayName}"`);
+
+              // Spec 05 Section 8.5: Show category if available
+              if (fs.category) {
+                logger.info(`      Category: ${fs.category}`);
+              }
+
               logger.info(`      Level: ${level ?? 1} (${levelName})`);
+
+              // Spec 05 Section 8.5: Show usage tracking if available
+              if (fs.trainingCount !== undefined) {
+                logger.info(`      Training count: ${fs.trainingCount}`);
+              }
+              if (fs.playCount !== undefined && fs.playCount > 0) {
+                logger.info(`      Play count: ${fs.playCount}`);
+              }
 
               if (fs.situation) {
                 logger.info(`      When: ${fs.situation}`);
@@ -3260,6 +3335,32 @@ export function registerLLMCommand(program: Command): void {
             });
 
             logger.info('');
+          }
+
+          // Failure Learning: Anti-Patterns (Spec 19)
+          const unitManager = new LearningUnitManager(agentMemory, profileName);
+          const antiPatterns = await unitManager.getAntiPatterns(id);
+          if (antiPatterns && antiPatterns.length > 0) {
+            logger.info(`\n📛 Anti-Patterns (${antiPatterns.length}):\n`);
+
+            antiPatterns.forEach((ap: any) => {
+              logger.info(`   ❌ ${ap.antiPatternName}`);
+              logger.info(`      What goes wrong: ${ap.whatGoesWrong.substring(0, 80)}${ap.whatGoesWrong.length > 80 ? '...' : ''}`);
+              logger.info(`      Frequency: ${ap.frequency}`);
+              logger.info('');
+            });
+          }
+
+          // Failure Learning: Reasoning Corrections (Spec 19)
+          const corrections = await unitManager.getReasoningCorrections(id);
+          if (corrections && corrections.length > 0) {
+            logger.info(`\n⚠️  Reasoning Corrections (${corrections.length}):\n`);
+
+            corrections.forEach((rc: any) => {
+              logger.info(`   ⚠️  ${rc.generalPrinciple.substring(0, 80)}${rc.generalPrinciple.length > 80 ? '...' : ''}`);
+              logger.info(`      Confidence: ${(rc.confidence * 100).toFixed(0)}%`);
+              logger.info('');
+            });
           }
 
           logger.info('─'.repeat(70));

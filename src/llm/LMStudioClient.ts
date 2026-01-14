@@ -44,10 +44,13 @@ interface ChatCompletionResponse {
  * Supports Qwen3 30B and other capable local models.
  */
 export class LMStudioClient {
+  private maxRetries = 3;
+  private baseRetryDelay = 1000; // 1 second
+
   constructor(private config: LLMConfig) {}
 
   /**
-   * Send chat completion request to LM Studio
+   * Send chat completion request to LM Studio with automatic retry
    *
    * Spec 11: Uses OpenAI-compatible /v1/chat/completions endpoint
    * @param messages - Chat messages to send
@@ -56,6 +59,74 @@ export class LMStudioClient {
    * @returns ChatResult with content and optional full reasoning
    */
   async chat(
+    messages: ChatMessage[],
+    onStream?: (token: string) => void,
+    onReasoning?: (token: string) => void
+  ): Promise<ChatResult> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      try {
+        return await this.chatAttempt(messages, onStream, onReasoning);
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        // Check if error is retryable
+        if (attempt < this.maxRetries && this.isRetryableError(lastError)) {
+          const delay = this.baseRetryDelay * Math.pow(2, attempt);
+          if (this.config.debug) {
+            console.warn(`   ⚠️  LLM request failed (attempt ${attempt + 1}/${this.maxRetries + 1}): ${lastError.message}`);
+            console.warn(`   🔄 Retrying in ${delay}ms...`);
+          }
+          await this.sleep(delay);
+          continue;
+        }
+
+        // Non-retryable error or max retries exceeded
+        throw lastError;
+      }
+    }
+
+    throw lastError || new Error('Unknown error in chat()');
+  }
+
+  /**
+   * Check if an error is retryable (transient network errors)
+   */
+  private isRetryableError(error: Error): boolean {
+    const message = error.message.toLowerCase();
+    const cause = (error as any).cause?.message?.toLowerCase() || '';
+
+    // Socket errors (connection closed, reset, refused)
+    if (message.includes('socket') || cause.includes('socket')) return true;
+    if (message.includes('other side closed') || cause.includes('other side closed')) return true;
+    if (message.includes('econnreset') || cause.includes('econnreset')) return true;
+    if (message.includes('econnrefused') || cause.includes('econnrefused')) return true;
+
+    // Fetch errors
+    if (message.includes('fetch failed')) return true;
+    if (message.includes('network') || cause.includes('network')) return true;
+
+    // Timeout errors are NOT retryable (already waited long enough)
+    if (message.includes('timeout')) return false;
+
+    // HTTP 5xx errors are retryable
+    if (message.includes('500') || message.includes('502') || message.includes('503') || message.includes('504')) return true;
+
+    return false;
+  }
+
+  /**
+   * Sleep for a specified duration
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Single attempt at chat completion
+   */
+  private async chatAttempt(
     messages: ChatMessage[],
     onStream?: (token: string) => void,
     onReasoning?: (token: string) => void

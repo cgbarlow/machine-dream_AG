@@ -450,6 +450,58 @@ for (const exp of experiences) {
 - ✅ Processing time <180 seconds for 500 experiences
 - ✅ At least 80% of experiences match a pattern (not "uncategorized")
 
+#### 3.3.4 Performance Options (Added 2026-01-14)
+
+LLMCluster v1 supports CLI switches for performance tuning:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--batch-size <n>` | 50 | Experiences per LLM categorization batch |
+| `--parallel-batches <n>` | 3 | Number of concurrent batch requests |
+| `--hybrid` | false | Use keyword matching for high-confidence, LLM for uncertain |
+| `--no-cache` | false | Disable pattern caching |
+
+**Configuration Interface**:
+```typescript
+export interface LLMClusterConfig {
+  batchSize: number;        // Default: 50
+  parallelBatches: number;  // Default: 3
+  hybridMode: boolean;      // Default: false
+  useCache: boolean;        // Default: true
+}
+```
+
+**Batch Processing**:
+- Experiences are grouped into batches of `batchSize`
+- Multiple batches can run concurrently with `parallelBatches`
+- Example: 1000 experiences, batch=100, parallel=3 → ~4x speedup
+
+**Hybrid Mode**:
+- First attempts keyword matching for high-confidence categorization
+- Only uses LLM for uncertain experiences
+- Reduces API calls and processing time
+- Maintains quality for ambiguous cases
+
+**Pattern Caching**:
+- Caches pattern assignments by experience ID
+- Avoids re-categorizing identical experiences
+- Default enabled; disable with `--no-cache`
+
+**CLI Usage**:
+```bash
+# Larger batches (fewer API calls, may be slower per call)
+machine-dream llm dream run --algorithm llmcluster --batch-size 100
+
+# Parallel processing (faster, more API load)
+machine-dream llm dream run --algorithm llmcluster --parallel-batches 3
+
+# Hybrid mode (keyword + LLM)
+machine-dream llm dream run --algorithm llmcluster --hybrid
+
+# Disable caching (fresh categorization)
+machine-dream llm dream run --algorithm llmcluster --no-cache
+```
+
 ---
 
 ## 4. Learning Unit Naming Convention

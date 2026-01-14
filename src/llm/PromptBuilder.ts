@@ -4,7 +4,13 @@
  * Specification: docs/specs/16-aisp-mode-spec.md
  */
 
-import type { LLMExperience, FewShotExample, SynthesizedPattern } from './types.js';
+import type {
+  LLMExperience,
+  FewShotExample,
+  SynthesizedPattern,
+  SynthesizedAntiPattern,
+  ReasoningCorrection,
+} from './types.js';
 import { BoardFormatter } from './BoardFormatter.js';
 import { AISPBuilder, type ForbiddenMove } from './AISPBuilder.js';
 
@@ -70,13 +76,17 @@ export class PromptBuilder {
    *                         CRITICAL: Forbidden list must use full history to prevent old forbidden
    *                         moves from being "forgotten" when move history is truncated
    * @param profileSystemPrompt - Additional system prompt from profile (Spec 13)
+   * @param antiPatterns - Anti-patterns from failure learning (Spec 19)
+   * @param reasoningCorrections - Reasoning corrections from failure learning (Spec 19)
    */
   buildPrompt(
     gridState: number[][],
     experiencesToShow: LLMExperience[] = [],
     fewShots: FewShotExample[] = [],
     allExperiences?: LLMExperience[],
-    profileSystemPrompt?: string
+    profileSystemPrompt?: string,
+    antiPatterns?: SynthesizedAntiPattern[],
+    reasoningCorrections?: ReasoningCorrection[]
   ): string {
     // Spec 16: Route to AISP format when enabled
     if (this.useAISP && this.aispBuilder) {
@@ -118,6 +128,17 @@ export class PromptBuilder {
       } else {
         prompt += this.formatFewShots(fewShots);
       }
+      prompt += '\n\n';
+    }
+
+    // Add failure learning sections (Spec 19)
+    if (antiPatterns && antiPatterns.length > 0) {
+      prompt += this.formatAntiPatterns(antiPatterns);
+      prompt += '\n\n';
+    }
+
+    if (reasoningCorrections && reasoningCorrections.length > 0) {
+      prompt += this.formatReasoningCorrections(reasoningCorrections);
       prompt += '\n\n';
     }
 
@@ -390,6 +411,60 @@ Use the first matching pattern. Follow its template exactly.`;
     if (!analysis) return 'Apply constraint reasoning';
     const firstLine = analysis.split('\n')[0] || analysis.split('.')[0];
     return firstLine.trim().substring(0, 100);
+  }
+
+  /**
+   * Format anti-patterns for the prompt
+   *
+   * Spec 19 Section 4.1: Anti-Pattern Section
+   * Shows top 3 anti-patterns by frequency to help LLM avoid common mistakes.
+   */
+  formatAntiPatterns(antiPatterns: SynthesizedAntiPattern[]): string {
+    if (!antiPatterns || antiPatterns.length === 0) return '';
+
+    // Sort by frequency and take top 3 (Spec 19: limit 3 in prompt)
+    const sorted = [...antiPatterns].sort((a, b) => b.frequency - a.frequency);
+    const top3 = sorted.slice(0, 3);
+
+    let output = '## COMMON MISTAKES TO AVOID\n\n';
+
+    for (const ap of top3) {
+      output += `### ❌ ${ap.antiPatternName}\n`;
+      output += `**What goes wrong:** ${ap.whatGoesWrong}\n`;
+      output += `**Why it fails:** ${ap.whyItFails}\n`;
+      output += `**Prevention:**\n`;
+      for (const step of ap.preventionSteps) {
+        output += `- ${step}\n`;
+      }
+      output += '\n';
+    }
+
+    return output.trim();
+  }
+
+  /**
+   * Format reasoning corrections for the prompt
+   *
+   * Spec 19 Section 4.2: Reasoning Corrections Section
+   * Shows top 3 corrections by confidence to help LLM avoid reasoning traps.
+   */
+  formatReasoningCorrections(corrections: ReasoningCorrection[]): string {
+    if (!corrections || corrections.length === 0) return '';
+
+    // Sort by confidence and take top 3 (Spec 19: limit 3 in prompt)
+    const sorted = [...corrections].sort((a, b) => b.confidence - a.confidence);
+    const top3 = sorted.slice(0, 3);
+
+    let output = '## REASONING TRAPS TO AVOID\n\n';
+
+    for (const rc of top3) {
+      output += `### ⚠️ Flawed reasoning pattern\n`;
+      output += `**The trap:** ${rc.flawedReasoningStep}\n`;
+      output += `**Correct approach:** ${rc.correction}\n`;
+      output += `**Remember:** ${rc.generalPrinciple}\n\n`;
+    }
+
+    return output.trim();
   }
 
   /**

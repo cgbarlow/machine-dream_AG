@@ -187,6 +187,15 @@ export interface FewShotExample {
 
   // Spec 16: AISP-encoded version for --aisp-full mode
   aispEncoded?: string;
+
+  // Spec 05 Section 8.5: Strategy Metadata (Added 2026-01-14)
+  // Display metadata
+  friendlyName?: string;    // Human-readable name (e.g., "Row-Column Intersection")
+  category?: string;        // Classification: "basic", "intermediate", "advanced"
+
+  // Usage tracking
+  trainingCount?: number;   // Experiences that contributed to this strategy
+  playCount?: number;       // Times used during play (successful moves)
 }
 
 /**
@@ -205,6 +214,10 @@ export interface ConsolidationReport {
 
   // Abstraction hierarchy built by LLM
   hierarchy?: AbstractionHierarchy;
+
+  // Failure Learning (Spec 19)
+  antiPatterns?: SynthesizedAntiPattern[];
+  reasoningCorrections?: ReasoningCorrection[];
 
   // LLM-generated insights summary
   insights: string;
@@ -255,6 +268,52 @@ export interface LLMWrongPath {
   wrongMove: LLMMove;
   correctMove: { row: number; col: number; value: number };
   frequency: number;
+}
+
+// ============================================================================
+// Failure Learning Types (Spec 19)
+// ============================================================================
+
+/**
+ * Synthesized Anti-Pattern - LLM-generated from clustered invalid moves
+ *
+ * Created by analyzing clusters of invalid moves (rule violations) and
+ * extracting common mistake patterns to avoid.
+ *
+ * Spec 19 Section 3
+ */
+export interface SynthesizedAntiPattern {
+  id: string;
+  antiPatternName: string;         // e.g., "Constraint Blindness"
+  clusterName: string;             // Source error type cluster
+  whatGoesWrong: string;           // Description of the mistake pattern
+  whyItFails: string;              // Root cause explanation
+  preventionSteps: string[];       // Action items to avoid this mistake
+  examples: Array<{
+    move: LLMMove;
+    error: string;
+  }>;
+  frequency: number;               // How many experiences contributed
+  sourceExperienceCount: number;
+}
+
+/**
+ * Reasoning Correction - LLM analysis of valid-but-wrong moves
+ *
+ * Created by analyzing valid-but-wrong moves to understand where the
+ * reasoning went wrong and how to correct it.
+ *
+ * Spec 19 Section 4
+ */
+export interface ReasoningCorrection {
+  id: string;
+  gridContext: string;             // Cell position and constraint state
+  wrongMove: LLMMove;              // The incorrect move that was made
+  correctValue: number;            // What the value should have been
+  flawedReasoningStep: string;     // The specific step in reasoning that was wrong
+  correction: string;              // How to reason correctly instead
+  generalPrinciple: string;        // Abstracted lesson to remember
+  confidence: number;              // LLM confidence in this analysis (0-1)
 }
 
 // ============================================================================
@@ -402,6 +461,10 @@ export interface LearningUnit {
   // Content
   fewShots: FewShotExample[];           // Consolidated strategies
   hierarchy?: AbstractionHierarchy;     // Abstraction levels (optional)
+
+  // Failure Learning (Spec 19)
+  antiPatterns?: SynthesizedAntiPattern[];     // Anti-patterns from invalid moves
+  reasoningCorrections?: ReasoningCorrection[]; // Corrections from valid-but-wrong moves
 
   // Tracking
   absorbedExperienceIds: string[];      // Experiences already absorbed into this unit
