@@ -41,7 +41,7 @@ export const DEFAULT_LLM_CONFIG: LLMConfig = {
   // on the same move when it should be trying alternatives
   temperature: parseFloat(process.env.LLM_TEMPERATURE || '0.6'),
   maxTokens: parseInt(process.env.LLM_MAX_TOKENS || '2048', 10), // Increased to allow complete reasoning without cutoff
-  timeout: parseInt(process.env.LLM_TIMEOUT || '300000', 10), // 5 minutes for slow models
+  timeout: parseInt(process.env.LLM_TIMEOUT || '600000', 10), // 10 minutes for slow models/energy saver
 
   // Learning settings
   memoryEnabled: process.env.LLM_MEMORY_ENABLED !== 'false',

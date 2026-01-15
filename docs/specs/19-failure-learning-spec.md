@@ -322,7 +322,80 @@ npx machine-dream llm play --profile test --debug
 
 ---
 
-## 9. Future Enhancements
+## 9. AISP Encoding for Anti-Patterns
+
+### 9.1 Overview
+
+When `--aisp-full` mode is enabled, anti-patterns are encoded in AISP syntax for compact storage and lower-ambiguity prompt injection.
+
+### 9.2 Anti-Pattern AISP Format
+
+**Structure**:
+```
+⟦Λ:AntiPattern.Name⟧{avoid≜mistake;why≜failure;prevent≜⟨steps⟩;freq≔N}
+```
+
+**Fields**:
+- `avoid≜` - What goes wrong (the mistake pattern to avoid)
+- `why≜` - Why this approach fails (root cause)
+- `prevent≜⟨...⟩` - Prevention steps (numbered)
+- `freq≔` - Frequency count
+
+### 9.3 Example AISP Anti-Pattern
+
+**Human-readable**:
+```
+Anti-Pattern: Constraint Blindness
+What goes wrong: Placing a digit without checking all three constraints
+Why it fails: Violates row, column, or box uniqueness rule
+Prevention:
+  1. Always check row constraint before placing
+  2. Always check column constraint before placing
+  3. Always check box constraint before placing
+```
+
+**AISP-encoded**:
+```
+⟦Λ:AntiPattern.Constraint_Blindness⟧{avoid≜"Placing a digit without checking all three constraints";why≜"Violates row, column, or box uniqueness rule";prevent≜⟨step1≔"Always check row constraint before placing";step2≔"Always check column constraint before placing";step3≔"Always check box constraint before placing"⟩;freq≔15}
+```
+
+### 9.4 Storage
+
+The `aispEncoded` field is added to `SynthesizedAntiPattern`:
+
+```typescript
+interface SynthesizedAntiPattern {
+  // ... existing fields ...
+  aispEncoded?: string;  // AISP-encoded version when aisp-full mode enabled
+}
+```
+
+### 9.5 CLI Display
+
+The `--verbose` flag on `learning show` displays the AISP encoding:
+
+```bash
+npx machine-dream llm learning show <unit-id> --verbose
+```
+
+**Output**:
+```
+📛 Anti-Patterns (3):
+
+   ❌ Constraint Blindness
+      What goes wrong: Placing a digit without checking all three constraints
+      Why it fails: Violates row, column, or box uniqueness rule
+      Prevention steps:
+        1. Always check row constraint before placing
+        2. Always check column constraint before placing
+        3. Always check box constraint before placing
+      AISP: ⟦Λ:AntiPattern.Constraint_Blindness⟧{avoid≜"...";...}
+      Frequency: 15
+```
+
+---
+
+## 10. Future Enhancements
 
 1. **Cross-profile anti-patterns**: Share common mistakes across profiles
 2. **Anti-pattern decay**: Reduce weight of old anti-patterns over time

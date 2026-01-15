@@ -241,6 +241,26 @@ export class AlgorithmRegistry {
   }
 
   /**
+   * Get an algorithm by its identifier (e.g., "llmclusterv2", "fastclusterv2")
+   *
+   * @param identifier - Algorithm identifier (lowercase name + version)
+   * @returns The algorithm, or null if not found
+   */
+  getAlgorithmByIdentifier(identifier: string): ClusteringAlgorithm | null {
+    const lowerIdentifier = identifier.toLowerCase();
+
+    for (const entries of this.algorithms.values()) {
+      for (const entry of entries) {
+        if (entry.algorithm.getIdentifier().toLowerCase() === lowerIdentifier) {
+          return entry.algorithm;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Check if an algorithm is registered
    *
    * @param name - Algorithm name

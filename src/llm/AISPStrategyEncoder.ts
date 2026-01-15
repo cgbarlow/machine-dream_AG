@@ -6,7 +6,7 @@
  * injection into future prompts when using --aisp-full mode.
  */
 
-import type { FewShotExample, SynthesizedPattern } from './types.js';
+import type { FewShotExample, SynthesizedPattern, SynthesizedAntiPattern } from './types.js';
 
 /**
  * AISP Strategy Encoder
@@ -86,6 +86,43 @@ export class AISPStrategyEncoder {
     parts.push(`level≔${example.abstractionLevel}`);
 
     return `⟦Λ:S.${name}⟧{${parts.join(';')}}`;
+  }
+
+  /**
+   * Encode a synthesized anti-pattern in AISP format
+   *
+   * Output format:
+   * ⟦Λ:AntiPattern.Name⟧{avoid≜mistake;why≜failure;prevent≜⟨steps⟩}
+   *
+   * Spec 19: Anti-patterns are encoded with "avoid" semantics
+   */
+  encodeAntiPattern(antiPattern: SynthesizedAntiPattern): string {
+    const name = this.sanitizeId(antiPattern.antiPatternName || 'Unknown');
+
+    const parts: string[] = [];
+
+    // What goes wrong (avoid condition)
+    parts.push(`avoid≜"${this.escapeString(antiPattern.whatGoesWrong)}"`);
+
+    // Why it fails (failure justification)
+    if (antiPattern.whyItFails) {
+      parts.push(`why≜"${this.escapeString(antiPattern.whyItFails)}"`);
+    }
+
+    // Prevention steps
+    if (antiPattern.preventionSteps && antiPattern.preventionSteps.length > 0) {
+      const steps = antiPattern.preventionSteps
+        .map((step, i) => `step${i + 1}≔"${this.escapeString(step)}"`)
+        .join(';');
+      parts.push(`prevent≜⟨${steps}⟩`);
+    }
+
+    // Frequency as confidence indicator
+    if (antiPattern.frequency > 0) {
+      parts.push(`freq≔${antiPattern.frequency}`);
+    }
+
+    return `⟦Λ:AntiPattern.${name}⟧{${parts.join(';')}}`;
   }
 
   /**
@@ -207,6 +244,11 @@ export class AISPStrategyEncoder {
       'step1': 'Step 1',
       'step2': 'Step 2',
       'step3': 'Step 3',
+      // Anti-pattern keys (Spec 19)
+      'avoid': 'Avoid',
+      'why': 'Why it fails',
+      'prevent': 'Prevention',
+      'freq': 'Frequency',
     };
     return labels[key] || key;
   }

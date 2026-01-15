@@ -62,8 +62,8 @@ export class ProfileValidator {
 
     // Validate timeout
     if (profile.timeout !== undefined) {
-      if (profile.timeout < 1000 || profile.timeout > 300000) {
-        errors.push('Timeout must be between 1000ms (1s) and 300000ms (5m)');
+      if (profile.timeout < 1000 || profile.timeout > 900000) {
+        errors.push('Timeout must be between 1000ms (1s) and 900000ms (15m)');
       }
     }
 

@@ -1688,6 +1688,7 @@ export interface ClusteringResult {
 | **FastCluster** | v2 | Fast (<5s) | Keyword + forced subdivision | Production default |
 | **DeepCluster** | v1 | Medium (<60s) | Two-phase: keyword + LLM semantic | Better quality |
 | **LLMCluster** | v1 | Slow (<180s) | Fully LLM-driven | Research |
+| **LLMCluster** | v2 | Slow (<300s) | LLM-driven with mutual exclusivity & self-critique | Research/Quality |
 
 #### FastCluster v2 (Default)
 
@@ -1719,6 +1720,35 @@ export interface ClusteringResult {
 3. Categorize ALL experiences using LLM-identified patterns
 
 **Benefits**: Maximum LLM leverage, no keyword heuristics
+
+**Limitations**: Patterns may overlap, causing experiences to funnel into broad patterns
+
+#### LLMCluster v2 (Added 2026-01-15)
+
+**Approach** (LLM-First Philosophy):
+1. **Mutual Exclusivity**: Request 15-20 patterns that are MUTUALLY EXCLUSIVE
+   - Each experience must clearly belong to exactly ONE pattern
+   - Patterns must have NON-OVERLAPPING criteria
+2. **Self-Critique**: LLM reviews its own patterns before categorization
+   - "Are these patterns distinct enough that each experience will clearly belong to exactly one?"
+   - Revise if needed
+3. **Demanding Categorization**: Force MOST SPECIFIC pattern selection
+   - "Identify the MOST SPECIFIC pattern that applies"
+   - LLM must justify its choices
+4. **Two-Pass Refinement**: Re-examine dominant clusters (>50% of experiences)
+   - "Pattern X received 70% of experiences. Identify 3-5 sub-patterns within them."
+   - Still 100% LLM-driven, no heuristics
+
+**Key Improvements from v1**:
+- Mutual exclusivity requirement prevents pattern overlap
+- Self-critique step ensures pattern quality before categorization
+- Demanding categorization reduces broad pattern bias
+- Two-pass refinement handles dominant clusters intelligently
+
+**Benefits**:
+- Better cluster distribution (more diverse strategies)
+- Higher quality patterns (LLM self-validates)
+- No hints or examples from code (fully LLM-driven)
 
 ### 9.4 CLI Algorithm Selection
 

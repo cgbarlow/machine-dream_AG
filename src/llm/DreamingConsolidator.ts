@@ -125,6 +125,24 @@ export class DreamingConsolidator {
   }
 
   /**
+   * Calculate cluster target for the clustering algorithm
+   *
+   * For doubled mode (higher strategy counts), we request MORE clusters
+   * than strategies to ensure diversity during selection.
+   *
+   * Standard mode: clusterTarget = fewShotMax
+   * Doubled mode (fewShotMax >= 10): clusterTarget = fewShotMax * 1.5
+   */
+  private getClusterTarget(): number {
+    const isDoubledMode = this.consolidationOptions.fewShotMax >= 10;
+    if (isDoubledMode) {
+      // Request 50% more clusters than strategies for diversity
+      return Math.ceil(this.consolidationOptions.fewShotMax * 1.5);
+    }
+    return this.consolidationOptions.fewShotMax;
+  }
+
+  /**
    * Run LLM-driven consolidation on unconsolidated experiences
    *
    * 5-Phase Pipeline:
@@ -165,10 +183,12 @@ export class DreamingConsolidator {
     console.log(`   Successful: ${successful.length}, Invalid: ${invalid.length}, Wrong: ${wrong.length}`);
 
     // Phase 3: COMPRESSION - Cluster similar experiences
+    const clusterTarget = this.getClusterTarget();
     console.log(`🔍 Clustering ${successful.length} experiences with ${this.clusteringAlgorithm.getIdentifier()}...`);
+    console.log(`   Cluster target: ${clusterTarget} (strategy selection: ${this.consolidationOptions.fewShotMin}-${this.consolidationOptions.fewShotMax})`);
     const clusterResult = await this.clusteringAlgorithm.cluster(
       successful,
-      this.consolidationOptions.fewShotMax,
+      clusterTarget,
       this.llmConfig
     );
     const clusters = clusterResult.clusters;
@@ -400,6 +420,9 @@ ${experienceDescriptions}
    * Parse AISP-formatted pattern response
    *
    * Spec 16: Parses strategy blocks in AISP format
+   *
+   * IMPORTANT: Must handle AISP special characters like {1..9} in field values.
+   * Uses balanced brace matching for fields that may contain nested braces.
    */
   private parseAISPPatternResponse(
     response: string,
@@ -411,19 +434,17 @@ ${experienceDescriptions}
       const nameMatch = response.match(/⟦Λ:Strategy\.([^⟧]+)⟧/);
       const strategyName = nameMatch ? nameMatch[1].replace(/_/g, ' ') : clusterName;
 
-      // Extract when condition
-      const whenMatch = response.match(/when≜([^;}\n]+)/);
-      const whenToUse = whenMatch ? whenMatch[1].trim() : 'Not specified';
+      // Extract when condition - use AISP-aware parsing
+      const whenToUse = this.extractAISPField(response, 'when') || 'Not specified';
 
-      // Extract action/steps
+      // Extract action/steps - handle nested ⟨...⟩
       const actionMatch = response.match(/action≜⟨([^⟩]+)⟩/);
       const reasoningSteps = actionMatch
-        ? actionMatch[1].split(',').map(s => s.trim().replace(/^"?|"?$/g, ''))
+        ? actionMatch[1].split(/;\s*step\d+≔/).map(s => s.trim().replace(/^"?|"?$/g, '').replace(/^step\d+≔"?/, ''))
         : ['Apply constraint reasoning'];
 
-      // Extract proof/insight
-      const proofMatch = response.match(/proof≜"?([^";}\n]+)"?/);
-      const successInsight = proofMatch ? proofMatch[1].trim() : '';
+      // Extract proof/insight - use AISP-aware parsing for fields with special chars
+      const successInsight = this.extractAISPField(response, 'proof') || '';
 
       // Extract confidence
       const confMatch = response.match(/conf≔([\d.]+)/);
@@ -455,6 +476,33 @@ ${experienceDescriptions}
       console.warn(`Failed to parse AISP pattern response:`, error);
       return null;
     }
+  }
+
+  /**
+   * Extract AISP field value with proper handling of special characters
+   *
+   * Handles:
+   * - Quoted strings: field≜"value with {braces} and ; semicolons"
+   * - AISP notation: field≜∀r,c:candidates≔{1..9}
+   * - Nested structures: field≜⟨step1;step2⟩
+   */
+  private extractAISPField(response: string, fieldName: string): string | null {
+    // Try quoted string first: field≜"..."
+    const quotedMatch = response.match(new RegExp(`${fieldName}≜"([^"]*(?:\\\\.[^"]*)*)"`));
+    if (quotedMatch) {
+      return quotedMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n').trim();
+    }
+
+    // Try AISP notation until next field marker (;fieldname≜ or ;fieldname≔)
+    // This handles: when≜∀r,c:candidates≔{1..9};proof≜...
+    const aispMatch = response.match(new RegExp(`${fieldName}[≜≔]([^;]*(?:\\{[^}]*\\}[^;]*)*?)(?=;[a-z]+[≜≔]|\\}$|$)`));
+    if (aispMatch) {
+      return aispMatch[1].trim();
+    }
+
+    // Fallback: simple extraction until semicolon or newline (may truncate)
+    const simpleMatch = response.match(new RegExp(`${fieldName}[≜≔]([^;\\n]+)`));
+    return simpleMatch ? simpleMatch[1].trim() : null;
   }
 
   /**
@@ -1057,7 +1105,14 @@ PREVENTION_STEP_3: [optional third step]`;
       { role: 'user', content: prompt },
     ]);
 
-    return this.parseAntiPatternResponse(result.content, errorType, experiences);
+    const antiPattern = this.parseAntiPatternResponse(result.content, errorType, experiences);
+
+    // Spec 19: Encode anti-pattern in AISP format when aisp-full mode enabled
+    if (antiPattern && this.aispMode === 'aisp-full') {
+      antiPattern.aispEncoded = this.aispEncoder.encodeAntiPattern(antiPattern);
+    }
+
+    return antiPattern;
   }
 
   /**
@@ -1420,11 +1475,14 @@ CONFIDENCE: [0.0-1.0 how confident you are in this analysis]`;
     const validButWrong = importantExperiences.filter((e) => e.validation.isValid && !e.validation.isCorrect);
 
     console.log(`   ↳ Correct: ${successful.length}, Invalid: ${invalid.length}, Valid-but-wrong: ${validButWrong.length}`);
+
+    const clusterTarget = this.getClusterTarget();
     console.log(`🔍 Clustering ${successful.length} experiences with ${this.clusteringAlgorithm.getIdentifier()}...`);
+    console.log(`   Cluster target: ${clusterTarget} (strategy selection: ${this.consolidationOptions.fewShotMin}-${this.consolidationOptions.fewShotMax})`);
 
     const clusterResult = await this.clusteringAlgorithm.cluster(
       successful,
-      this.consolidationOptions.fewShotMax,
+      clusterTarget,
       this.llmConfig
     );
     const clusters = clusterResult.clusters;

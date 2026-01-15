@@ -295,6 +295,9 @@ export interface SynthesizedAntiPattern {
   }>;
   frequency: number;               // How many experiences contributed
   sourceExperienceCount: number;
+
+  // Spec 19: AISP-encoded version for --aisp-full mode
+  aispEncoded?: string;
 }
 
 /**

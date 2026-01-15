@@ -355,6 +355,25 @@ Never save working files, text/mds and tests to the root folder.
 
 **CRITICAL RULE**: Always build to spec. No implementation changes unless outlined in specification documents.
 
+### Use /plan Mode for All Planning
+
+**MANDATORY**: When any task requires planning (new features, refactors, multi-file changes, architectural decisions), you MUST use `/plan` mode. Do not skip planning and jump straight to implementation.
+
+### Planning Principles (for /plan mode)
+
+When planning in `/plan` mode, always follow these principles:
+
+1. **Spec-Based Development**: Update or create specs FIRST before implementation
+2. **ADR for Architecture**: Create/modify ADRs for architecturally significant changes (follow ADR template in `docs/adr/`)
+3. **DRY**: Don't Repeat Yourself - identify reusable patterns and abstractions
+4. **NO MOCKS**: Write production-ready code only, no mock implementations
+5. **TDD**: Plan tests alongside implementation, test-first approach
+6. **Documentation Updates**: Review and update all relevant docs including:
+   - README.md
+   - User guide
+   - CLI spec (Spec 09)
+   - Any affected specification documents
+
 ### Specification-First Workflow
 
 1. **Before implementing ANY feature**:

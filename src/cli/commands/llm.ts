@@ -2322,18 +2322,19 @@ export function registerLLMCommand(program: Command): void {
           let algorithmsToUse: any[] = [];
 
           if (options.algorithm) {
-            // Single algorithm specified
-            const algo = registry.getAlgorithm(options.algorithm);
+            // Single algorithm specified - try by identifier first (e.g., "llmclusterv2"), then by name
+            const algo = registry.getAlgorithmByIdentifier(options.algorithm) ||
+                         registry.getAlgorithm(options.algorithm);
             if (!algo) {
               throw new CLIError(`Algorithm not found: ${options.algorithm}`, 1);
             }
             algorithmsToUse = [algo];
             logger.info(`🔧 Using algorithm: ${algo.getIdentifier()}`);
           } else if (options.algorithms) {
-            // Multiple specific algorithms
+            // Multiple specific algorithms - try by identifier first, then by name
             const algoNames = options.algorithms.split(',').map((n: string) => n.trim().toLowerCase());
             for (const name of algoNames) {
-              const algo = registry.getAlgorithm(name);
+              const algo = registry.getAlgorithmByIdentifier(name) || registry.getAlgorithm(name);
               if (algo) {
                 algorithmsToUse.push(algo);
               } else {
@@ -3145,6 +3146,7 @@ export function registerLLMCommand(program: Command): void {
     .argument('<id>', 'Learning unit ID')
     .option('--profile <name>', 'LLM profile (searches all profiles if not specified)')
     .option('--compact', 'Show compact summary instead of full details')
+    .option('--verbose', 'Show full text without truncation')
     .option('--format <format>', 'Output format (table|json)', 'table')
     .action(async (id, options) => {
       try {
@@ -3345,7 +3347,22 @@ export function registerLLMCommand(program: Command): void {
 
             antiPatterns.forEach((ap: any) => {
               logger.info(`   ❌ ${ap.antiPatternName}`);
-              logger.info(`      What goes wrong: ${ap.whatGoesWrong.substring(0, 80)}${ap.whatGoesWrong.length > 80 ? '...' : ''}`);
+              if (options.verbose) {
+                // Show full text with --verbose
+                logger.info(`      What goes wrong: ${ap.whatGoesWrong}`);
+                logger.info(`      Why it fails: ${ap.whyItFails}`);
+                if (ap.preventionSteps && ap.preventionSteps.length > 0) {
+                  logger.info(`      Prevention steps:`);
+                  ap.preventionSteps.forEach((step: string, i: number) => {
+                    logger.info(`        ${i + 1}. ${step}`);
+                  });
+                }
+                if (ap.aispEncoded) {
+                  logger.info(`      AISP: ${ap.aispEncoded}`);
+                }
+              } else {
+                logger.info(`      What goes wrong: ${ap.whatGoesWrong.substring(0, 80)}${ap.whatGoesWrong.length > 80 ? '...' : ''}`);
+              }
               logger.info(`      Frequency: ${ap.frequency}`);
               logger.info('');
             });
@@ -3357,7 +3374,14 @@ export function registerLLMCommand(program: Command): void {
             logger.info(`\n⚠️  Reasoning Corrections (${corrections.length}):\n`);
 
             corrections.forEach((rc: any) => {
-              logger.info(`   ⚠️  ${rc.generalPrinciple.substring(0, 80)}${rc.generalPrinciple.length > 80 ? '...' : ''}`);
+              if (options.verbose) {
+                // Show full text with --verbose
+                logger.info(`   ⚠️  ${rc.generalPrinciple}`);
+                logger.info(`      Flawed step: ${rc.flawedReasoningStep}`);
+                logger.info(`      Correction: ${rc.correction}`);
+              } else {
+                logger.info(`   ⚠️  ${rc.generalPrinciple.substring(0, 80)}${rc.generalPrinciple.length > 80 ? '...' : ''}`);
+              }
               logger.info(`      Confidence: ${(rc.confidence * 100).toFixed(0)}%`);
               logger.info('');
             });
