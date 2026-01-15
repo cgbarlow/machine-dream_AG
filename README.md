@@ -27,6 +27,20 @@ Improve → Apply learned strategies → Fewer errors → Better performance
 
 ---
 
+## Research Background
+
+This project implements concepts from research on continuous machine cognition:
+
+- [What Happens When the Machine Never Stops Thinking? - Part 1](https://agentics-nz.ghost.io/what-happens-when-the-machine-never-stops-thinking/) — Implications of continuous AI cognition
+- [What Happens When the Machine Never Stops Thinking? - Part 2](https://agentics-nz.ghost.io/what-happens-when-the-machine-never-stops-thinking-part-2/) — Economic and architectural implications
+
+**Key architectural concepts:**
+- **GRASP Loop** — Generate → Review → Absorb → Synthesize → Persist
+- **AgentDB** — SQLite-based cognitive memory (ReasoningBank, ReflexionMemory)
+- **Dreaming** — 5-phase consolidation inspired by human sleep
+
+---
+
 ## Quick Start
 
 **Prerequisites:** Node.js v20+ and optionally [LM Studio](https://lmstudio.ai/) for local LLM inference.
@@ -181,20 +195,6 @@ See [scripts/SCRIPTS.md](scripts/SCRIPTS.md) for complete documentation.
 
 ---
 
-## Research Background
-
-This project implements concepts from research on continuous machine cognition:
-
-- [What Happens When the Machine Never Stops Thinking?](https://agentics-nz.ghost.io/what-happens-when-the-machine-never-stops-thinking/) — Implications of continuous AI cognition
-- [Part 2](https://agentics-nz.ghost.io/what-happens-when-the-machine-never-stops-thinking-part-2/) — Economic and architectural implications
-
-**Key architectural concepts:**
-- **GRASP Loop** — Generate → Review → Absorb → Synthesize → Persist
-- **AgentDB** — SQLite-based cognitive memory (ReasoningBank, ReflexionMemory)
-- **Dreaming** — 5-phase consolidation inspired by human sleep
-
----
-
 ## Documentation
 
 | Document | Description |
@@ -236,3 +236,4 @@ Research project — contributions welcome for:
 ## License
 
 MIT
+
