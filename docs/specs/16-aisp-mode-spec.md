@@ -494,25 +494,28 @@ This ensures:
 - Embedded natural language doesn't affect delta score
 - Prompts with embedded data can still achieve high tiers
 
-**Representative Sample Validation for Large Documents:**
+**Centralized Smart Validation (`AISPValidatorService.validateSmart`):**
 
-The AISP validator WASM has a 1KB limit (bytes, not chars). AISP symbols are 3-byte UTF-8, so ~300 chars ≈ 900 bytes. For documents >300 chars, the first 300 characters are validated as a representative sample:
+The AISP validator WASM has a 1KB limit (bytes, not chars). AISP symbols are 3-byte UTF-8, so ~300 chars ≈ 900 bytes. The centralized `validateSmart()` method handles:
+
+1. **NL Stripping**: Replace quoted strings with `"…"` stubs
+2. **Sampling**: For documents >300 chars, validate first 300 as representative sample
 
 ```typescript
-private validateInChunks(text: string): AISPValidationResult {
-  if (text.length <= 300) return this.validator.validate(text);
+// src/llm/AISPValidator.ts
+validateSmart(text: string): AISPValidationResult {
+  // Strip embedded natural language from quoted strings
+  const stripped = text.replace(/"[^"]*"/g, '"…"');
 
-  // First 300 chars contain header + initial blocks
-  const sample = text.substring(0, 300);
-  return this.validator.validate(sample);
+  // Sample for large documents
+  if (stripped.length <= 300) return this.validate(stripped);
+
+  const sample = stripped.substring(0, 300);
+  return this.validate(sample);  // Logs: 📊 AISP sample: Gold δ=0.680 (sampled 300/1113 chars)
 }
 ```
 
-**Why sampling works:**
-- AISP header (`𝔸1.0...`) and initial blocks establish document quality
-- Mid-document fragments fail parsing (no header) - cannot be validated independently
-- First 300 chars are representative of overall structure and density
-- Logged as: `📊 AISP sample: Gold δ=0.680 (sampled 300/1113 chars)`
+**All convenience methods use `validateSmart`:** `isValid`, `getDensity`, `getTier`, `meetsTier`, `logValidation`, `validateWithCritique`
 
 **Tier-Based Logging:**
 - Platinum/Gold/Silver: `✓ AISP [context] tier (δ=X.XXX)`

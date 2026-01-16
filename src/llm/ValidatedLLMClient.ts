@@ -117,10 +117,8 @@ export class ValidatedLLMClient {
         const userMessages = messages.filter(m => m.role === 'user');
         const promptContent = userMessages.map(m => m.content).join('\n');
 
-        // Strip embedded natural language before validating AISP structure
-        const strippedContent = this.stripNaturalLanguageForValidation(promptContent);
-        // Validate in chunks (AISP validator has 1KB WASM limit)
-        promptValidation = this.validateInChunks(strippedContent);
+        // Use centralized smart validation (NL stripping + sampling)
+        promptValidation = this.validator.validateSmart(promptContent);
         this.logValidation(promptValidation, context, true);
         this.emitValidationEvent(promptValidation, context, true);
       }
@@ -138,9 +136,8 @@ export class ValidatedLLMClient {
       await this.ensureValidatorInitialized();
 
       if (this.validatorInitialized) {
-        // Strip embedded natural language and use sampling for large responses
-        const strippedResponse = this.stripNaturalLanguageForValidation(result.content);
-        responseValidation = this.validateInChunks(strippedResponse);
+        // Use centralized smart validation (NL stripping + sampling)
+        responseValidation = this.validator.validateSmart(result.content);
         this.logValidation(responseValidation, context, false);
         this.emitValidationEvent(responseValidation, context, false);
 
@@ -200,63 +197,6 @@ export class ValidatedLLMClient {
    */
   getUnderlyingClient(): LMStudioClient {
     return this.client;
-  }
-
-  /**
-   * Strip embedded natural language content from AISP prompts before validation.
-   *
-   * AISP prompts often contain embedded natural language data (experience reasoning,
-   * puzzle states) in quoted strings. This dilutes the AISP density score.
-   *
-   * This method replaces quoted string content with stubs to preserve AISP structure
-   * while allowing accurate validation of the AISP syntax.
-   *
-   * Example:
-   *   Before: e1≔"The cell at position (1,2) can only be 5 because..."
-   *   After:  e1≔"…"
-   */
-  private stripNaturalLanguageForValidation(text: string): string {
-    // Replace content in double-quoted strings with ellipsis stub
-    // Preserves AISP structure (e1≔"…") while removing natural language
-    return text.replace(/"[^"]*"/g, '"…"');
-  }
-
-  /**
-   * Validate content in chunks to handle AISP validator's 1KB WASM limit.
-   *
-   * Splits content into ≤1KB chunks, validates each, and aggregates:
-   * - delta: weighted average across chunks
-   * - tier: minimum tier (weakest link)
-   * - valid: true only if all chunks valid
-   *
-   * @param text - Full content to validate
-   * @returns Aggregated validation result
-   */
-  private validateInChunks(text: string): AISPValidationResult {
-    // AISP validator has 1KB WASM limit (bytes, not chars)
-    // AISP symbols are 3-byte UTF-8, so ~300 chars ≈ 900 bytes max
-    const MAX_SAMPLE_SIZE = 300;
-
-    if (text.length <= MAX_SAMPLE_SIZE) {
-      // Small enough to validate directly
-      return this.validator.validate(text);
-    }
-
-    // For larger documents, validate first chunk as representative sample
-    // The AISP header and initial blocks establish document quality
-    // Mid-document fragments fail parsing (no header), so sampling is correct approach
-    const sample = text.substring(0, MAX_SAMPLE_SIZE);
-    const result = this.validator.validate(sample);
-
-    // Log that we're using sampling for transparency
-    const sampleNote = `(sampled ${MAX_SAMPLE_SIZE}/${text.length} chars)`;
-    if (result.tierValue >= 2) {
-      console.log(`   📊 AISP sample: ${result.tierName} δ=${(result.delta ?? 0).toFixed(3)} ${sampleNote}`);
-    } else if (result.tierValue === 1) {
-      console.log(`   ⚠️ AISP sample: ${result.tierName} δ=${(result.delta ?? 0).toFixed(3)} ${sampleNote}`);
-    }
-
-    return result;
   }
 
   /**

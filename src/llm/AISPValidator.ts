@@ -162,6 +162,40 @@ export class AISPValidatorService {
   }
 
   /**
+   * Smart validation with NL stripping and sampling for large documents.
+   *
+   * Use this for LLM prompts/responses that may contain embedded natural
+   * language in quoted strings and exceed the 1KB WASM limit.
+   *
+   * @param text - AISP text to validate
+   * @returns Validation result with tier and delta
+   */
+  validateSmart(text: string): AISPValidationResult {
+    // Strip embedded natural language from quoted strings
+    const stripped = text.replace(/"[^"]*"/g, '"…"');
+
+    // Sample for large documents (1KB WASM limit, AISP symbols are 3-byte UTF-8)
+    const MAX_SAMPLE_SIZE = 300;
+    if (stripped.length <= MAX_SAMPLE_SIZE) {
+      return this.validate(stripped);
+    }
+
+    // First 300 chars contain header + initial blocks - representative sample
+    const sample = stripped.substring(0, MAX_SAMPLE_SIZE);
+    const result = this.validate(sample);
+
+    // Log sampling for transparency
+    const sampleNote = `(sampled ${MAX_SAMPLE_SIZE}/${stripped.length} chars)`;
+    if (result.tierValue >= 2) {
+      console.log(`   📊 AISP sample: ${result.tierName} δ=${(result.delta ?? 0).toFixed(3)} ${sampleNote}`);
+    } else if (result.tierValue === 1) {
+      console.log(`   ⚠️ AISP sample: ${result.tierName} δ=${(result.delta ?? 0).toFixed(3)} ${sampleNote}`);
+    }
+
+    return result;
+  }
+
+  /**
    * Validate with LLM critique on failure
    *
    * If validation fails (tier = ⊘), requests LLM critique
@@ -177,7 +211,7 @@ export class AISPValidatorService {
     originalPrompt: string,
     llmClient: LMStudioClient
   ): Promise<AISPValidationWithCritique> {
-    const result = this.validate(text);
+    const result = this.validateSmart(text);
 
     // Only request critique if tier is Reject (⊘)
     if (result.tierValue > 0) {
@@ -242,28 +276,28 @@ export class AISPValidatorService {
    * Quick check if text is valid AISP
    */
   isValid(text: string): boolean {
-    return this.validate(text).valid;
+    return this.validateSmart(text).valid;
   }
 
   /**
    * Get density score for text
    */
   getDensity(text: string): number {
-    return this.validate(text).delta;
+    return this.validateSmart(text).delta;
   }
 
   /**
    * Get tier symbol for text
    */
   getTier(text: string): string {
-    return this.validate(text).tier;
+    return this.validateSmart(text).tier;
   }
 
   /**
    * Get tier name for text
    */
   getTierName(text: string): string {
-    return this.validate(text).tierName;
+    return this.validateSmart(text).tierName;
   }
 
   /**
@@ -275,7 +309,7 @@ export class AISPValidatorService {
    */
   meetsTier(text: string, minTier: 'Bronze' | 'Silver' | 'Gold' | 'Platinum'): boolean {
     const tierMap = { Bronze: 1, Silver: 2, Gold: 3, Platinum: 4 };
-    const result = this.validate(text);
+    const result = this.validateSmart(text);
     return result.tierValue >= tierMap[minTier];
   }
 
@@ -328,7 +362,7 @@ export class AISPValidatorService {
    * Log validation result with appropriate level
    */
   logValidation(text: string, context?: string): void {
-    const result = this.validate(text);
+    const result = this.validateSmart(text);
     const prefix = context ? `[${context}] ` : '';
 
     const delta = result.delta ?? 0;
