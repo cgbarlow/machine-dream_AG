@@ -138,7 +138,9 @@ export class ValidatedLLMClient {
       await this.ensureValidatorInitialized();
 
       if (this.validatorInitialized) {
-        responseValidation = this.validator.validate(result.content);
+        // Strip embedded natural language and use sampling for large responses
+        const strippedResponse = this.stripNaturalLanguageForValidation(result.content);
+        responseValidation = this.validateInChunks(strippedResponse);
         this.logValidation(responseValidation, context, false);
         this.emitValidationEvent(responseValidation, context, false);
 
