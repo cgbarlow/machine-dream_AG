@@ -162,35 +162,35 @@ export class AISPValidatorService {
   }
 
   /**
-   * Smart validation with NL stripping and sampling for large documents.
+   * Smart validation with NL stripping for LLM prompts/responses.
    *
-   * Use this for LLM prompts/responses that may contain embedded natural
-   * language in quoted strings and exceed the 1KB WASM limit.
+   * Strips embedded natural language from quoted strings before validation
+   * to improve AISP density scores. With aisp-validator 0.3.0+, the default
+   * limit is 64KB which covers all typical LLM responses.
    *
    * @param text - AISP text to validate
    * @returns Validation result with tier and delta
    */
   validateSmart(text: string): AISPValidationResult {
     // Strip embedded natural language from quoted strings
+    // This improves density scores by removing NL that dilutes AISP symbols
     const stripped = text.replace(/"[^"]*"/g, '"…"');
 
-    // Sample for large documents (1KB WASM limit, AISP symbols are 3-byte UTF-8)
-    const MAX_SAMPLE_SIZE = 300;
-    if (stripped.length <= MAX_SAMPLE_SIZE) {
+    // aisp-validator 0.3.0+ supports 64KB default, 1MB max
+    // Only sample if document exceeds 60KB (leave headroom)
+    const MAX_SIZE = 60 * 1024; // 60KB
+    if (stripped.length <= MAX_SIZE) {
       return this.validate(stripped);
     }
 
-    // First 300 chars contain header + initial blocks - representative sample
-    const sample = stripped.substring(0, MAX_SAMPLE_SIZE);
+    // For extremely large documents (>60KB), sample first 60KB
+    // This is rare - typical LLM responses are <10KB
+    const sample = stripped.substring(0, MAX_SIZE);
     const result = this.validate(sample);
 
-    // Log sampling for transparency
-    const sampleNote = `(sampled ${MAX_SAMPLE_SIZE}/${stripped.length} chars)`;
-    if (result.tierValue >= 2) {
-      console.log(`   📊 AISP sample: ${result.tierName} δ=${(result.delta ?? 0).toFixed(3)} ${sampleNote}`);
-    } else if (result.tierValue === 1) {
-      console.log(`   ⚠️ AISP sample: ${result.tierName} δ=${(result.delta ?? 0).toFixed(3)} ${sampleNote}`);
-    }
+    // Log sampling for transparency (only for oversized docs)
+    const sampleNote = `(sampled ${(MAX_SIZE / 1024).toFixed(0)}KB/${(stripped.length / 1024).toFixed(1)}KB)`;
+    console.log(`   📊 AISP: ${result.tierName} δ=${(result.delta ?? 0).toFixed(3)} ${sampleNote}`);
 
     return result;
   }

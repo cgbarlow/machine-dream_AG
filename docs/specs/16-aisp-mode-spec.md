@@ -496,10 +496,10 @@ This ensures:
 
 **Centralized Smart Validation (`AISPValidatorService.validateSmart`):**
 
-The AISP validator WASM has a 1KB limit (bytes, not chars). AISP symbols are 3-byte UTF-8, so ~300 chars ≈ 900 bytes. The centralized `validateSmart()` method handles:
+With `aisp-validator@0.3.0+`, the document size limit is now **64KB default** (up to 1MB configurable). This covers all typical LLM responses. The centralized `validateSmart()` method handles:
 
-1. **NL Stripping**: Replace quoted strings with `"…"` stubs
-2. **Sampling**: For documents >300 chars, validate first 300 as representative sample
+1. **NL Stripping**: Replace quoted strings with `"…"` stubs to improve density scores
+2. **Large Document Handling**: For documents >60KB, samples first 60KB (extremely rare)
 
 ```typescript
 // src/llm/AISPValidator.ts
@@ -507,11 +507,13 @@ validateSmart(text: string): AISPValidationResult {
   // Strip embedded natural language from quoted strings
   const stripped = text.replace(/"[^"]*"/g, '"…"');
 
-  // Sample for large documents
-  if (stripped.length <= 300) return this.validate(stripped);
+  // aisp-validator 0.3.0+ supports 64KB default
+  const MAX_SIZE = 60 * 1024; // 60KB headroom
+  if (stripped.length <= MAX_SIZE) return this.validate(stripped);
 
-  const sample = stripped.substring(0, 300);
-  return this.validate(sample);  // Logs: 📊 AISP sample: Gold δ=0.680 (sampled 300/1113 chars)
+  // Sample for extremely large documents (rare)
+  const sample = stripped.substring(0, MAX_SIZE);
+  return this.validate(sample);
 }
 ```
 
