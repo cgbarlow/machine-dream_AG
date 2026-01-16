@@ -138,11 +138,11 @@ export class AISPValidatorService {
       const result = AISP.validate(text);
       return {
         valid: result.valid,
-        tier: result.tier,
-        tierValue: result.tierValue,
-        tierName: result.tierName,
-        delta: result.delta,
-        pureDensity: result.pureDensity,
+        tier: result.tier ?? '⊘',
+        tierValue: result.tierValue ?? 0,
+        tierName: result.tierName ?? 'Reject',
+        delta: result.delta ?? 0,
+        pureDensity: result.pureDensity ?? 0,
         ambiguity: result.ambiguity,
         error: result.error,
         errorCode: result.errorCode,
@@ -295,7 +295,7 @@ export class AISPValidatorService {
 ⟦Σ:Input⟧{
   original_request≔"${originalPrompt.substring(0, 500).replace(/"/g, "'")}"
   llm_response≔"${text.substring(0, 500).replace(/"/g, "'")}"
-  validation_result≔{valid:${result.valid ? '⊤' : '⊥'}, tier:"${result.tier}", delta:${result.delta.toFixed(3)}}
+  validation_result≔{valid:${result.valid ? '⊤' : '⊥'}, tier:"${result.tier}", delta:${(result.delta ?? 0).toFixed(3)}}
 }
 
 ⟦Ω:Task⟧{
@@ -331,15 +331,16 @@ export class AISPValidatorService {
     const result = this.validate(text);
     const prefix = context ? `[${context}] ` : '';
 
+    const delta = result.delta ?? 0;
     if (result.tierValue >= 2) {
       // Silver or above - info level
-      console.log(`${prefix}✓ AISP ${result.tierName} (δ=${result.delta.toFixed(3)})`);
+      console.log(`${prefix}✓ AISP ${result.tierName} (δ=${delta.toFixed(3)})`);
     } else if (result.tierValue === 1) {
       // Bronze - warning level
-      console.warn(`${prefix}⚠️ AISP ${result.tierName} (δ=${result.delta.toFixed(3)}) - below Silver`);
+      console.warn(`${prefix}⚠️ AISP ${result.tierName} (δ=${delta.toFixed(3)}) - below Silver`);
     } else {
       // Reject - error level
-      console.error(`${prefix}❌ AISP ${result.tierName} (δ=${result.delta.toFixed(3)}) - validation failed`);
+      console.error(`${prefix}❌ AISP ${result.tierName} (δ=${delta.toFixed(3)}) - validation failed`);
     }
   }
 }

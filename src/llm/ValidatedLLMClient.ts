@@ -204,16 +204,17 @@ export class ValidatedLLMClient {
   ): void {
     const type = isPrompt ? 'prompt' : 'response';
     const prefix = `AISP [${context}:${type}]`;
+    const delta = result.delta ?? 0;
 
     if (result.tierValue >= 2) {
       // Silver or above - info level
-      console.log(`✓ ${prefix} ${result.tierName} (δ=${result.delta.toFixed(3)})`);
+      console.log(`✓ ${prefix} ${result.tierName} (δ=${delta.toFixed(3)})`);
     } else if (result.tierValue === 1) {
       // Bronze - warning level
-      console.warn(`⚠️ ${prefix} ${result.tierName} (δ=${result.delta.toFixed(3)})`);
+      console.warn(`⚠️ ${prefix} ${result.tierName} (δ=${delta.toFixed(3)})`);
     } else {
       // Reject - error level
-      console.error(`❌ ${prefix} ${result.tierName} (δ=${result.delta.toFixed(3)})`);
+      console.error(`❌ ${prefix} ${result.tierName} (δ=${delta.toFixed(3)})`);
     }
   }
 
@@ -228,9 +229,9 @@ export class ValidatedLLMClient {
   ): void {
     const event: AISPValidationEvent = {
       context,
-      tier: result.tier,
-      tierName: result.tierName,
-      delta: result.delta,
+      tier: result.tier ?? '⊘',
+      tierName: result.tierName ?? 'Reject',
+      delta: result.delta ?? 0,
       isPrompt,
       critique,
     };

@@ -2322,10 +2322,20 @@ export function registerLLMCommand(program: Command): void {
           const { ExperienceStore } = await import('../../llm/ExperienceStore.js');
           const { DreamingConsolidator } = await import('../../llm/DreamingConsolidator.js');
           const { LMStudioClient } = await import('../../llm/LMStudioClient.js');
+          const { ValidatedLLMClient } = await import('../../llm/ValidatedLLMClient.js');
           const { initializeAlgorithmRegistry, AlgorithmRegistry } = await import('../../llm/clustering/index.js');
 
           // Re-initialize algorithm registry with LLM client to enable all algorithms
+          // V1 algorithms use LMStudioClient, V2 algorithms use ValidatedLLMClient
           const llmClient = new LMStudioClient(config);
+          const validatedClient = new ValidatedLLMClient(config);
+
+          // Set AISP mode on validated client for V2 algorithms
+          if (options.aispFull) {
+            validatedClient.setAISPMode('aisp-full');
+          } else if (options.aisp) {
+            validatedClient.setAISPMode('aisp');
+          }
 
           // Spec 18 Section 3.3.4: Build LLMCluster config from CLI options
           // Only include explicitly set options; LLMClusterV1 provides defaults
@@ -2335,7 +2345,7 @@ export function registerLLMCommand(program: Command): void {
           if (options.hybrid) llmClusterConfig.hybridMode = true;
           if (options.cache === false) llmClusterConfig.useCache = false;
 
-          initializeAlgorithmRegistry(llmClient, false, llmClusterConfig);
+          initializeAlgorithmRegistry(llmClient, false, llmClusterConfig, validatedClient);
 
           // Determine which algorithms to use (DEFAULT: all latest versions)
           const registry = AlgorithmRegistry.getInstance();

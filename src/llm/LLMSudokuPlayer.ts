@@ -554,21 +554,21 @@ export class LLMSudokuPlayer extends EventEmitter {
    * Health check LM Studio connection
    */
   async healthCheck(): Promise<boolean> {
-    return this.client.healthCheck();
+    return this.client.getUnderlyingClient().healthCheck();
   }
 
   /**
    * Get loaded model info
    */
   async getModelInfo() {
-    return this.client.getModelInfo();
+    return this.client.getUnderlyingClient().getModelInfo();
   }
 
   /**
    * Verify that the expected model is loaded
    */
   async verifyModel() {
-    return this.client.verifyModel();
+    return this.client.getUnderlyingClient().verifyModel();
   }
 
   /**

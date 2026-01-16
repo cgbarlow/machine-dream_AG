@@ -27,6 +27,7 @@ import { DeepClusterV2 } from './DeepClusterV2.js';
 import { LLMClusterV1, type LLMClusterConfig } from './LLMClusterV1.js';
 import { LLMClusterV2, type LLMClusterV2Config } from './LLMClusterV2.js';
 import type { LMStudioClient } from '../LMStudioClient.js';
+import type { ValidatedLLMClient } from '../ValidatedLLMClient.js';
 
 // Track whether registry has been initialized
 let registryInitialized = false;
@@ -35,7 +36,10 @@ let registryInitialized = false;
  * Options for initializing the algorithm registry
  */
 export interface AlgorithmRegistryOptions {
+  /** LMStudioClient for V1 algorithms (DeepClusterV1, LLMClusterV1) */
   llmClient?: LMStudioClient;
+  /** ValidatedLLMClient for V2 algorithms with AISP support (DeepClusterV2, LLMClusterV2) */
+  validatedClient?: ValidatedLLMClient;
   llmClusterConfig?: Partial<LLMClusterConfig>;
   llmClusterV2Config?: Partial<LLMClusterV2Config>;
   silent?: boolean;
@@ -60,7 +64,8 @@ export interface AlgorithmRegistryOptions {
 export function initializeAlgorithmRegistry(
   llmClient?: LMStudioClient,
   silent = false,
-  llmClusterConfig?: Partial<LLMClusterConfig>
+  llmClusterConfig?: Partial<LLMClusterConfig>,
+  validatedClient?: ValidatedLLMClient
 ): void {
   const registry = AlgorithmRegistry.getInstance();
 
@@ -81,16 +86,23 @@ export function initializeAlgorithmRegistry(
   }
 
   // Register LLM-based algorithms if client provided and not already registered
-  if (llmClient && !hasLLMAlgorithms) {
-    const deepCluster = new DeepClusterV1(llmClient);
-    const deepClusterV2 = new DeepClusterV2(llmClient);
-    const llmCluster = new LLMClusterV1(llmClient, llmClusterConfig);
-    const llmClusterV2 = new LLMClusterV2(llmClient);
+  if ((llmClient || validatedClient) && !hasLLMAlgorithms) {
+    // V1 algorithms use LMStudioClient (use provided or get from validated client)
+    const baseClient = llmClient || validatedClient?.getUnderlyingClient();
+    if (baseClient) {
+      const deepCluster = new DeepClusterV1(baseClient);
+      const llmCluster = new LLMClusterV1(baseClient, llmClusterConfig);
+      registry.register(deepCluster);
+      registry.register(llmCluster);
+    }
 
-    registry.register(deepCluster);
-    registry.register(deepClusterV2);
-    registry.register(llmCluster);
-    registry.register(llmClusterV2);
+    // V2 algorithms use ValidatedLLMClient for centralized AISP validation
+    if (validatedClient) {
+      const deepClusterV2 = new DeepClusterV2(validatedClient);
+      const llmClusterV2 = new LLMClusterV2(validatedClient);
+      registry.register(deepClusterV2);
+      registry.register(llmClusterV2);
+    }
   }
 
   if (!silent && !hasLLMAlgorithms) {
