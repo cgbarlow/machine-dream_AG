@@ -260,7 +260,7 @@ Think like a taxonomist creating a classification system where each item belongs
         { role: 'user', content: prompt },
       ],
       {
-        validatePrompt: false, // Prompts contain embedded data; only validate responses
+        validatePrompt: this.aispMode !== 'off', // NL stripped before validation
         validateResponse: this.aispMode === 'aisp-full',
         context: 'pattern-identification',
       }
@@ -515,7 +515,7 @@ Your response:`;
         { role: 'user', content: userPrompt },
       ],
       {
-        validatePrompt: false, // Prompts contain embedded data; only validate responses
+        validatePrompt: this.aispMode !== 'off', // NL stripped before validation
         validateResponse: this.aispMode === 'aisp-full',
         context: 'pattern-self-critique',
       }
@@ -817,7 +817,7 @@ For each statement, output the number of the MOST SPECIFIC matching pattern:`;
         { role: 'user', content: userPrompt },
       ],
       {
-        validatePrompt: false, // Prompts contain embedded data; only validate responses
+        validatePrompt: this.aispMode !== 'off', // NL stripped before validation
         validateResponse: this.aispMode === 'aisp-full',
         context: 'pattern-categorization',
       }
@@ -965,7 +965,7 @@ Provide 3-5 sub-patterns:`;
         { role: 'user', content: userPrompt },
       ],
       {
-        validatePrompt: false, // Prompts contain embedded data; only validate responses
+        validatePrompt: this.aispMode !== 'off', // NL stripped before validation
         validateResponse: this.aispMode === 'aisp-full',
         context: 'dominant-cluster-refinement',
       }

@@ -1,6 +1,6 @@
 # Specification 16: AISP Mode Integration
 
-**Version:** 1.3.0
+**Version:** 1.3.1
 **Date:** 2026-01-16
 **Status:** Implemented
 **Depends On:** Spec 11 (LLM Sudoku Player), Spec 05 (Dreaming Pipeline), Spec 18 (Algorithm Versioning)
@@ -471,6 +471,29 @@ export class ValidatedLLMClient {
 | `aisp` | Yes (warn) | No | Log warning |
 | `aisp-full` | Yes (warn) | Yes (critique) | Request critique, fallback |
 
+**Natural Language Stripping for Prompt Validation:**
+
+AISP prompts often contain embedded natural language data (experience reasoning, puzzle states) in quoted strings. This dilutes the AISP density score. Before validating prompts, quoted string content is replaced with stubs to preserve AISP structure while calculating accurate density:
+
+```
+Before: e1≔"The cell at position (1,2) can only be 5 because all other values are eliminated"
+After:  e1≔"…"
+```
+
+Implementation in `ValidatedLLMClient`:
+
+```typescript
+private stripNaturalLanguageForValidation(text: string): string {
+  // Replace quoted string content with ellipsis stub
+  return text.replace(/"[^"]*"/g, '"…"');
+}
+```
+
+This ensures:
+- AISP structure (`⟦Σ⟧`, `≜`, `∈`, etc.) is validated
+- Embedded natural language doesn't affect delta score
+- Prompts with embedded data can still achieve high tiers
+
 **Tier-Based Logging:**
 - Platinum/Gold/Silver: `✓ AISP [context] tier (δ=X.XXX)`
 - Bronze: `⚠️ AISP [context] Bronze (δ=X.XXX)`
@@ -754,6 +777,7 @@ AISP syntax is more compact than natural language:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.3.1 | 2026-01-16 | Natural language stripping for prompt validation (Section 4.11) |
 | 1.3.0 | 2026-01-16 | Centralized AISP validation: Section 4.11, ValidatedLLMClient wrapper, factory pattern |
 | 1.2.0 | 2026-01-16 | Clustering AISP support: FR-05, aisp-validator integration, FastClusterV3, DeepClusterV2, LLMClusterV2 AISP |
 | 1.1.0 | 2026-01-12 | Full implementation: AISP system prompts, dreaming integration, strategy encoding |

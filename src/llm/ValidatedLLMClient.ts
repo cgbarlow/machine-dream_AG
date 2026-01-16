@@ -117,7 +117,9 @@ export class ValidatedLLMClient {
         const userMessages = messages.filter(m => m.role === 'user');
         const promptContent = userMessages.map(m => m.content).join('\n');
 
-        promptValidation = this.validator.validate(promptContent);
+        // Strip embedded natural language before validating AISP structure
+        const strippedContent = this.stripNaturalLanguageForValidation(promptContent);
+        promptValidation = this.validator.validate(strippedContent);
         this.logValidation(promptValidation, context, true);
         this.emitValidationEvent(promptValidation, context, true);
       }
@@ -192,6 +194,25 @@ export class ValidatedLLMClient {
    */
   getUnderlyingClient(): LMStudioClient {
     return this.client;
+  }
+
+  /**
+   * Strip embedded natural language content from AISP prompts before validation.
+   *
+   * AISP prompts often contain embedded natural language data (experience reasoning,
+   * puzzle states) in quoted strings. This dilutes the AISP density score.
+   *
+   * This method replaces quoted string content with stubs to preserve AISP structure
+   * while allowing accurate validation of the AISP syntax.
+   *
+   * Example:
+   *   Before: e1≔"The cell at position (1,2) can only be 5 because..."
+   *   After:  e1≔"…"
+   */
+  private stripNaturalLanguageForValidation(text: string): string {
+    // Replace content in double-quoted strings with ellipsis stub
+    // Preserves AISP structure (e1≔"…") while removing natural language
+    return text.replace(/"[^"]*"/g, '"…"');
   }
 
   /**

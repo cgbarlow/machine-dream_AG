@@ -368,7 +368,7 @@ ${i + 1}. Grid context: ${this.describeGridContext(exp.gridState, exp.move)}
           { role: 'user', content: userPrompt },
         ],
         {
-          validatePrompt: false, // Prompts contain embedded data; only validate responses
+          validatePrompt: this.aispMode !== 'off', // NL stripped before validation
           validateResponse: this.aispMode === 'aisp-full',
           context: 'pattern-synthesis',
         }
@@ -739,7 +739,7 @@ Be concise. Each item should be a short phrase or sentence.`;
           { role: 'user', content: prompt },
         ],
         {
-          validatePrompt: false, // Prompts contain embedded data; only validate responses
+          validatePrompt: this.aispMode !== 'off', // NL stripped before validation
           validateResponse: this.aispMode === 'aisp-full',
           context: 'hierarchy-build',
         }
@@ -951,7 +951,7 @@ WHY_DIVERSE: Elimination approach rather than completion`;
           { role: 'user', content: prompt },
         ],
         {
-          validatePrompt: false, // Prompts contain embedded data; only validate responses
+          validatePrompt: this.aispMode !== 'off', // NL stripped before validation
           validateResponse: this.aispMode === 'aisp-full',
           context: 'fewshot-selection',
         }
@@ -1045,7 +1045,7 @@ Identify at most 3 anti-patterns.`;
           { role: 'user', content: prompt },
         ],
         {
-          validatePrompt: false, // Prompts contain embedded data; only validate responses
+          validatePrompt: this.aispMode !== 'off', // NL stripped before validation
           validateResponse: this.aispMode === 'aisp-full',
           context: 'anti-pattern-analysis',
         }
@@ -1143,7 +1143,7 @@ PREVENTION_STEP_3: [optional third step]`;
         { role: 'user', content: prompt },
       ],
       {
-        validatePrompt: false, // Prompts contain embedded data; only validate responses
+        validatePrompt: this.aispMode !== 'off', // NL stripped before validation
         validateResponse: this.aispMode === 'aisp-full',
         context: 'anti-pattern-synthesis',
       }
@@ -1270,7 +1270,7 @@ CONFIDENCE: [0.0-1.0 how confident you are in this analysis]`;
         { role: 'user', content: prompt },
       ],
       {
-        validatePrompt: false, // Prompts contain embedded data; only validate responses
+        validatePrompt: this.aispMode !== 'off', // NL stripped before validation
         validateResponse: this.aispMode === 'aisp-full',
         context: 'reasoning-correction',
       }
@@ -1780,7 +1780,7 @@ MERGED_STRATEGIES:
           { role: 'user', content: prompt },
         ],
         {
-          validatePrompt: false, // Prompts contain embedded data; only validate responses
+          validatePrompt: this.aispMode !== 'off', // NL stripped before validation
           validateResponse: this.aispMode === 'aisp-full',
           context: 'strategy-merge',
         }
