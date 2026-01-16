@@ -522,6 +522,33 @@ ${experienceDescriptions}
   }
 
   /**
+   * Extract list from AISP field (handles ⟨item₁;item₂⟩ format)
+   * Spec 16 Section 4.12: AISP Prompt Coverage
+   */
+  private extractAISPListField(content: string, fieldName: string): string[] {
+    const regex = new RegExp(`${fieldName}≔⟨([^⟩]+)⟩`);
+    const match = content.match(regex);
+    if (!match) return [];
+
+    return match[1]
+      .split(';')
+      .map(s => s.trim().replace(/^["']|["']$/g, ''))
+      .filter(s => s.length > 0);
+  }
+
+  /**
+   * Sanitize string for AISP embedding (escape quotes, remove control chars)
+   * Spec 16 Section 4.12: AISP Prompt Coverage
+   */
+  private sanitizeForAISP(text: string): string {
+    return text
+      .replace(/"/g, "'")
+      .replace(/[\n\r\t]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /**
    * Build prompt for named strategy synthesis (default mode)
    */
   private buildNamedStrategyPrompt(count: number, experienceDescriptions: string): string {
@@ -701,14 +728,123 @@ IMPORTANT: Do NOT give this pattern a name. Focus on situation and action.`;
 
   /**
    * LLM builds abstraction hierarchy from synthesized patterns
+   * Spec 16 Section 4.12: Conditional AISP/English prompts
    */
   private async buildAbstractionHierarchy(
     patterns: SynthesizedPattern[],
     profileName?: string
   ): Promise<AbstractionHierarchy> {
+    // Build prompts based on mode
+    const systemPrompt = this.aispMode === 'aisp-full'
+      ? this.buildAISPHierarchySystemPrompt()
+      : 'You are organizing Sudoku strategies into an abstraction hierarchy, from specific to general.';
+
+    const prompt = this.aispMode === 'aisp-full'
+      ? this.buildAISPHierarchyPrompt(patterns)
+      : this.buildEnglishHierarchyPrompt(patterns);
+
+    try {
+      const result = await this.llmClient.chat(
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt },
+        ],
+        {
+          validatePrompt: this.aispMode !== 'off',
+          validateResponse: this.aispMode === 'aisp-full',
+          context: 'hierarchy-build',
+        }
+      );
+
+      // Parse based on mode with fallback
+      if (this.aispMode === 'aisp-full') {
+        const hierarchy = this.parseAISPHierarchyResponse(result.content, patterns.length, profileName);
+        if (hierarchy.levels.length > 0) return hierarchy;
+        // Fallback to English parsing
+        return this.parseHierarchyResponse(result.content, patterns.length, profileName);
+      }
+      return this.parseHierarchyResponse(result.content, patterns.length, profileName);
+    } catch (error) {
+      // Return a basic hierarchy if LLM fails
+      return this.createBasicHierarchy(patterns, profileName);
+    }
+  }
+
+  /**
+   * Build AISP-formatted hierarchy system prompt
+   * Spec 16 Section 4.12: AISP Prompt Coverage
+   */
+  private buildAISPHierarchySystemPrompt(): string {
+    return `𝔸1.0.sudoku.hierarchy.system
+γ≔abstraction.hierarchy.construction
+
+⟦Ω:Rules⟧{
+  task≜organize(strategies)→hierarchy[L0..L3]
+  L0≜specific_instances
+  L1≜grouped_techniques
+  L2≜broad_categories
+  L3≜universal_principles
+}
+
+⟦Ε:Output⟧{
+  format≔⟨
+    L0≔item1;item2;item3
+    L1≔tech1;tech2
+    L2≔cat1;cat2
+    L3≔principle1
+  ⟩
+  ;; Each level on one line, items separated by semicolons
+  ∀output:syntax∈AISP
+  ¬prose
+}`;
+  }
+
+  /**
+   * Build AISP-formatted hierarchy user prompt
+   * Spec 16 Section 4.12: AISP Prompt Coverage
+   */
+  private buildAISPHierarchyPrompt(patterns: SynthesizedPattern[]): string {
+    const date = new Date().toISOString().split('T')[0];
+    const strategyList = patterns.map((p, i) =>
+      `    s[${i}]≔"${this.sanitizeForAISP(p.strategyName || p.clusterName || 'Unknown')}"`
+    ).join('\n');
+
+    return `𝔸1.0.sudoku.hierarchy.build@${date}
+γ≔abstraction.hierarchy
+
+⟦Σ:Strategies⟧{
+${strategyList}
+}
+
+⟦Ω:Task⟧{
+  task≜organize(strategies)→hierarchy
+  L0≜select(2..3,specific_instances)
+  L1≜group(similar→techniques,2..4)
+  L2≜abstract(techniques→categories,1..3)
+  L3≜extract(1..2,universal_principles)
+}
+
+⟦Ε:Output⟧{
+  format≔⟨
+    L0≔instance1;instance2;instance3
+    L1≔technique1;technique2
+    L2≔category1;category2
+    L3≔principle1
+  ⟩
+  ;; Each level on one line, items separated by semicolons
+  ;; Use concise phrases (2-5 words each)
+  ∀output:syntax∈AISP
+  ¬prose
+}`;
+  }
+
+  /**
+   * Build English-formatted hierarchy prompt (original format)
+   */
+  private buildEnglishHierarchyPrompt(patterns: SynthesizedPattern[]): string {
     const patternList = patterns.map(p => `- ${p.strategyName}: ${p.whenToUse}`).join('\n');
 
-    const prompt = `You have ${patterns.length} Sudoku solving strategies. Organize them into a 4-level abstraction hierarchy.
+    return `You have ${patterns.length} Sudoku solving strategies. Organize them into a 4-level abstraction hierarchy.
 
 Your strategies:
 ${patternList}
@@ -728,28 +864,72 @@ LEVEL_3_PRINCIPLES:
 [Extract 1-2 universal problem-solving principles]
 
 Be concise. Each item should be a short phrase or sentence.`;
+  }
 
-    try {
-      const result = await this.llmClient.chat(
-        [
-          {
-            role: 'system',
-            content: 'You are organizing Sudoku strategies into an abstraction hierarchy, from specific to general.',
-          },
-          { role: 'user', content: prompt },
-        ],
-        {
-          validatePrompt: this.aispMode !== 'off', // NL stripped before validation
-          validateResponse: this.aispMode === 'aisp-full',
-          context: 'hierarchy-build',
-        }
-      );
+  /**
+   * Parse AISP hierarchy response
+   * Spec 16 Section 4.12: AISP Prompt Coverage
+   * Handles format: L0≔item1;item2;item3 (one level per line)
+   */
+  private parseAISPHierarchyResponse(
+    response: string,
+    patternCount: number,
+    profileName?: string
+  ): AbstractionHierarchy {
+    // New simpler format: L0≔item1;item2;item3 (semicolon-separated on each line)
+    const extractLevel = (level: string): string[] => {
+      // Match L0≔... or L0=... pattern, handle both ≔ and =
+      const regex = new RegExp(`${level}[≔=](.+?)(?:\\n|$)`, 'i');
+      const match = response.match(regex);
+      if (!match) return [];
+      // Split by semicolon, clean up
+      return match[1]
+        .split(';')
+        .map(s => s.trim().replace(/^["'⟨]|["'⟩]$/g, ''))
+        .filter(s => s.length > 0 && s !== '...');
+    };
 
-      return this.parseHierarchyResponse(result.content, patterns.length, profileName);
-    } catch (error) {
-      // Return a basic hierarchy if LLM fails
-      return this.createBasicHierarchy(patterns, profileName);
+    const l0 = extractLevel('L0');
+    const l1 = extractLevel('L1');
+    const l2 = extractLevel('L2');
+    const l3 = extractLevel('L3');
+
+    // Fallback to old format if new format didn't work
+    if (l0.length === 0 && l1.length === 0 && l2.length === 0 && l3.length === 0) {
+      const hierarchyMatch = response.match(/⟦Θ:Hierarchy⟧\{([^}]+)\}/s);
+      if (hierarchyMatch) {
+        const content = hierarchyMatch[1];
+        const levels: HierarchyLevel[] = [
+          { level: 0 as const, name: 'Specific Instances', items: this.extractAISPListField(content, 'L0') },
+          { level: 1 as const, name: 'Named Techniques', items: this.extractAISPListField(content, 'L1') },
+          { level: 2 as const, name: 'Categories', items: this.extractAISPListField(content, 'L2') },
+          { level: 3 as const, name: 'Universal Principles', items: this.extractAISPListField(content, 'L3') },
+        ].filter(l => l.items.length > 0);
+
+        return {
+          levels,
+          profileName: profileName || 'default',
+          createdAt: new Date(),
+          totalPatterns: patternCount,
+        };
+      }
+      return this.createBasicHierarchy([], profileName);
     }
+
+    // Build levels array using proper HierarchyLevel structure
+    const levels: HierarchyLevel[] = [
+      { level: 0 as const, name: 'Specific Instances', items: l0 },
+      { level: 1 as const, name: 'Named Techniques', items: l1 },
+      { level: 2 as const, name: 'Categories', items: l2 },
+      { level: 3 as const, name: 'Universal Principles', items: l3 },
+    ].filter(l => l.items.length > 0);
+
+    return {
+      levels,
+      profileName: profileName || 'default',
+      createdAt: new Date(),
+      totalPatterns: patternCount,
+    };
   }
 
   /**
@@ -902,6 +1082,7 @@ Be concise. Each item should be a short phrase or sentence.`;
    *
    * Few-shots are LLM-synthesized teaching examples, NOT raw move data
    * Uses LLM to select diverse strategies (Spec 11 - LLM-Driven Diversity)
+   * Spec 16 Section 4.12: Conditional AISP/English prompts
    */
   private async generateFewShotsFromPatterns(
     patterns: SynthesizedPattern[]
@@ -916,49 +1097,40 @@ Be concise. Each item should be a short phrase or sentence.`;
     // Use LLM to select diverse strategies
     console.log(`🎯 Asking LLM to select diverse strategies from ${patterns.length} patterns...`);
 
-    const prompt = `You have synthesized ${patterns.length} Sudoku strategies from your experiences.
+    // Build prompts based on mode
+    const systemPrompt = this.aispMode === 'aisp-full'
+      ? this.buildAISPFewShotSelectionSystemPrompt()
+      : 'You are selecting diverse Sudoku strategies. Be strict about avoiding duplicates.';
 
-Your strategies:
-${patterns.map((p, i) => `${i + 1}. ${p.strategyName}: ${p.whenToUse}`).join('\n')}
-
-Now select ${this.consolidationOptions.fewShotMin}-${this.consolidationOptions.fewShotMax} DIVERSE strategies to remember as few-shot examples.
-
-CRITICAL: Ensure diversity!
-- Do NOT select strategies that use the same underlying technique
-- If multiple strategies are variations of "last digit in row/column/box", pick only ONE
-- Aim for variety: completion strategies, elimination strategies, constraint checking, etc.
-- Identify and reject duplicates explicitly
-
-For each selected strategy, respond with ONLY the strategy numbers you selected, one per line:
-SELECTED: [number]
-WHY_DIVERSE: [brief explanation of why this is different from others]
-
-Example response:
-SELECTED: 1
-WHY_DIVERSE: Focuses on row completion
-SELECTED: 4
-WHY_DIVERSE: Uses box constraint checking, different from row-based strategies
-SELECTED: 7
-WHY_DIVERSE: Elimination approach rather than completion`;
+    const prompt = this.aispMode === 'aisp-full'
+      ? this.buildAISPFewShotSelectionPrompt(patterns, this.consolidationOptions.fewShotMin)
+      : this.buildEnglishFewShotSelectionPrompt(patterns);
 
     try {
       const result = await this.llmClient.chat(
         [
-          {
-            role: 'system',
-            content: 'You are selecting diverse Sudoku strategies. Be strict about avoiding duplicates.',
-          },
+          { role: 'system', content: systemPrompt },
           { role: 'user', content: prompt },
         ],
         {
-          validatePrompt: this.aispMode !== 'off', // NL stripped before validation
+          validatePrompt: this.aispMode !== 'off',
           validateResponse: this.aispMode === 'aisp-full',
           context: 'fewshot-selection',
         }
       );
 
-      // Parse selected indices from LLM response
-      const selectedIndices = this.parseSelectedStrategies(result.content, patterns.length);
+      // Parse based on mode with fallback
+      let selectedIndices: number[];
+      if (this.aispMode === 'aisp-full') {
+        selectedIndices = this.parseAISPSelectionResponse(result.content, patterns.length);
+        if (selectedIndices.length === 0) {
+          // Fallback to English parsing
+          selectedIndices = this.parseSelectedStrategies(result.content, patterns.length);
+        }
+      } else {
+        selectedIndices = this.parseSelectedStrategies(result.content, patterns.length);
+      }
+
       console.log(`   LLM selected ${selectedIndices.length} diverse strategies: ${selectedIndices.join(', ')}`);
 
       // Map selected indices to patterns
@@ -982,7 +1154,134 @@ WHY_DIVERSE: Elimination approach rather than completion`;
   }
 
   /**
-   * Parse selected strategy indices from LLM response
+   * Build AISP-formatted fewshot selection system prompt
+   * Spec 16 Section 4.12: AISP Prompt Coverage
+   */
+  private buildAISPFewShotSelectionSystemPrompt(): string {
+    return `𝔸1.0.sudoku.fewshot.system
+γ≔strategy.diversity.selection
+
+⟦Ω:Rules⟧{
+  task≜select(diverse_strategies)
+  constraint≜∀s₁,s₂∈selected:¬overlap(s₁,s₂)
+  goal≜maximize(reasoning_coverage)
+}
+
+⟦Ε:Output⟧{
+  format≔⟨
+    sel[0]→s2
+    sel[1]→s5
+    sel[2]→s1
+  ⟩
+  ;; Each line: sel[order]→s{strategy_index}
+  ∀output:syntax∈AISP
+  ¬prose
+}`;
+  }
+
+  /**
+   * Build AISP-formatted fewshot selection user prompt
+   * Spec 16 Section 4.12: AISP Prompt Coverage
+   */
+  private buildAISPFewShotSelectionPrompt(
+    patterns: SynthesizedPattern[],
+    count: number
+  ): string {
+    const date = new Date().toISOString().split('T')[0];
+    const patternList = patterns.map((p, i) =>
+      `    s[${i}]≔{name:"${this.sanitizeForAISP(p.strategyName || p.clusterName || 'Unknown')}",when:"${this.sanitizeForAISP((p.whenToUse || '').substring(0, 80))}"}`
+    ).join('\n');
+
+    return `𝔸1.0.sudoku.strategy.selection@${date}
+γ≔fewshot.diversity.selection
+
+⟦Σ:Candidates⟧{
+${patternList}
+}
+
+⟦Ω:Task⟧{
+  task≜select(${count},diverse_strategies)
+  rule≜∀s₁,s₂∈selected:different(s₁.approach,s₂.approach)
+  ;; Pick strategies that cover different reasoning techniques
+}
+
+⟦Ε:Output⟧{
+  format≔⟨
+    sel[0]→s2
+    sel[1]→s0
+    sel[2]→s4
+  ⟩
+  ;; Each line: sel[order]→s{index} where index is 0-${patterns.length - 1}
+  ;; Select ${count} diverse strategies
+  ∀output:syntax∈AISP
+  ¬prose
+}`;
+  }
+
+  /**
+   * Build English-formatted fewshot selection prompt (original format)
+   */
+  private buildEnglishFewShotSelectionPrompt(patterns: SynthesizedPattern[]): string {
+    return `You have synthesized ${patterns.length} Sudoku strategies from your experiences.
+
+Your strategies:
+${patterns.map((p, i) => `${i + 1}. ${p.strategyName}: ${p.whenToUse}`).join('\n')}
+
+Now select ${this.consolidationOptions.fewShotMin}-${this.consolidationOptions.fewShotMax} DIVERSE strategies to remember as few-shot examples.
+
+CRITICAL: Ensure diversity!
+- Do NOT select strategies that use the same underlying technique
+- If multiple strategies are variations of "last digit in row/column/box", pick only ONE
+- Aim for variety: completion strategies, elimination strategies, constraint checking, etc.
+- Identify and reject duplicates explicitly
+
+For each selected strategy, respond with ONLY the strategy numbers you selected, one per line:
+SELECTED: [number]
+WHY_DIVERSE: [brief explanation of why this is different from others]
+
+Example response:
+SELECTED: 1
+WHY_DIVERSE: Focuses on row completion
+SELECTED: 4
+WHY_DIVERSE: Uses box constraint checking, different from row-based strategies
+SELECTED: 7
+WHY_DIVERSE: Elimination approach rather than completion`;
+  }
+
+  /**
+   * Parse AISP selection response
+   * Spec 16 Section 4.12: AISP Prompt Coverage
+   * Handles format: sel[0]→s2 or sel[0]→s{2}
+   */
+  private parseAISPSelectionResponse(response: string, maxIndex: number): number[] {
+    const indices: number[] = [];
+
+    // New format: sel[n]→s{m} or sel[n]→sm
+    const newRegex = /sel\[\d+\]→s\{?(\d+)\}?/gi;
+    let match;
+    while ((match = newRegex.exec(response)) !== null) {
+      const idx = parseInt(match[1], 10);
+      if (idx >= 0 && idx < maxIndex && !indices.includes(idx)) {
+        indices.push(idx);
+      }
+    }
+
+    // Fallback to old format if new format didn't match
+    if (indices.length === 0) {
+      const oldRegex = /⟦Χ:Selection\.\d+⟧\{[^}]*idx≔(\d+)/g;
+      while ((match = oldRegex.exec(response)) !== null) {
+        const idx = parseInt(match[1], 10);
+        if (idx >= 0 && idx < maxIndex && !indices.includes(idx)) {
+          indices.push(idx);
+        }
+      }
+    }
+
+    return indices.slice(0, 5); // Max 5 strategies
+  }
+
+  /**
+   * Parse selected strategy indices from English LLM response
    */
   private parseSelectedStrategies(response: string, maxIndex: number): number[] {
     const indices: number[] = [];

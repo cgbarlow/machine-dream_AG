@@ -28,6 +28,13 @@ vi.mock('../../../src/llm/AISPValidator.js', () => ({
       delta: 0.45,
       pureDensity: 0.45,
     }),
+    validateSmart: vi.fn().mockReturnValue({
+      valid: true,
+      tier: '◊',
+      tierName: 'Silver',
+      delta: 0.45,
+      pureDensity: 0.45,
+    }),
     validateWithCritique: vi.fn().mockResolvedValue({
       result: { valid: true, tier: '◊', tierName: 'Silver', delta: 0.45 },
       critique: undefined,

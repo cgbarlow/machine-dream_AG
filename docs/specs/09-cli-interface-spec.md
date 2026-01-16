@@ -735,6 +735,14 @@ Options:
   --output <file>              # Save consolidation report
   --learning-unit <id>         # Update specific learning unit (default: "default")
   --anonymous-patterns         # Generate patterns in anonymous format (no strategy names)
+  --algorithm <name>           # Clustering algorithm: fastcluster, deepcluster, llmcluster, llmclusterv2
+  --algorithms <list>          # Comma-separated list (default: all latest versions)
+  --aisp                       # Mark learning unit as AISP mode (for naming)
+  --aisp-full                  # Mark learning unit as AISP-full mode (AISP prompts + output)
+  --double-strategies          # Double the number of strategies (6-10 few-shots, 10-14 merged)
+  --no-dual-unit               # Create only single learning unit (default: creates BOTH standard AND -2x)
+  --debug                      # Show detailed debug output including LLM responses and pattern parsing
+                               # (Spec 16 Section 4.13: categorization response preview, parse stats, validation warnings)
 ```
 
 **Output:**
@@ -756,6 +764,16 @@ machine-dream llm dream run --all
 
 # Save consolidation report
 machine-dream llm dream run --profile qwen3-coder --output dream-report.json
+
+# Run with specific algorithm and debug output
+machine-dream llm dream run --algorithm llmclusterv2 --aisp-full --debug
+
+# Debug output shows (Spec 16 Section 4.13):
+#   📋 Categorization response (36 lines):
+#      [0]: "exp[0]→P1"
+#      [1]: "exp[1]→P2"
+#   📊 Parse results: 30 AISP, 4 fallback, 2 uncategorized
+#   ⚠️ High uncategorized rate: 55% (20/36)  # if >50%
 ```
 
 **Example output:**

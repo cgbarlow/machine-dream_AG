@@ -2,7 +2,11 @@
 # A/B/X Multi-Model Comparison Script
 # Specification: docs/specs/15-batch-testing-spec.md
 #
-# Usage: ./scripts/abx-test.sh <config.json>
+# Usage: ./scripts/abx-test.sh <config.json> [options]
+#
+# Options:
+#   --debug          Enable debug output for LLM calls
+#   --output-dir     Custom output directory (default: ./abx-results/YYYYMMDD_HHMMSS)
 #
 # Config file format:
 # {
@@ -21,10 +25,46 @@
 
 set -e
 
-CONFIG="$1"
+# Parse command line arguments
+CONFIG=""
+DEBUG_FLAG=""
+OUTPUT_DIR=""
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --debug)
+      DEBUG_FLAG="--debug"
+      shift
+      ;;
+    --output-dir)
+      OUTPUT_DIR="$2"
+      shift 2
+      ;;
+    -h|--help)
+      echo "Usage: $0 <config.json> [options]"
+      echo ""
+      echo "Options:"
+      echo "  --debug          Enable debug output for LLM calls"
+      echo "  --output-dir     Custom output directory (default: ./abx-results/YYYYMMDD_HHMMSS)"
+      echo ""
+      echo "Config file required. See scripts/abx-config.example.json for format."
+      exit 0
+      ;;
+    *)
+      if [[ -z "$CONFIG" ]]; then
+        CONFIG="$1"
+      fi
+      shift
+      ;;
+  esac
+done
 
 if [[ ! -f "$CONFIG" ]]; then
-  echo "Usage: $0 <config.json>"
+  echo "Usage: $0 <config.json> [options]"
+  echo ""
+  echo "Options:"
+  echo "  --debug          Enable debug output for LLM calls"
+  echo "  --output-dir     Custom output directory (default: ./abx-results/YYYYMMDD_HHMMSS)"
   echo ""
   echo "Config file required. See scripts/abx-config.example.json for format."
   exit 1
@@ -36,7 +76,12 @@ RUNS_PER_CONFIG=$(jq -r '.runsPerConfig // 5' "$CONFIG")
 PUZZLES=$(jq -r '.puzzles[]' "$CONFIG")
 NUM_CONFIGS=$(jq -r '.configurations | length' "$CONFIG")
 
-RESULTS_DIR="./abx-results/$(date +%Y%m%d_%H%M%S)"
+# Set results directory
+if [[ -n "$OUTPUT_DIR" ]]; then
+  RESULTS_DIR="$OUTPUT_DIR"
+else
+  RESULTS_DIR="./abx-results/$(date +%Y%m%d_%H%M%S)"
+fi
 mkdir -p "$RESULTS_DIR"
 
 echo "=============================================="
@@ -46,6 +91,9 @@ echo "Test: $TEST_NAME"
 echo "Runs per config: $RUNS_PER_CONFIG"
 echo "Configurations: $NUM_CONFIGS"
 echo "Results dir: $RESULTS_DIR"
+if [[ -n "$DEBUG_FLAG" ]]; then
+  echo "Debug mode: enabled"
+fi
 echo "=============================================="
 echo ""
 
@@ -92,6 +140,9 @@ for i in $(seq 0 $((NUM_CONFIGS - 1))); do
       fi
       if [[ -n "$OPTIONS" ]]; then
         CMD="$CMD $OPTIONS"
+      fi
+      if [[ -n "$DEBUG_FLAG" ]]; then
+        CMD="$CMD $DEBUG_FLAG"
       fi
 
       # Run and capture output

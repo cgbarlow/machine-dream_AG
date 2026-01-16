@@ -1,0 +1,40 @@
+{
+  "testName": "All Profiles with LLMClusterV2 Learning Unit (AISP-Full)",
+  "description": "Compare all model profiles using gpt-oss-120b_aisp-full_llmclusterv2_20260116_7 learning unit in AISP-full mode",
+  "runsPerConfig": 1,
+  "puzzles": [
+    "puzzles/9x9-easy.json"
+  ],
+  "configurations": [
+    {
+      "name": "deepseek-r1_learning",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": ["--aisp-full"]
+    },
+    {
+      "name": "gpt-oss-120b_learning",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": ["--aisp-full"]
+    },
+    {
+      "name": "nemotron-nano_learning",
+      "profile": "nemotron-nano",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": ["--aisp-full"]
+    },
+    {
+      "name": "qwen3-coder_learning",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": ["--aisp-full"]
+    },
+    {
+      "name": "qwq-32b_learning",
+      "profile": "qwq-32b",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": ["--aisp-full"]
+    }
+  ]
+}

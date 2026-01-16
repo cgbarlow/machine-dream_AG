@@ -143,22 +143,30 @@ export class ValidatedLLMClient {
 
         // Request critique on Reject tier
         if (responseValidation.tierValue === 0) {
-          const userContent = messages.find(m => m.role === 'user')?.content ?? '';
-          const critiqueResult = await this.validator.validateWithCritique(
-            result.content,
-            userContent,
-            this.client
-          );
-
-          if (critiqueResult.critique) {
-            console.warn(`   💭 AISP Critique [${context}]: ${critiqueResult.critique}`);
-            if (critiqueResult.guidance) {
-              console.warn(`   📝 Guidance: ${critiqueResult.guidance}`);
-            }
+          // Check for known false-positive patterns before requesting expensive critique
+          const knownFalsePositive = this.detectKnownFalsePositive(result.content, context);
+          if (knownFalsePositive) {
+            console.warn(`   ⚠️ AISP validation false-positive [${context}]: ${knownFalsePositive}`);
             critiqueFallback = true;
+            this.emitValidationEvent(responseValidation, context, false, knownFalsePositive);
+          } else {
+            const userContent = messages.find(m => m.role === 'user')?.content ?? '';
+            const critiqueResult = await this.validator.validateWithCritique(
+              result.content,
+              userContent,
+              this.client
+            );
 
-            // Emit with critique
-            this.emitValidationEvent(responseValidation, context, false, critiqueResult.critique);
+            if (critiqueResult.critique) {
+              console.warn(`   💭 AISP Critique [${context}]: ${critiqueResult.critique}`);
+              if (critiqueResult.guidance) {
+                console.warn(`   📝 Guidance: ${critiqueResult.guidance}`);
+              }
+              critiqueFallback = true;
+
+              // Emit with critique
+              this.emitValidationEvent(responseValidation, context, false, critiqueResult.critique);
+            }
           }
         }
       }
@@ -242,5 +250,35 @@ export class ValidatedLLMClient {
     };
 
     validationEventEmitter.emit('llm:aisp:validation', event);
+  }
+
+  /**
+   * Detect known false-positive validation failures
+   *
+   * Some AISP responses use simple line-based formats that the validator
+   * rejects because it expects JSON metadata. If the response matches our
+   * expected format, return a brief explanation instead of triggering
+   * expensive LLM critique.
+   *
+   * @returns Explanation string if known false-positive, null otherwise
+   */
+  private detectKnownFalsePositive(response: string, context: string): string | null {
+    // fewshot-selection: expects sel[n]→sm format
+    if (context === 'fewshot-selection') {
+      const hasSelectionFormat = /sel\[\d+\]→s\d+/i.test(response);
+      if (hasSelectionFormat) {
+        return 'Response uses valid sel[n]→sm format; validator expects JSON metadata (known incompatibility)';
+      }
+    }
+
+    // hierarchy-build: expects L0≔...; L1≔... format
+    if (context === 'hierarchy-build') {
+      const hasHierarchyFormat = /L[0-3][≔=].+/i.test(response);
+      if (hasHierarchyFormat) {
+        return 'Response uses valid Ln≔items format; validator expects JSON metadata (known incompatibility)';
+      }
+    }
+
+    return null;
   }
 }

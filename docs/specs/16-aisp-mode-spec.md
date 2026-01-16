@@ -557,6 +557,142 @@ eventEmitter.emit('llm:aisp:validation', {
 });
 ```
 
+### 4.12 Complete AISP Prompt Coverage
+
+**Status:** All LLM contexts must use AISP-formatted prompts when `--aisp-full` is enabled.
+
+**Required AISP Contexts:**
+
+| Context | File | Status |
+|---------|------|--------|
+| `pattern-identification` | LLMClusterV2.ts | ✅ AISP prompts |
+| `pattern-self-critique` | LLMClusterV2.ts | ✅ AISP prompts |
+| `pattern-categorization` | LLMClusterV2.ts | ✅ AISP prompts |
+| `pattern-synthesis` | DreamingConsolidator.ts | ✅ AISP prompts |
+| `semantic-split` | DeepClusterV2.ts | ✅ AISP prompts |
+| `fewshot-selection` | DreamingConsolidator.ts | ✅ AISP prompts |
+| `hierarchy-build` | DreamingConsolidator.ts | ✅ AISP prompts |
+| `move-generation` | LLMSudokuPlayer.ts | ✅ AISP prompts |
+
+**AISP Block Conventions:**
+
+| Block | Symbol | Purpose |
+|-------|--------|---------|
+| `⟦Σ:Input⟧` | Input/State | Define input data structure |
+| `⟦Ω:Task⟧` | Task Definition | Define what LLM should do |
+| `⟦Ε:Output⟧` | Output Format | Specify expected response format |
+| `⟦Λ:Result⟧` | Function/Result | Structure for LLM response |
+| `⟦Θ:Hierarchy⟧` | Structure | For hierarchical outputs |
+| `⟦Χ:Selection⟧` | Selection | For selection outputs |
+
+**Conditional Selection Pattern:**
+
+```typescript
+// All contexts must follow this pattern
+const systemPrompt = this.aispMode === 'aisp-full'
+  ? this.buildAISPSystemPrompt()
+  : 'English system prompt...';
+
+const prompt = this.aispMode === 'aisp-full'
+  ? this.buildAISPPrompt(data)
+  : this.buildEnglishPrompt(data);
+
+// Parse with fallback
+if (this.aispMode === 'aisp-full') {
+  result = this.parseAISPResponse(response);
+  if (!result) result = this.parseEnglishResponse(response); // Fallback
+}
+```
+
+**Expected Tier Thresholds:**
+
+| Tier | δ Threshold | Prompt | Response |
+|------|-------------|--------|----------|
+| Platinum | ≥ 0.75 | Required | Desired |
+| Gold | ≥ 0.60 | Acceptable | Acceptable |
+| Silver | ≥ 0.40 | Warning | Acceptable |
+| Bronze | ≥ 0.20 | Error | Warning |
+| Reject | < 0.20 | Error + critique | Error + critique |
+
+**Fallback Behavior:**
+
+When AISP parsing fails, parsers must fall back to English parsing to maintain robustness:
+1. Try AISP parser first
+2. If AISP returns empty/null, try English parser
+3. Log warning if fallback was used
+4. Continue execution with parsed result
+
+---
+
+### 4.13 AISP Response Parsing & Debugging
+
+**Status:** Response parsing must be tolerant of format variations and provide debug output.
+
+**ADR Reference:** ADR-015 (AISP Response Parsing Robustness)
+
+#### 4.13.1 Prompt Format Guidelines
+
+**DO NOT** use placeholder notation in output format specifications:
+```aisp
+;; BAD - LLM may interpret {n} literally
+format≔⟨exp[0]→P{n}⟩
+
+;; GOOD - Use concrete examples
+format≔⟨
+  exp[0]→P1
+  exp[1]→P3
+  exp[2]→P2
+⟩
+```
+
+#### 4.13.2 Parser Tolerance Requirements
+
+Parsers must accept multiple equivalent formats:
+
+| Pattern | Examples | Regex |
+|---------|----------|-------|
+| Basic | `P1`, `P2`, `P15` | `/P\{?(\d+)\}?/i` |
+| With braces | `P{1}`, `P{2}` | (same regex) |
+| Full AISP | `exp[0]→P1` | `/(?:exp\[\d+\]→)?P\{?(\d+)\}?/i` |
+| Full with braces | `exp[0]→P{1}` | (same regex) |
+
+#### 4.13.3 Debug Logging Requirements
+
+When `--debug` is enabled, parsers must log:
+
+1. **Response preview** (first 5 lines):
+   ```
+   📋 Categorization response (36 lines):
+      [0]: "exp[0]→P1"
+      [1]: "exp[1]→P2"
+      ...
+   ```
+
+2. **Parsing summary**:
+   ```
+   📊 Parse results: 30 AISP, 4 fallback, 2 uncategorized
+   ```
+
+3. **Validation warnings** (when >50% uncategorized):
+   ```
+   ⚠️ High uncategorized rate: 55% (20/36)
+   ```
+
+4. **Failure details** (when >80% uncategorized):
+   ```
+   ❌ Categorization likely failed (100% uncategorized)
+   💡 Check if LLM response format matches expected: exp[n]→P{m} or P{m}
+   📝 Raw response first 500 chars: ...
+   ```
+
+#### 4.13.4 Validation Thresholds
+
+| Uncategorized % | Action |
+|-----------------|--------|
+| 0-50% | Normal operation |
+| 51-80% | Warning logged (always) |
+| 81-100% | Error details logged (with --debug) |
+
 ---
 
 ## 5. Prompt Structure

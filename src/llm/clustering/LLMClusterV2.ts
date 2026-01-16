@@ -823,19 +823,69 @@ For each statement, output the number of the MOST SPECIFIC matching pattern:`;
       }
     );
 
-    // Parse response
+    // Parse response - try AISP format first, fallback to plain numbers
+    // Spec 16 Section 4.13, ADR-015: Tolerant regex handles both P1 and P{1} formats
     const lines = response.content.trim().split('\n');
     const results: { exp: LLMExperience; patternName: string }[] = [];
 
+    // Debug: Log raw response preview (Spec 16 Section 4.13.3)
+    if (this.debugMode) {
+      console.log(`   📋 Categorization response (${lines.length} lines):`);
+      lines.slice(0, 5).forEach((l, i) =>
+        console.log(`      [${i}]: "${l.substring(0, 60)}${l.length > 60 ? '...' : ''}"`)
+      );
+      if (lines.length > 5) console.log(`      ... (${lines.length - 5} more lines)`);
+    }
+
+    // Parsing stats for debug and validation
+    const parseStats = { aisp: 0, fallback: 0, uncategorized: 0 };
+
     for (let i = 0; i < batch.length; i++) {
-      const line = lines[i]?.trim();
-      const patternNum = parseInt(line || '0', 10);
+      const line = lines[i]?.trim() || '';
+      let patternNum: number;
+
+      // Try AISP format first: exp[n]→P{m} or P{m} (with optional curly braces)
+      // ADR-015: Regex handles both P1 and P{1} formats for robustness
+      const aispMatch = line.match(/(?:exp\[\d+\]→)?P\{?(\d+)\}?/i);
+      if (aispMatch) {
+        patternNum = parseInt(aispMatch[1], 10);
+        parseStats.aisp++;
+      } else {
+        // Fallback to raw number
+        const parsed = parseInt(line || '0', 10);
+        if (!isNaN(parsed)) {
+          patternNum = parsed;
+          parseStats.fallback++;
+        } else {
+          patternNum = 0;
+          parseStats.uncategorized++;
+        }
+      }
 
       if (patternNum > 0 && patternNum <= patterns.length) {
         results.push({ exp: batch[i], patternName: patterns[patternNum - 1].name });
       } else {
         results.push({ exp: batch[i], patternName: 'uncategorized' });
+        // Count as uncategorized if pattern number was out of range
+        if (patternNum !== 0) parseStats.uncategorized++;
       }
+    }
+
+    // Debug: Log parsing summary (Spec 16 Section 4.13.3)
+    if (this.debugMode) {
+      console.log(`   📊 Parse results: ${parseStats.aisp} AISP, ${parseStats.fallback} fallback, ${parseStats.uncategorized} uncategorized`);
+    }
+
+    // Validation: Warn if too many uncategorized (Spec 16 Section 4.13.4)
+    const uncatCount = results.filter(r => r.patternName === 'uncategorized').length;
+    const uncatPercent = (uncatCount / batch.length) * 100;
+    if (uncatPercent > 50) {
+      console.log(`   ⚠️ High uncategorized rate: ${uncatPercent.toFixed(0)}% (${uncatCount}/${batch.length})`);
+    }
+    if (uncatPercent >= 80 && this.debugMode) {
+      console.log(`   ❌ Categorization likely failed (${uncatPercent.toFixed(0)}% uncategorized)`);
+      console.log(`   💡 Check if LLM response format matches expected: exp[n]→P{m} or P{m}`);
+      console.log(`   📝 Raw response first 500 chars: ${response.content.substring(0, 500)}`);
     }
 
     return results;
@@ -851,13 +901,19 @@ For each statement, output the number of the MOST SPECIFIC matching pattern:`;
 γ≔sudoku.experience.categorization
 
 ⟦Ω:Task⟧{
-  task≜categorize(experiences)→most_specific(pattern)
-  rule≜prefer(specific)>prefer(general)
+  task≜categorize(experiences)→best_fit(pattern)
+  rule≜∀exp:∃p∈patterns:assign(exp,p)
+  ;; Every experience fits SOME pattern - find the best match
 }
 
 ⟦Ε:Output⟧{
-  format≔⟦Σ:Categories⟧{⟨n₁,n₂,...,nₖ⟩}
-  ;; One number per experience, one per line
+  format≔⟨
+    exp[0]→P1
+    exp[1]→P3
+    exp[2]→P2
+  ⟩
+  ;; Each line: exp[index]→Pn where n is pattern number (1-indexed)
+  ;; ADR-015: Use concrete examples, not placeholders
   ∀output:syntax∈AISP
   ¬prose
 }`;
@@ -884,15 +940,21 @@ ${batch.map((exp, i) => `  e${i + 1}≔"${exp.move.reasoning.replace(/"/g, "'").
 }
 
 ⟦Ω:Task⟧{
-  ∀eᵢ∈Experiences:assign(eᵢ)→most_specific(pⱼ)
-  prefer(specific)>prefer(general)
-  no_match⇒0
+  ∀eᵢ∈Experiences:assign(eᵢ)→best_fit(pⱼ)
+  rule≜∀exp:∃p∈patterns:assign(exp,p)
+  ;; Every experience fits SOME pattern - find the best match
 }
 
 ⟦Ε:Output⟧{
-  ;; Output pattern numbers (1-${patterns.length}), one per line
-  format≔⟨n₁⟩\\n⟨n₂⟩\\n...⟨nₖ⟩
-  ∀nᵢ∈{0..${patterns.length}}
+  format≔⟨
+    exp[0]→P1
+    exp[1]→P3
+    exp[2]→P2
+  ⟩
+  ;; Each line: exp[index]→Pn where n is pattern number (1-${patterns.length})
+  ;; ADR-015: Use concrete examples, not placeholders
+  ∀n∈{1..${patterns.length}}
+  ∀output:syntax∈AISP
   ¬prose
 }`;
   }
