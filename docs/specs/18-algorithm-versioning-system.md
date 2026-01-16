@@ -502,6 +502,164 @@ machine-dream llm dream run --algorithm llmcluster --hybrid
 machine-dream llm dream run --algorithm llmcluster --no-cache
 ```
 
+### 3.4 FastCluster v3 (AISP Support)
+
+#### 3.4.1 Overview
+
+**Name**: FastCluster
+**Version**: 3
+**Identifier**: `fastclusterv3`
+**Approach**: FastCluster v2 with AISP cluster naming and encoding support
+
+**Performance Targets**:
+- Speed: <5 seconds for 500 experiences (same as v2)
+- Quality: 5-15 semantically coherent clusters with AISP naming
+- Memory: <100MB peak usage
+
+#### 3.4.2 Algorithm Description
+
+Extends FastClusterV2 with AISP mode support:
+
+**AISP Cluster Naming** (when `aispMode === 'aisp-full'`):
+```typescript
+protected formatClusterName(keywords: string[]): string {
+  if (this.aispMode === 'aisp-full') {
+    // "only candidate" -> ⟦Λ:Cluster.OnlyCandidate⟧
+    return `⟦Λ:Cluster.${this.toAISPIdentifier(keywords)}⟧`;
+  }
+  return keywords.join('_');  // v2 behavior
+}
+
+private toAISPIdentifier(keywords: string[]): string {
+  // Convert to PascalCase: "only candidate" -> "OnlyCandidate"
+  return keywords.map(k => k.split(' ').map(w =>
+    w.charAt(0).toUpperCase() + w.slice(1)
+  ).join('')).join('');
+}
+```
+
+**Backward Compatibility**:
+- When `aispMode === 'off'`: Identical behavior to FastClusterV2
+- Only cluster names change in AISP mode; clustering logic remains the same
+
+#### 3.4.3 Validation Criteria
+
+**Success Criteria**:
+- ✅ All FastClusterV2 tests pass when `aispMode === 'off'`
+- ✅ Cluster names use `⟦Λ:Cluster.Name⟧` format when `aispMode === 'aisp-full'`
+- ✅ Cluster contents are identical to v2 (only naming changes)
+
+### 3.5 DeepCluster v2 (AISP Support)
+
+#### 3.5.1 Overview
+
+**Name**: DeepCluster
+**Version**: 2
+**Identifier**: `deepclusterv2`
+**Approach**: DeepCluster v1 with AISP LLM prompts and validation
+
+**Performance Targets**:
+- Speed: <60 seconds for 500 experiences (same as v1)
+- Quality: 8-20 semantically diverse clusters with AISP formatting
+- Memory: <200MB peak usage
+
+#### 3.5.2 Algorithm Description
+
+Extends DeepClusterV1 with AISP mode support:
+
+**Phase 2: AISP Semantic Split** (when `aispMode === 'aisp-full'`):
+```typescript
+// Build AISP prompt for pattern identification
+private buildAISPSemanticSplitPrompt(
+  clusterName: string,
+  experiences: LLMExperience[]
+): string {
+  const date = new Date().toISOString().split('T')[0];
+  return `𝔸1.0.sudoku.semantic.split@${date}
+γ≔sudoku.pattern.identification
+ρ≔⟨cluster,patterns,categorization⟩
+
+${this.aispBuilder.getAISPGenerationSpec()}
+
+⟦Γ:Context⟧{
+  cluster≜"${clusterName}"
+  experience_count≜${experiences.length}
+  task≜identify(semantic_patterns)→categorize
+}
+
+⟦Σ:Experiences⟧{
+  ${experiences.map((e, i) => `exp[${i}]≔"${e.reasoning.substring(0, 100)}..."`).join('\n  ')}
+}
+
+⟦Ε:Output⟧{
+  format≔⟦Λ:Pattern.Name⟧{
+    desc≔when_applicable
+    keywords≔{terms}
+    examples≔{exp_ids}
+  }
+  ∀output:syntax∈AISP
+  ¬prose
+}`;
+}
+
+// Parse AISP pattern response
+private parseAISPPatternResponse(response: string): SemanticPattern[] {
+  // Extract ⟦Λ:Pattern.Name⟧{...} blocks
+  const patternRegex = /⟦Λ:Pattern\.(\w+)⟧\{([^}]+)\}/g;
+  // ... pattern extraction logic
+}
+```
+
+**AISP Validation**:
+- All LLM responses validated using `AISPValidatorService`
+- On tier ⊘ (δ < 0.20): Request LLM critique, fallback to English parsing
+- Log warnings for tier ◊⁻ (δ < 0.40)
+
+**Backward Compatibility**:
+- When `aispMode === 'off'`: Identical behavior to DeepClusterV1
+
+#### 3.5.3 Validation Criteria
+
+**Success Criteria**:
+- ✅ All DeepClusterV1 tests pass when `aispMode === 'off'`
+- ✅ LLM prompts use AISP syntax when `aispMode === 'aisp-full'`
+- ✅ aisp-validator validates prompts with tier ≥ ◊⁻ (δ ≥ 0.20)
+- ✅ Graceful fallback on AISP validation failure
+
+### 3.6 LLMCluster v2 (AISP Support)
+
+#### 3.6.1 Overview
+
+**Name**: LLMCluster
+**Version**: 2
+**Identifier**: `llmclusterv2`
+**Approach**: Full AISP prompts for pattern identification, categorization, and refinement
+
+**Note**: LLMClusterV2 receives an in-place update to add AISP support. The version identifier remains `llmclusterv2` but the codeHash changes.
+
+#### 3.6.2 AISP Prompt Types
+
+When `aispMode === 'aisp-full'`, all four prompt types use AISP syntax:
+
+1. **Pattern Identification**: `buildAISPMutuallyExclusivePrompt()`
+2. **Self-Critique**: `buildAISPSelfCritiquePrompt()`
+3. **Categorization**: `buildAISPCategorizationSystemPrompt()` + `buildAISPCategorizationBatchPrompt()`
+4. **Refinement**: `buildAISPRefinementPrompt()`
+
+#### 3.6.3 AISP Validation
+
+- All LLM responses validated using `AISPValidatorService.validateWithCritique()`
+- Validation tiers: ◊⁺⁺ (δ≥0.75), ◊⁺ (δ≥0.60), ◊ (δ≥0.40), ◊⁻ (δ≥0.20), ⊘ (δ<0.20)
+- On tier ⊘: Request LLM critique for guidance, fallback to English parsing
+
+#### 3.6.4 Validation Criteria
+
+**Success Criteria**:
+- ✅ All existing LLMClusterV2 tests pass when `aispMode === 'off'`
+- ✅ All prompts use AISP syntax when `aispMode === 'aisp-full'`
+- ✅ aisp-validator reports tier ≥ ◊⁻ for generated prompts
+- ✅ LLM critique logged on validation failure
+
 ---
 
 ## 4. Learning Unit Naming Convention

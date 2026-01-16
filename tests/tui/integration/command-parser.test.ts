@@ -193,7 +193,8 @@ describe('CommandParser Service Integration Tests (Spec 14 Section 4)', () => {
     });
 
     it('should support llm command with subcommands', async () => {
-      const spy = vi.spyOn(executor, 'executeLLM');
+      // Mock to prevent actual LLM operations (dream/benchmark take too long)
+      const spy = vi.spyOn(executor, 'executeLLM').mockResolvedValue('LLM command executed');
 
       await parser.execute('llm play puzzle.json');
       expect(spy).toHaveBeenCalledWith(expect.arrayContaining(['play']));

@@ -240,7 +240,7 @@ describe('ProfileValidator (Spec 13)', () => {
 
     it('should fail validation for timeout too long', () => {
       const profile = createValidProfile();
-      profile.timeout = 400000;
+      profile.timeout = 1000000; // Exceeds max of 900000ms (15 minutes)
 
       const result = ProfileValidator.validate(profile);
       expect(result.valid).toBe(false);

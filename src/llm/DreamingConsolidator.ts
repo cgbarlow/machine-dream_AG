@@ -85,11 +85,18 @@ export class DreamingConsolidator {
    * - Prompts sent to LLM for synthesis
    * - Strategy storage format (aispEncoded field)
    * - All reasoning and analysis
+   * - Clustering algorithm prompts (ADR-013)
    *
    * @param mode - 'off' | 'aisp' | 'aisp-full'
    */
   setAISPMode(mode: AISPMode): void {
     this.aispMode = mode;
+
+    // Propagate to clustering algorithm (ADR-013)
+    if (this.clusteringAlgorithm.setAISPMode) {
+      this.clusteringAlgorithm.setAISPMode(mode);
+    }
+
     console.log(`🔤 AISP mode set to: ${mode}`);
   }
 

@@ -7,9 +7,11 @@
  * See:
  * - Spec 18: Algorithm Versioning System
  * - ADR-011: Versioned Algorithms Architecture
+ * - ADR-013: AISP Validator Integration
  */
 
 import type { LLMExperience, LLMConfig } from '../types.js';
+import type { AISPMode } from '../AISPBuilder.js';
 
 /**
  * Result of clustering operation
@@ -97,6 +99,20 @@ export interface ClusteringAlgorithm {
    * @returns Identifier (e.g., "fastclusterv2")
    */
   getIdentifier(): string;
+
+  /**
+   * Set AISP mode for prompt generation
+   * When 'aisp-full', all prompts use pure AISP syntax
+   *
+   * @param mode - AISP mode ('off', 'aisp', 'aisp-full')
+   */
+  setAISPMode?(mode: AISPMode): void;
+
+  /**
+   * Get current AISP mode
+   * @returns Current AISP mode
+   */
+  getAISPMode?(): AISPMode;
 }
 
 /**
@@ -107,6 +123,7 @@ export interface ClusteringAlgorithm {
  */
 export abstract class BaseClusteringAlgorithm implements ClusteringAlgorithm {
   protected metadata: AlgorithmMetadata;
+  protected aispMode: AISPMode = 'off';
 
   /**
    * Create a new clustering algorithm
@@ -115,6 +132,22 @@ export abstract class BaseClusteringAlgorithm implements ClusteringAlgorithm {
   constructor(metadata: AlgorithmMetadata) {
     this.metadata = metadata;
     this.validateMetadata(metadata);
+  }
+
+  /**
+   * Set AISP mode for prompt generation
+   * @param mode - AISP mode ('off', 'aisp', 'aisp-full')
+   */
+  setAISPMode(mode: AISPMode): void {
+    this.aispMode = mode;
+  }
+
+  /**
+   * Get current AISP mode
+   * @returns Current AISP mode
+   */
+  getAISPMode(): AISPMode {
+    return this.aispMode;
   }
 
   /**

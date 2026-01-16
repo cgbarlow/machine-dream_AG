@@ -7,18 +7,23 @@
  * See:
  * - Spec 18: Algorithm Versioning System
  * - ADR-011: Versioned Algorithms Architecture
+ * - ADR-013: AISP Validator Integration
  */
 
 export * from './ClusteringAlgorithm.js';
 export * from './AlgorithmRegistry.js';
 export * from './FastClusterV2.js';
+export * from './FastClusterV3.js';
 export * from './DeepClusterV1.js';
+export * from './DeepClusterV2.js';
 export * from './LLMClusterV1.js';
 export * from './LLMClusterV2.js';
 
 import { AlgorithmRegistry } from './AlgorithmRegistry.js';
 import { FastClusterV2 } from './FastClusterV2.js';
+import { FastClusterV3 } from './FastClusterV3.js';
 import { DeepClusterV1 } from './DeepClusterV1.js';
+import { DeepClusterV2 } from './DeepClusterV2.js';
 import { LLMClusterV1, type LLMClusterConfig } from './LLMClusterV1.js';
 import { LLMClusterV2, type LLMClusterV2Config } from './LLMClusterV2.js';
 import type { LMStudioClient } from '../LMStudioClient.js';
@@ -42,9 +47,11 @@ export interface AlgorithmRegistryOptions {
  * This should be called once at application startup.
  * Registers all available clustering algorithms:
  * - FastCluster v2 (default) - Keyword-based with dominant cluster fix
+ * - FastCluster v3 - Keyword-based with AISP cluster naming (ADR-013)
  * - DeepCluster v1 - Two-phase: keyword + LLM semantic split
+ * - DeepCluster v2 - Two-phase with AISP semantic prompts (ADR-013)
  * - LLMCluster v1 - Fully LLM-driven pattern identification
- * - LLMCluster v2 - Enhanced LLM-driven with mutual exclusivity & self-critique
+ * - LLMCluster v2 - Enhanced LLM-driven with mutual exclusivity, self-critique, and AISP support
  *
  * @param llmClient - Optional LLM client for LLM-based algorithms
  * @param silent - Suppress console output (default: false)
@@ -66,16 +73,22 @@ export function initializeAlgorithmRegistry(
     registry.register(fastCluster, true);
     registry.setDefaultAlgorithm(fastCluster.getName());
 
+    // Register FastCluster v3 with AISP support (ADR-013)
+    const fastClusterV3 = new FastClusterV3();
+    registry.register(fastClusterV3);
+
     registryInitialized = true;
   }
 
   // Register LLM-based algorithms if client provided and not already registered
   if (llmClient && !hasLLMAlgorithms) {
     const deepCluster = new DeepClusterV1(llmClient);
+    const deepClusterV2 = new DeepClusterV2(llmClient);
     const llmCluster = new LLMClusterV1(llmClient, llmClusterConfig);
     const llmClusterV2 = new LLMClusterV2(llmClient);
 
     registry.register(deepCluster);
+    registry.register(deepClusterV2);
     registry.register(llmCluster);
     registry.register(llmClusterV2);
   }

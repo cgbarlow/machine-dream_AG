@@ -1,9 +1,9 @@
 # Specification 16: AISP Mode Integration
 
-**Version:** 1.1.0
-**Date:** 2026-01-12
+**Version:** 1.2.0
+**Date:** 2026-01-16
 **Status:** Implemented
-**Depends On:** Spec 11 (LLM Sudoku Player), Spec 05 (Dreaming Pipeline)
+**Depends On:** Spec 11 (LLM Sudoku Player), Spec 05 (Dreaming Pipeline), Spec 18 (Algorithm Versioning)
 
 ---
 
@@ -12,6 +12,7 @@
 | ADR | Relationship |
 |-----|--------------|
 | [ADR-001: Pure LLM Solving](../adr/001-pure-llm-solving.md) | Authorizes AISP integration |
+| [ADR-013: AISP Validator Integration](../adr/013-aisp-validator-integration.md) | Authorizes aisp-validator for clustering |
 
 ---
 
@@ -80,6 +81,30 @@ Both modes are supported in:
 - `scripts/iterative-learning.sh`
 - `scripts/training-run.sh`
 - `scripts/abx-test.sh`
+
+### FR-05: Clustering Algorithm AISP Mode
+
+When `--aisp-full` is enabled during dreaming consolidation:
+- `DreamingConsolidator.setAISPMode()` propagates mode to clustering algorithm
+- `ClusteringAlgorithm.setAISPMode()` enables AISP prompt generation
+- All LLM-based clustering prompts (pattern identification, categorization, refinement) use AISP syntax
+- LLM responses are validated using `aisp-validator` package (v0.2.2)
+- Validation failures trigger LLM self-critique for guidance on AISP compliance
+- Fallback to English parsing on AISP validation failure with tier ⊘ (δ < 0.20)
+
+**AISP Clustering Tiers:**
+| Tier | Symbol | Density (δ) | Action |
+|------|--------|-------------|--------|
+| Platinum | ◊⁺⁺ | δ ≥ 0.75 | Accept |
+| Gold | ◊⁺ | δ ≥ 0.60 | Accept |
+| Silver | ◊ | δ ≥ 0.40 | Accept |
+| Bronze | ◊⁻ | δ ≥ 0.20 | Accept with warning |
+| Reject | ⊘ | δ < 0.20 | Request critique, fallback |
+
+**Algorithm Support:**
+- **FastClusterV3**: AISP cluster naming (`⟦Λ:Cluster.Name⟧` format)
+- **DeepClusterV2**: AISP semantic split prompts for LLM pattern identification
+- **LLMClusterV2**: Full AISP prompts for all phases (pattern, categorization, refinement)
 
 ---
 
@@ -302,6 +327,99 @@ Parsed as:
 - `col: 1`
 - `value: 2`
 - `reasoning: "∧(row_missing=2)∧(col_missing=2)∧(box_missing=2)"`
+
+### 4.8 ClusteringAlgorithm AISP Integration
+
+Extends the clustering algorithm interface with AISP mode support (`src/llm/clustering/ClusteringAlgorithm.ts`):
+
+```typescript
+import type { AISPMode } from '../AISPBuilder.js';
+
+export interface ClusteringAlgorithm {
+  // ... existing methods ...
+
+  /**
+   * Set AISP mode for prompt generation
+   * When 'aisp-full', all prompts use pure AISP syntax
+   */
+  setAISPMode?(mode: AISPMode): void;
+}
+
+export abstract class BaseClusteringAlgorithm {
+  protected aispMode: AISPMode = 'off';
+
+  setAISPMode(mode: AISPMode): void {
+    this.aispMode = mode;
+  }
+}
+```
+
+### 4.9 AISPValidatorService
+
+Wrapper around `aisp-validator` package with LLM critique functionality (`src/llm/AISPValidator.ts`):
+
+```typescript
+import AISP from 'aisp-validator';
+
+export interface AISPValidationResult {
+  valid: boolean;
+  tier: string;           // ◊⁺⁺, ◊⁺, ◊, ◊⁻, ⊘
+  tierName: string;       // Platinum, Gold, Silver, Bronze, Reject
+  delta: number;          // Density [0, 1]
+  pureDensity: number;    // Symbol/token ratio
+  error?: string;
+}
+
+export class AISPValidatorService {
+  private initialized: boolean = false;
+
+  /**
+   * Initialize WASM kernel (required before validation)
+   */
+  async init(): Promise<void>;
+
+  /**
+   * Validate AISP text
+   * @returns Validation result with tier and delta
+   */
+  validate(text: string): AISPValidationResult;
+
+  /**
+   * Validate with LLM critique on failure
+   * Requests guidance on making prompt AISP compliant
+   */
+  async validateWithCritique(
+    text: string,
+    originalPrompt: string,
+    llmClient: LMStudioClient
+  ): Promise<{
+    result: AISPValidationResult;
+    critique?: string;      // LLM critique if tier = ⊘
+    guidance?: string;      // How to improve AISP compliance
+  }>;
+
+  /**
+   * Get detailed density breakdown for debugging
+   */
+  debug(text: string): object;
+}
+```
+
+### 4.10 DreamingConsolidator AISP Propagation
+
+Updates to propagate AISP mode to clustering algorithms:
+
+```typescript
+// src/llm/DreamingConsolidator.ts
+setAISPMode(mode: AISPMode): void {
+  this.aispMode = mode;
+  // Propagate to clustering algorithm
+  if (this.clusteringAlgorithm.setAISPMode) {
+    this.clusteringAlgorithm.setAISPMode(mode);
+  }
+  console.log(`🔤 AISP mode set to: ${mode}`);
+}
+```
 
 ---
 
@@ -548,6 +666,7 @@ AISP syntax is more compact than natural language:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.2.0 | 2026-01-16 | Clustering AISP support: FR-05, aisp-validator integration, FastClusterV3, DeepClusterV2, LLMClusterV2 AISP |
 | 1.1.0 | 2026-01-12 | Full implementation: AISP system prompts, dreaming integration, strategy encoding |
 | 1.0.0 | 2026-01-12 | Initial specification |
 

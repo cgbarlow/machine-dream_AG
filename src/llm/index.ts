@@ -14,6 +14,8 @@ export { LearningUnitManager } from './LearningUnitManager.js';
 export { LMStudioModelManager } from './ModelManager.js';
 export { AISPBuilder } from './AISPBuilder.js';
 export { AISPStrategyEncoder } from './AISPStrategyEncoder.js';
+export { AISPValidatorService } from './AISPValidator.js';
+export type { AISPValidationResult, AISPDebugBreakdown, AISPValidationWithCritique } from './AISPValidator.js';
 export { LLMBenchmark } from './Benchmark.js';
 export { DEFAULT_LLM_CONFIG, SYSTEM_PROMPT, validateConfig, buildSystemPrompt } from './config.js';
 export type { AISPMode, SystemPromptOptions } from './config.js';

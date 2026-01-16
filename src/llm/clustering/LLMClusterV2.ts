@@ -8,14 +8,21 @@
  * - Request 15-20 patterns initially for more diversity
  * - Two-pass refinement for dominant clusters (>50% experiences)
  *
+ * AISP Mode Support (ADR-013):
+ * - When aispMode === 'aisp-full', all prompts use pure AISP syntax
+ * - Pattern identification uses AISP mutual exclusivity constraints
+ * - Categorization uses AISP output format
+ * - LLM responses validated with aisp-validator
+ *
  * Philosophy: LLM does the heavy lifting. No hints, no examples from us.
  * We just ask the model to think harder and critique its own work.
  *
  * Performance: <180s for 500 experiences (similar to v1)
  *
  * See:
- * - Spec 18: Algorithm Versioning System
+ * - Spec 18: Algorithm Versioning System - Section 3.3
  * - ADR-011: Versioned Algorithms Architecture
+ * - ADR-013: AISP Validator Integration
  */
 
 import crypto from 'crypto';
@@ -28,6 +35,8 @@ import {
 } from './ClusteringAlgorithm.js';
 import type { LLMExperience, LLMConfig } from '../types.js';
 import { LMStudioClient } from '../LMStudioClient.js';
+import { AISPBuilder } from '../AISPBuilder.js';
+import { AISPValidatorService } from '../AISPValidator.js';
 
 // ES module equivalent of __filename
 const __filename = fileURLToPath(import.meta.url);
@@ -81,6 +90,9 @@ export class LLMClusterV2 extends BaseClusteringAlgorithm {
   private llmClient: LMStudioClient;
   private config: LLMClusterV2Config;
   private debugMode = false;
+  private aispBuilder: AISPBuilder;
+  private aispValidator: AISPValidatorService;
+  private validatorInitialized = false;
 
   /**
    * Sample size for pattern identification (100-150 experiences)
@@ -99,13 +111,31 @@ export class LLMClusterV2 extends BaseClusteringAlgorithm {
       name: 'LLMCluster',
       version: 2,
       identifier: 'llmclusterv2',
-      description: 'Improved LLM-driven pattern identification with mutual exclusivity and self-critique',
+      description: 'Improved LLM-driven pattern identification with mutual exclusivity, self-critique, and AISP support',
       codeHash: computeCodeHash(__filename),
       createdAt: new Date('2026-01-15'),
     };
     super(metadata);
     this.llmClient = llmClient;
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.aispBuilder = new AISPBuilder();
+    this.aispValidator = new AISPValidatorService();
+  }
+
+  /**
+   * Initialize AISP validator if needed
+   */
+  private async ensureValidatorInitialized(): Promise<void> {
+    if (this.validatorInitialized) return;
+
+    if (this.aispMode === 'aisp-full') {
+      try {
+        await this.aispValidator.init();
+        this.validatorInitialized = true;
+      } catch (error) {
+        console.warn(`⚠️ Failed to initialize AISP validator: ${error}`);
+      }
+    }
   }
 
   /**
@@ -128,6 +158,10 @@ export class LLMClusterV2 extends BaseClusteringAlgorithm {
 
     console.log(`🔍 Clustering ${experiences.length} experiences with ${this.getIdentifier()}...`);
     console.log(`   Target clusters: ${targetCount}`);
+    if (this.aispMode === 'aisp-full') {
+      console.log(`   🔤 AISP mode enabled - all prompts will use AISP syntax`);
+      await this.ensureValidatorInitialized();
+    }
 
     if (experiences.length === 0) {
       return {
@@ -222,37 +256,127 @@ export class LLMClusterV2 extends BaseClusteringAlgorithm {
   /**
    * Ask LLM to identify MUTUALLY EXCLUSIVE reasoning patterns
    * v2 improvement: Emphasize non-overlapping criteria
+   * AISP mode: Uses pure AISP prompts when aispMode === 'aisp-full'
    */
   private async identifyMutuallyExclusivePatterns(
     sampled: LLMExperience[],
     targetCount: number
   ): Promise<ReasoningPattern[]> {
-    const prompt = this.buildMutuallyExclusivePrompt(sampled, targetCount);
-
-    const response = await this.llmClient.chat([
-      {
-        role: 'system',
-        content: `You are a Sudoku reasoning expert. Your task is to identify DISTINCT, NON-OVERLAPPING reasoning patterns.
+    // Select prompt based on AISP mode
+    const systemPrompt = this.aispMode === 'aisp-full'
+      ? this.buildAISPPatternSystemPrompt()
+      : `You are a Sudoku reasoning expert. Your task is to identify DISTINCT, NON-OVERLAPPING reasoning patterns.
 
 CRITICAL: Each pattern MUST be mutually exclusive from all others. If an experience could fit multiple patterns, your patterns are not distinct enough.
 
-Think like a taxonomist creating a classification system where each item belongs to exactly ONE category.`,
-      },
-      {
-        role: 'user',
-        content: prompt,
-      },
+Think like a taxonomist creating a classification system where each item belongs to exactly ONE category.`;
+
+    const prompt = this.aispMode === 'aisp-full'
+      ? this.buildAISPMutuallyExclusivePrompt(sampled, targetCount)
+      : this.buildMutuallyExclusivePrompt(sampled, targetCount);
+
+    const response = await this.llmClient.chat([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: prompt },
     ]);
 
     if (this.debugMode && response.content.length > 0) {
       console.log(`   📝 LLM response preview: ${response.content.substring(0, 500)}...`);
     }
 
-    const patterns = this.parsePatterns(response.content);
+    // Validate and parse based on AISP mode
+    let patterns: ReasoningPattern[];
+    if (this.aispMode === 'aisp-full' && this.validatorInitialized) {
+      patterns = await this.parseAndValidateAISPPatterns(response.content, prompt);
+    } else {
+      patterns = this.parsePatterns(response.content);
+    }
 
     if (patterns.length === 0) {
       console.warn(`   ⚠️  Failed to parse patterns, using fallback`);
       return this.getFallbackPatterns();
+    }
+
+    return patterns;
+  }
+
+  /**
+   * Parse and validate AISP pattern response
+   */
+  private async parseAndValidateAISPPatterns(
+    response: string,
+    originalPrompt: string
+  ): Promise<ReasoningPattern[]> {
+    // Validate response
+    const validation = await this.aispValidator.validateWithCritique(
+      response,
+      originalPrompt,
+      this.llmClient
+    );
+
+    if (validation.result.tierValue === 0) {
+      // Reject tier - log critique and fall back to English parsing
+      console.warn(`   ⚠️ AISP validation failed (δ=${validation.result.delta.toFixed(3)})`);
+      if (validation.critique) {
+        console.warn(`   Critique: ${validation.critique.substring(0, 200)}...`);
+      }
+      if (validation.guidance) {
+        console.warn(`   Guidance: ${validation.guidance.substring(0, 200)}...`);
+      }
+      console.warn(`   Falling back to English parsing`);
+      return this.parsePatterns(response);
+    } else if (validation.result.tierValue < 2) {
+      // Bronze tier - warn but continue
+      console.warn(`   ⚠️ AISP tier ${validation.result.tierName} (δ=${validation.result.delta.toFixed(3)}) - below Silver`);
+    }
+
+    // Try to parse AISP patterns
+    const patterns = this.parseAISPPatterns(response);
+
+    // If AISP parsing failed, fall back to English
+    if (patterns.length === 0) {
+      console.warn(`   ⚠️ No AISP patterns parsed, falling back to English parsing`);
+      return this.parsePatterns(response);
+    }
+
+    return patterns;
+  }
+
+  /**
+   * Parse AISP-formatted patterns
+   */
+  private parseAISPPatterns(response: string): ReasoningPattern[] {
+    const patterns: ReasoningPattern[] = [];
+    const patternRegex = /⟦Λ:Pattern\.(\w+)⟧\{([^}]+)\}/g;
+    let match;
+
+    while ((match = patternRegex.exec(response)) !== null) {
+      const id = match[1];
+      const content = match[2];
+
+      // Extract fields
+      const nameMatch = content.match(/name≔"?([^",]+)"?/);
+      const descMatch = content.match(/desc≔"?([^",]+)"?/);
+      const distinctMatch = content.match(/distinct≔"?([^",]+)"?/);
+      const keywordsMatch = content.match(/keywords≔\{([^}]+)\}/);
+      const charMatch = content.match(/char≔\{([^}]+)\}/);
+
+      if (nameMatch) {
+        patterns.push({
+          id,
+          name: nameMatch[1].trim(),
+          description: descMatch?.[1]?.trim() || '',
+          distinctionCriteria: distinctMatch?.[1]?.trim(),
+          keywords: keywordsMatch?.[1]
+            ?.split(',')
+            .map((k) => k.trim().toLowerCase().replace(/"/g, ''))
+            .filter((k) => k.length > 0) || [],
+          characteristics: charMatch?.[1]
+            ?.split(',')
+            .map((c) => c.trim().replace(/"/g, ''))
+            .filter((c) => c.length > 0) || [],
+        });
+      }
     }
 
     return patterns;
@@ -307,18 +431,110 @@ Now identify ${targetCount} MUTUALLY EXCLUSIVE patterns:`;
   }
 
   /**
+   * Build AISP system prompt for pattern identification
+   */
+  private buildAISPPatternSystemPrompt(): string {
+    const date = new Date().toISOString().split('T')[0];
+
+    return `𝔸1.0.sudoku.clustering@${date}
+γ≔sudoku.pattern.identification
+ρ≔⟨patterns,taxonomy,mutual_exclusivity⟩
+
+${this.aispBuilder.getAISPGenerationSpec()}
+
+⟦Ω:Task⟧{
+  task≜identify(reasoning_patterns)
+  constraint≜∀p₁,p₂∈patterns:p₁≠p₂⇒¬overlap(p₁,p₂)
+  mutual_exclusivity≜∀exp:∃!p∈patterns:matches(exp,p)
+}
+
+⟦Σ:PatternFormat⟧{
+  Pattern≜⟦Λ:Pattern.ID⟧{
+    name≔string
+    desc≔when_applicable
+    distinct≔what_differs_from_others
+    keywords≔{unique_terms}
+    char≔{characteristics}
+  }
+}
+
+⟦Ε:Output⟧{
+  ∀pattern:format∈PatternFormat
+  ∀output:syntax∈AISP
+  ¬prose; ¬natural_language
+}`;
+  }
+
+  /**
+   * Build AISP prompt requiring MUTUALLY EXCLUSIVE patterns
+   */
+  private buildAISPMutuallyExclusivePrompt(
+    sampled: LLMExperience[],
+    targetCount: number
+  ): string {
+    const date = new Date().toISOString().split('T')[0];
+
+    return `𝔸1.0.sudoku.pattern.identification@${date}
+γ≔pattern.extraction
+
+⟦Σ:Input⟧{
+  experiences≔⟨
+${sampled.slice(0, 60).map((exp, i) => `    e${i + 1}≔"${exp.move.reasoning.replace(/"/g, "'").substring(0, 100)}"`).join('\n')}
+  ⟩
+  ${sampled.length > 60 ? `  ;; ...and ${sampled.length - 60} more experiences` : ''}
+  target_count≔${targetCount}
+}
+
+⟦Ω:Task⟧{
+  task≜identify(${targetCount},MUTUALLY_EXCLUSIVE,reasoning_patterns)
+  ∀p₁,p₂∈output:p₁≠p₂⇒¬overlap(p₁,p₂)
+  ∀exp∈experiences:∃!p∈patterns:matches(exp,p)
+}
+
+⟦Σ:RequiredFields⟧{
+  ID≜P1,P2,...,P${targetCount}
+  name≜concise_pattern_name
+  desc≜when_pattern_applies
+  distinct≜CRITICAL:why_different_from_ALL_other_patterns
+  keywords≜{terms_UNIQUE_to_this_pattern}
+  char≜{characteristics}
+}
+
+⟦Ε:Output⟧{
+  format≔⟨
+    ⟦Λ:Pattern.P1⟧{name≔...,desc≔...,distinct≔...,keywords≔{...},char≔{...}}
+    ⟦Λ:Pattern.P2⟧{...}
+    ...
+  ⟩
+  ∀output:syntax∈AISP
+  ¬prose; ¬natural_language
+}`;
+  }
+
+  /**
    * LLM self-critique step: Ask LLM to review and revise patterns
    * v2 improvement: Quality control before categorization
+   * AISP mode: Uses AISP prompts when aispMode === 'aisp-full'
    */
   private async selfCritiquePatterns(
     patterns: ReasoningPattern[],
     sampled: LLMExperience[]
   ): Promise<ReasoningPattern[]> {
-    const patternSummary = patterns
-      .map((p) => `${p.id}. ${p.name}: ${p.description}`)
-      .join('\n');
+    // Build prompts based on AISP mode
+    let systemPrompt: string;
+    let userPrompt: string;
 
-    const prompt = `You previously identified these ${patterns.length} reasoning patterns:
+    if (this.aispMode === 'aisp-full') {
+      systemPrompt = this.buildAISPCritiqueSystemPrompt();
+      userPrompt = this.buildAISPSelfCritiquePrompt(patterns, sampled);
+    } else {
+      systemPrompt = 'You are reviewing pattern definitions for quality. Be critical. Identify any overlap or ambiguity.';
+
+      const patternSummary = patterns
+        .map((p) => `${p.id}. ${p.name}: ${p.description}`)
+        .join('\n');
+
+      userPrompt = `You previously identified these ${patterns.length} reasoning patterns:
 
 ${patternSummary}
 
@@ -343,20 +559,16 @@ Sample experiences for reference:
 ${sampled.slice(0, 20).map((exp, i) => `${i + 1}. "${exp.move.reasoning}"`).join('\n')}
 
 Your response:`;
+    }
 
     const response = await this.llmClient.chat([
-      {
-        role: 'system',
-        content: 'You are reviewing pattern definitions for quality. Be critical. Identify any overlap or ambiguity.',
-      },
-      {
-        role: 'user',
-        content: prompt,
-      },
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
     ]);
 
-    // If LLM says patterns are OK, keep them
-    if (response.content.trim().startsWith('PATTERNS_OK')) {
+    // Check for PATTERNS_OK response (AISP or English)
+    if (response.content.trim().startsWith('PATTERNS_OK') ||
+        response.content.includes('⊤:patterns_valid')) {
       if (this.debugMode) {
         console.log(`   ✓ LLM approved patterns as distinct`);
       }
@@ -364,7 +576,12 @@ Your response:`;
     }
 
     // Otherwise, try to parse revised patterns
-    const revisedPatterns = this.parsePatterns(response.content);
+    let revisedPatterns: ReasoningPattern[];
+    if (this.aispMode === 'aisp-full' && this.validatorInitialized) {
+      revisedPatterns = await this.parseAndValidateAISPPatterns(response.content, userPrompt);
+    } else {
+      revisedPatterns = this.parsePatterns(response.content);
+    }
 
     if (revisedPatterns.length > 0) {
       if (this.debugMode) {
@@ -375,6 +592,69 @@ Your response:`;
 
     // If parsing failed, keep original
     return patterns;
+  }
+
+  /**
+   * Build AISP system prompt for self-critique
+   */
+  private buildAISPCritiqueSystemPrompt(): string {
+    const date = new Date().toISOString().split('T')[0];
+
+    return `𝔸1.0.sudoku.pattern.critique@${date}
+γ≔pattern.quality.review
+
+${this.aispBuilder.getAISPGenerationSpec()}
+
+⟦Ω:Task⟧{
+  task≜review(patterns)→critique∨approve
+  criteria≜mutual_exclusivity∧specificity∧coverage
+}
+
+⟦Ε:Output⟧{
+  approve≔⊤:patterns_valid
+  revise≔⟦Λ:Pattern.P1⟧{...}...
+  ∀output:syntax∈AISP
+  ¬prose
+}`;
+  }
+
+  /**
+   * Build AISP self-critique prompt
+   */
+  private buildAISPSelfCritiquePrompt(
+    patterns: ReasoningPattern[],
+    sampled: LLMExperience[]
+  ): string {
+    const date = new Date().toISOString().split('T')[0];
+
+    const patternList = patterns
+      .map((p) => `    ⟦Λ:Pattern.${p.id}⟧{name≔"${p.name}",desc≔"${p.description}"}`)
+      .join('\n');
+
+    return `𝔸1.0.sudoku.pattern.critique@${date}
+γ≔self.critique
+
+⟦Σ:Patterns⟧{
+${patternList}
+}
+
+⟦Σ:SampleExperiences⟧{
+${sampled.slice(0, 20).map((exp, i) => `  e${i + 1}≔"${exp.move.reasoning.replace(/"/g, "'").substring(0, 80)}"`).join('\n')}
+}
+
+⟦Ω:CritiqueTask⟧{
+  q1≜∀p₁,p₂:mutually_exclusive(p₁,p₂)?
+  q2≜∃exp:matches(exp,p₁)∧matches(exp,p₂)?
+  q3≜∃p:too_broad(p)⇒captures(>50%)?
+  q4≜∃p₁,p₂:too_similar(p₁,p₂)⇒merge?
+}
+
+⟦Ε:Output⟧{
+  if(all_valid)⇒⊤:patterns_valid
+  else⇒revised_patterns:⟦Λ:Pattern.P1⟧{name≔...,desc≔...,distinct≔...,keywords≔{...},char≔{...}}...
+  ∀output:syntax∈AISP
+  ¬prose
+}`;
   }
 
   /**
@@ -529,21 +809,33 @@ Your response:`;
   /**
    * Categorize batch with demanding prompt
    * v2 improvement: Ask for MOST SPECIFIC pattern
+   * AISP mode: Uses AISP prompts when aispMode === 'aisp-full'
    */
   private async categorizeBatchDemanding(
     batch: LLMExperience[],
     patterns: ReasoningPattern[]
   ): Promise<{ exp: LLMExperience; patternName: string }[]> {
-    // Build pattern list with distinction criteria
-    const patternList = patterns
-      .map((p, i) => `${i + 1}. ${p.name}: ${p.description}${p.distinctionCriteria ? ` [DISTINCT: ${p.distinctionCriteria}]` : ''}`)
-      .join('\n');
+    let systemPrompt: string;
+    let userPrompt: string;
 
-    const experienceList = batch
-      .map((exp, i) => `${i + 1}. "${exp.move.reasoning}"`)
-      .join('\n\n');
+    if (this.aispMode === 'aisp-full') {
+      systemPrompt = this.buildAISPCategorizationSystemPrompt();
+      userPrompt = this.buildAISPCategorizationBatchPrompt(batch, patterns);
+    } else {
+      // Build pattern list with distinction criteria
+      const patternList = patterns
+        .map((p, i) => `${i + 1}. ${p.name}: ${p.description}${p.distinctionCriteria ? ` [DISTINCT: ${p.distinctionCriteria}]` : ''}`)
+        .join('\n');
 
-    const prompt = `CATEGORIZATION TASK: Assign each reasoning statement to the MOST SPECIFIC pattern.
+      const experienceList = batch
+        .map((exp, i) => `${i + 1}. "${exp.move.reasoning}"`)
+        .join('\n\n');
+
+      systemPrompt = `You categorize Sudoku reasoning into SPECIFIC patterns.
+IMPORTANT: Always prefer more specific patterns over general ones.
+Output only numbers, one per line.`;
+
+      userPrompt = `CATEGORIZATION TASK: Assign each reasoning statement to the MOST SPECIFIC pattern.
 
 Available patterns (${patterns.length}):
 ${patternList}
@@ -559,18 +851,11 @@ ${experienceList}
 
 Output ONLY pattern numbers (1-${patterns.length}), one per line.
 For each statement, output the number of the MOST SPECIFIC matching pattern:`;
+    }
 
     const response = await this.llmClient.chat([
-      {
-        role: 'system',
-        content: `You categorize Sudoku reasoning into SPECIFIC patterns.
-IMPORTANT: Always prefer more specific patterns over general ones.
-Output only numbers, one per line.`,
-      },
-      {
-        role: 'user',
-        content: prompt,
-      },
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
     ]);
 
     // Parse response
@@ -589,6 +874,62 @@ Output only numbers, one per line.`,
     }
 
     return results;
+  }
+
+  /**
+   * Build AISP system prompt for categorization
+   */
+  private buildAISPCategorizationSystemPrompt(): string {
+    const date = new Date().toISOString().split('T')[0];
+
+    return `𝔸1.0.sudoku.categorization@${date}
+γ≔sudoku.experience.categorization
+
+⟦Ω:Task⟧{
+  task≜categorize(experiences)→most_specific(pattern)
+  rule≜prefer(specific)>prefer(general)
+}
+
+⟦Ε:Output⟧{
+  format≔⟦Σ:Categories⟧{⟨n₁,n₂,...,nₖ⟩}
+  ;; One number per experience, one per line
+  ∀output:syntax∈AISP
+  ¬prose
+}`;
+  }
+
+  /**
+   * Build AISP batch categorization prompt
+   */
+  private buildAISPCategorizationBatchPrompt(
+    batch: LLMExperience[],
+    patterns: ReasoningPattern[]
+  ): string {
+    const date = new Date().toISOString().split('T')[0];
+
+    return `𝔸1.0.sudoku.categorization.batch@${date}
+γ≔batch.categorization
+
+⟦Σ:Patterns⟧{
+${patterns.map((p, i) => `  p${i + 1}≔⟦Λ:Pattern.${p.id}⟧{name≔"${p.name}",desc≔"${p.description}"${p.distinctionCriteria ? `,distinct≔"${p.distinctionCriteria}"` : ''}}`).join('\n')}
+}
+
+⟦Σ:Experiences⟧{
+${batch.map((exp, i) => `  e${i + 1}≔"${exp.move.reasoning.replace(/"/g, "'").substring(0, 100)}"`).join('\n')}
+}
+
+⟦Ω:Task⟧{
+  ∀eᵢ∈Experiences:assign(eᵢ)→most_specific(pⱼ)
+  prefer(specific)>prefer(general)
+  no_match⇒0
+}
+
+⟦Ε:Output⟧{
+  ;; Output pattern numbers (1-${patterns.length}), one per line
+  format≔⟨n₁⟩\\n⟨n₂⟩\\n...⟨nₖ⟩
+  ∀nᵢ∈{0..${patterns.length}}
+  ¬prose
+}`;
   }
 
   /**
@@ -612,6 +953,7 @@ Output only numbers, one per line.`,
   /**
    * Refine dominant cluster by asking LLM to split it
    * v2 improvement: LLM-driven refinement, no heuristics
+   * AISP mode: Uses AISP prompts when aispMode === 'aisp-full'
    */
   private async refineDominantCluster(
     clusters: Map<string, LLMExperience[]>,
@@ -624,8 +966,15 @@ Output only numbers, one per line.`,
     const sampleSize = Math.min(100, dominant.experiences.length);
     const sampled = this.sampleBalanced(dominant.experiences, sampleSize);
 
-    // Ask LLM to identify sub-patterns within the dominant cluster
-    const prompt = `The pattern "${dominant.name}" captured ${dominant.percentage.toFixed(0)}% of all experiences. This is too broad.
+    let systemPrompt: string;
+    let userPrompt: string;
+
+    if (this.aispMode === 'aisp-full') {
+      systemPrompt = this.buildAISPRefinementSystemPrompt();
+      userPrompt = this.buildAISPRefinementPrompt(dominant, sampled);
+    } else {
+      systemPrompt = 'You are splitting a broad category into specific sub-categories. Be precise and ensure sub-patterns are mutually exclusive.';
+      userPrompt = `The pattern "${dominant.name}" captured ${dominant.percentage.toFixed(0)}% of all experiences. This is too broad.
 
 Analyze these ${sampled.length} experiences from this pattern and identify 3-5 DISTINCT SUB-PATTERNS within them:
 
@@ -643,19 +992,20 @@ KEYWORDS: [unique keywords]
 CHAR: [characteristics]
 
 Provide 3-5 sub-patterns:`;
+    }
 
     const response = await this.llmClient.chat([
-      {
-        role: 'system',
-        content: 'You are splitting a broad category into specific sub-categories. Be precise and ensure sub-patterns are mutually exclusive.',
-      },
-      {
-        role: 'user',
-        content: prompt,
-      },
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
     ]);
 
-    const subPatterns = this.parsePatterns(response.content);
+    // Parse patterns based on AISP mode
+    let subPatterns: ReasoningPattern[];
+    if (this.aispMode === 'aisp-full' && this.validatorInitialized) {
+      subPatterns = await this.parseAndValidateAISPPatterns(response.content, userPrompt);
+    } else {
+      subPatterns = this.parsePatterns(response.content);
+    }
 
     if (subPatterns.length < 2) {
       console.log(`   ⚠️  LLM couldn't split dominant cluster (found ${subPatterns.length} sub-patterns)`);
@@ -686,6 +1036,68 @@ Provide 3-5 sub-patterns:`;
     }
 
     return refined;
+  }
+
+  /**
+   * Build AISP system prompt for refinement
+   */
+  private buildAISPRefinementSystemPrompt(): string {
+    const date = new Date().toISOString().split('T')[0];
+
+    return `𝔸1.0.sudoku.pattern.refinement@${date}
+γ≔cluster.subdivision
+
+${this.aispBuilder.getAISPGenerationSpec()}
+
+⟦Ω:Task⟧{
+  task≜split(dominant_cluster)→sub_patterns
+  constraint≜∀p₁,p₂:mutually_exclusive(p₁,p₂)
+}
+
+⟦Ε:Output⟧{
+  format≔⟦Λ:Pattern.P1⟧{...}⟦Λ:Pattern.P2⟧{...}...
+  ∀output:syntax∈AISP
+  ¬prose
+}`;
+  }
+
+  /**
+   * Build AISP refinement prompt for dominant cluster
+   */
+  private buildAISPRefinementPrompt(
+    dominant: { name: string; percentage: number },
+    sampled: LLMExperience[]
+  ): string {
+    const date = new Date().toISOString().split('T')[0];
+
+    return `𝔸1.0.sudoku.pattern.refinement@${date}
+γ≔dominant.cluster.split
+
+⟦Σ:DominantCluster⟧{
+  name≔"${dominant.name}"
+  percentage≔${dominant.percentage.toFixed(0)}%
+  problem≔too_broad
+}
+
+⟦Σ:Experiences⟧{
+${sampled.slice(0, 50).map((exp, i) => `  e${i + 1}≔"${exp.move.reasoning.replace(/"/g, "'").substring(0, 100)}"`).join('\n')}
+  ${sampled.length > 50 ? `  ;; ...and ${sampled.length - 50} more similar experiences` : ''}
+}
+
+⟦Ω:Task⟧{
+  task≜identify(3..5,sub_patterns)∈"${dominant.name}"
+  constraint≜∀p:distinct(p)∧mutually_exclusive
+}
+
+⟦Ε:Output⟧{
+  format≔⟨
+    ⟦Λ:Pattern.P1⟧{name≔...,desc≔...,keywords≔{...},char≔{...}}
+    ⟦Λ:Pattern.P2⟧{...}
+    ...
+  ⟩
+  ∀output:syntax∈AISP
+  ¬prose
+}`;
   }
 
   /**

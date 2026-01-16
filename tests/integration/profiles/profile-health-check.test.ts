@@ -74,7 +74,7 @@ describe('Profile Health Check Integration (Spec 13)', () => {
         expect(result.error).toBeDefined();
         expect(result.latency).toBeDefined();
       }
-    });
+    }, { timeout: 35000 }); // Network timeout + buffer
 
     it('should measure latency during health check', async () => {
       manager.create(createLMStudioProfile());
@@ -84,7 +84,7 @@ describe('Profile Health Check Integration (Spec 13)', () => {
       expect(result.latency).toBeDefined();
       expect(typeof result.latency).toBe('number');
       expect(result.latency).toBeGreaterThan(0);
-    });
+    }, { timeout: 35000 }); // Network timeout + buffer
 
     it('should test active profile when no name specified', async () => {
       const options = createLMStudioProfile();
@@ -96,7 +96,7 @@ describe('Profile Health Check Integration (Spec 13)', () => {
 
       expect(result).toBeDefined();
       expect(result.timestamp).toBeDefined();
-    });
+    }, { timeout: 35000 }); // Network timeout + buffer
   });
 
   describe('Health Check with Different Providers', () => {
@@ -274,7 +274,7 @@ describe('Profile Health Check Integration (Spec 13)', () => {
 
       expect(result.healthy).toBe(false);
       expect(result.error).toBeDefined();
-    });
+    }, { timeout: 35000 }); // DNS resolution + network timeout
   });
 
   describe('Success Criteria', () => {
@@ -288,7 +288,7 @@ describe('Profile Health Check Integration (Spec 13)', () => {
         expect(result.model).toBeDefined();
         expect(result.latency).toBeGreaterThan(0);
       }
-    });
+    }, { timeout: 35000 }); // Network timeout + buffer
 
     it('should provide detailed latency information', async () => {
       manager.create(createLMStudioProfile());
@@ -303,7 +303,7 @@ describe('Profile Health Check Integration (Spec 13)', () => {
         expect(result.latency).toBeGreaterThan(0);
         expect(result.latency).toBeLessThan(60000);
       }
-    });
+    }, { timeout: 35000 }); // Network timeout + buffer
   });
 
   describe('Multiple Provider Health Checks', () => {
@@ -336,6 +336,6 @@ describe('Profile Health Check Integration (Spec 13)', () => {
 
       // Each should have independent results
       expect(result1.timestamp).not.toBe(result2.timestamp);
-    });
+    }, { timeout: 70000 }); // Two network calls + buffer
   });
 });

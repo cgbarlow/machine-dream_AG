@@ -150,7 +150,10 @@ machine-dream llm dream run --no-failure-learning
 ```bash
 machine-dream llm play puzzles/9x9-easy.json --aisp       # AISP prompts
 machine-dream llm play puzzles/9x9-easy.json --aisp-full  # Full AISP mode
+machine-dream llm dream run --aisp-full                   # AISP clustering prompts
 ```
+
+When `--aisp-full` is used with `llm dream run`, all clustering prompts (pattern identification, categorization) use pure AISP syntax. Responses are validated using `aisp-validator` for density compliance (δ ≥ 0.20).
 
 ### Multi-Provider Support
 
