@@ -252,7 +252,7 @@ export class DeepClusterV2 extends BaseClusteringAlgorithm {
         { role: 'user', content: prompt },
       ],
       {
-        validatePrompt: this.aispMode !== 'off',
+        validatePrompt: false, // Prompts contain embedded data; only validate responses
         validateResponse: this.aispMode === 'aisp-full',
         context: 'semantic-split',
       }

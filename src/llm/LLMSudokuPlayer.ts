@@ -214,7 +214,7 @@ export class LLMSudokuPlayer extends EventEmitter {
       try {
         // Validation options for AISP mode
         const validationOptions = {
-          validatePrompt: this.aispMode !== 'off',
+          validatePrompt: false, // Prompts contain embedded data; only validate responses
           validateResponse: this.aispMode === 'aisp-full',
           context: 'move-generation',
         };
