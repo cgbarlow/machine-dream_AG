@@ -127,6 +127,9 @@ export class ValidatedLLMClient {
     }
 
     // === LLM CALL ===
+    if (context && context !== 'unknown') {
+      console.log(`   ⏳ Waiting for LLM response [${context}]...`);
+    }
     const result = await this.client.chat(messages, onStream, onReasoning);
 
     // === RESPONSE VALIDATION ===
