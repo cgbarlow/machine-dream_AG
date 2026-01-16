@@ -148,12 +148,22 @@ machine-dream llm dream run --no-failure-learning
 [AI Specification Protocol](https://github.com/bar181/aisp-open-core) reduces prompt ambiguity:
 
 ```bash
-machine-dream llm play puzzles/9x9-easy.json --aisp       # AISP prompts
-machine-dream llm play puzzles/9x9-easy.json --aisp-full  # Full AISP mode
-machine-dream llm dream run --aisp-full                   # AISP clustering prompts
+machine-dream llm play puzzles/9x9-easy.json --aisp       # AISP prompt validation
+machine-dream llm play puzzles/9x9-easy.json --aisp-full  # Full validation (prompt + response)
+machine-dream llm dream run --aisp-full                   # Full validation for dreaming
 ```
 
-When `--aisp-full` is used with `llm dream run`, all clustering prompts (pattern identification, categorization) use pure AISP syntax. Responses are validated using `aisp-validator` for density compliance (δ ≥ 0.20).
+**Validation Modes:**
+- `--aisp` — Validates prompts only; warns on low tier
+- `--aisp-full` — Validates both prompts AND responses; triggers critique workflow on Reject tier
+
+**Validation Tiers:** Platinum (δ≥0.75), Gold (δ≥0.60), Silver (δ≥0.40), Bronze (δ≥0.20), Reject (δ<0.20)
+
+Session AISP mode is tracked and visible in session list/show:
+```bash
+machine-dream llm session list    # Shows Mode column (std/aisp/aisp-full)
+machine-dream llm session show <id>
+```
 
 ### Multi-Provider Support
 
@@ -205,7 +215,7 @@ See [scripts/SCRIPTS.md](scripts/SCRIPTS.md) for complete documentation.
 | [User Guide](docs/USER_GUIDE.md) | Complete usage and configuration |
 | [CLI Reference](docs/cli-reference.md) | All commands and options |
 | [Specifications](docs/specs/) | 19 formal specifications |
-| [ADRs](docs/adr/) | 12 architecture decision records |
+| [ADRs](docs/adr/) | 13 architecture decision records |
 | [Scripts Guide](scripts/SCRIPTS.md) | Batch testing workflows |
 
 ### Key Specifications

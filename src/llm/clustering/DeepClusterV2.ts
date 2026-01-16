@@ -27,9 +27,8 @@ import {
   type ClusteringResult,
 } from './ClusteringAlgorithm.js';
 import type { LLMExperience, LLMConfig } from '../types.js';
-import { LMStudioClient } from '../LMStudioClient.js';
+import { ValidatedLLMClient } from '../ValidatedLLMClient.js';
 import { AISPBuilder } from '../AISPBuilder.js';
-import { AISPValidatorService } from '../AISPValidator.js';
 
 // ES module equivalent of __filename
 const __filename = fileURLToPath(import.meta.url);
@@ -59,10 +58,8 @@ interface SemanticPattern {
  * Approach: Two-phase clustering with AISP-enhanced LLM semantic split
  */
 export class DeepClusterV2 extends BaseClusteringAlgorithm {
-  private llmClient: LMStudioClient;
+  private llmClient: ValidatedLLMClient;
   private aispBuilder: AISPBuilder;
-  private aispValidator: AISPValidatorService;
-  private validatorInitialized = false;
 
   /**
    * Reasoning keywords for Phase 1 clustering (priority order)
@@ -93,7 +90,7 @@ export class DeepClusterV2 extends BaseClusteringAlgorithm {
    */
   private readonly SEMANTIC_SPLIT_THRESHOLD = 50;
 
-  constructor(llmClient: LMStudioClient) {
+  constructor(llmClient: ValidatedLLMClient) {
     const metadata: AlgorithmMetadata = {
       name: 'DeepCluster',
       version: 2,
@@ -105,23 +102,6 @@ export class DeepClusterV2 extends BaseClusteringAlgorithm {
     super(metadata);
     this.llmClient = llmClient;
     this.aispBuilder = new AISPBuilder();
-    this.aispValidator = new AISPValidatorService();
-  }
-
-  /**
-   * Initialize AISP validator if needed
-   */
-  private async ensureValidatorInitialized(): Promise<void> {
-    if (this.validatorInitialized) return;
-
-    if (this.aispMode === 'aisp-full') {
-      try {
-        await this.aispValidator.init();
-        this.validatorInitialized = true;
-      } catch (error) {
-        console.warn(`⚠️ Failed to initialize AISP validator: ${error}`);
-      }
-    }
   }
 
   /**
@@ -138,7 +118,6 @@ export class DeepClusterV2 extends BaseClusteringAlgorithm {
     console.log(`   Target clusters: ${targetCount}`);
     if (this.aispMode === 'aisp-full') {
       console.log(`   🔤 AISP mode enabled`);
-      await this.ensureValidatorInitialized();
     }
 
     // Phase 1: Keyword-based clustering
@@ -266,17 +245,27 @@ export class DeepClusterV2 extends BaseClusteringAlgorithm {
       ? this.buildAISPSystemPrompt()
       : 'You are analyzing Sudoku reasoning patterns to identify distinct semantic approaches.';
 
-    // Get LLM response
-    const response = await this.llmClient.chat([
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: prompt },
-    ]);
+    // Get LLM response with centralized validation
+    const response = await this.llmClient.chat(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt },
+      ],
+      {
+        validatePrompt: this.aispMode !== 'off',
+        validateResponse: this.aispMode === 'aisp-full',
+        context: 'semantic-split',
+      }
+    );
 
-    // Validate and parse response
+    // Parse response - validation handled by ValidatedLLMClient
     let patterns: SemanticPattern[];
 
-    if (this.aispMode === 'aisp-full' && this.validatorInitialized) {
-      patterns = await this.parseAISPPatterns(response.content, prompt);
+    if (this.aispMode === 'aisp-full') {
+      patterns = this.parseAISPPatternsSimple(response.content);
+      if (patterns.length === 0) {
+        patterns = this.parseSemanticPatterns(response.content);
+      }
     } else {
       patterns = this.parseSemanticPatterns(response.content);
     }
@@ -387,27 +376,9 @@ Provide 4-8 patterns now:`;
   }
 
   /**
-   * Parse AISP-formatted patterns with validation
+   * Parse AISP-formatted patterns (simple - validation handled by ValidatedLLMClient)
    */
-  private async parseAISPPatterns(response: string, originalPrompt: string): Promise<SemanticPattern[]> {
-    // Validate response
-    const validation = await this.aispValidator.validateWithCritique(
-      response,
-      originalPrompt,
-      this.llmClient
-    );
-
-    if (validation.result.tierValue === 0) {
-      // Reject tier - log critique and fall back to English parsing
-      console.warn(`   ⚠️ AISP validation failed (δ=${validation.result.delta.toFixed(3)})`);
-      if (validation.critique) {
-        console.warn(`   Critique: ${validation.critique.substring(0, 200)}...`);
-      }
-      console.warn(`   Falling back to English parsing`);
-      return this.parseSemanticPatterns(response);
-    }
-
-    // Try to parse AISP patterns
+  private parseAISPPatternsSimple(response: string): SemanticPattern[] {
     const patterns: SemanticPattern[] = [];
     const patternRegex = /⟦Λ:Pattern\.(\w+)⟧\{([^}]+)\}/g;
     let match;
@@ -431,12 +402,6 @@ Provide 4-8 patterns now:`;
           exampleIds: [],
         });
       }
-    }
-
-    // If AISP parsing failed, fall back to English
-    if (patterns.length === 0) {
-      console.warn(`   ⚠️ No AISP patterns parsed, falling back to English parsing`);
-      return this.parseSemanticPatterns(response);
     }
 
     return patterns;

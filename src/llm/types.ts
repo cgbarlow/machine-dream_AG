@@ -3,6 +3,41 @@
  * Specification: docs/specs/11-llm-sudoku-player.md
  */
 
+import type { AISPMode } from './AISPBuilder.js';
+import type { AISPValidationResult } from './AISPValidator.js';
+
+// Re-export AISPMode for consumers
+export type { AISPMode } from './AISPBuilder.js';
+
+// ============================================================================
+// AISP Validation Types (Spec 16 Section 4.11, ADR-014)
+// ============================================================================
+
+/**
+ * Options for AISP validation during LLM I/O
+ */
+export interface AISPValidationOptions {
+  /** Validate the prompt before sending */
+  validatePrompt?: boolean;
+  /** Validate the response after receiving */
+  validateResponse?: boolean;
+  /** Context label for logging (e.g., "move-generation", "pattern-synthesis") */
+  context?: string;
+  /** Original prompt for critique workflow (used if response validation fails) */
+  originalPrompt?: string;
+}
+
+/**
+ * Extended chat result with validation metadata
+ */
+export interface ValidatedChatResult {
+  content: string;
+  reasoning?: string;  // Full streaming reasoning tokens from LM Studio
+  promptValidation?: AISPValidationResult;
+  responseValidation?: AISPValidationResult;
+  critiqueFallback?: boolean;
+}
+
 /**
  * LLM Configuration (Spec 11 - Configuration)
  */
@@ -112,6 +147,9 @@ export interface PlaySession {
   puzzleId: string;
   startTime: Date;
   endTime?: Date;
+
+  // AISP Mode tracking (Spec 11, ADR-014)
+  aispMode?: AISPMode;              // AISP mode used for this session ('off' | 'aisp' | 'aisp-full')
 
   // Outcome
   solved: boolean;

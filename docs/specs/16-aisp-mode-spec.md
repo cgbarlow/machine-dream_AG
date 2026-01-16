@@ -1,6 +1,6 @@
 # Specification 16: AISP Mode Integration
 
-**Version:** 1.2.0
+**Version:** 1.3.0
 **Date:** 2026-01-16
 **Status:** Implemented
 **Depends On:** Spec 11 (LLM Sudoku Player), Spec 05 (Dreaming Pipeline), Spec 18 (Algorithm Versioning)
@@ -421,6 +421,94 @@ setAISPMode(mode: AISPMode): void {
 }
 ```
 
+### 4.11 Centralized AISP Validation Layer
+
+All LLM I/O passes through a centralized validation layer when AISP mode is enabled (`src/llm/ValidatedLLMClient.ts`):
+
+```typescript
+import type { AISPMode } from './AISPBuilder.js';
+import type { AISPValidationResult } from './AISPValidator.js';
+
+export interface AISPValidationOptions {
+  /** Validate the prompt before sending */
+  validatePrompt?: boolean;
+  /** Validate the response after receiving */
+  validateResponse?: boolean;
+  /** Context label for logging (e.g., "move-generation", "pattern-synthesis") */
+  context?: string;
+}
+
+export interface ValidatedChatResult {
+  content: string;
+  promptValidation?: AISPValidationResult;
+  responseValidation?: AISPValidationResult;
+  critiqueFallback?: boolean;
+}
+
+export class ValidatedLLMClient {
+  private aispMode: AISPMode = 'off';
+
+  setAISPMode(mode: AISPMode): void;
+
+  /**
+   * Chat with optional AISP validation
+   * - aispMode='off': No validation (passthrough)
+   * - aispMode='aisp': Validate prompts only (warn on low tier)
+   * - aispMode='aisp-full': Validate both prompts AND responses
+   */
+  chat(
+    messages: ChatMessage[],
+    options?: AISPValidationOptions
+  ): Promise<ValidatedChatResult>;
+}
+```
+
+**Validation Behavior by Mode:**
+
+| Mode | Prompt Validation | Response Validation | On Reject (⊘) |
+|------|------------------|---------------------|---------------|
+| `off` | None | None | N/A |
+| `aisp` | Yes (warn) | No | Log warning |
+| `aisp-full` | Yes (warn) | Yes (critique) | Request critique, fallback |
+
+**Tier-Based Logging:**
+- Platinum/Gold/Silver: `✓ AISP [context] tier (δ=X.XXX)`
+- Bronze: `⚠️ AISP [context] Bronze (δ=X.XXX)`
+- Reject: `❌ AISP [context] Reject (δ=X.XXX)` + critique workflow
+
+**Factory Pattern:**
+
+All consumers use `LLMClientFactory` instead of direct `LMStudioClient` instantiation:
+
+```typescript
+// src/llm/LLMClientFactory.ts
+export function createLLMClient(
+  config: LLMConfig,
+  aispMode: AISPMode = 'off'
+): ValidatedLLMClient;
+```
+
+**Consumers Updated:**
+- `LLMSudokuPlayer` - move generation
+- `DreamingConsolidator` - synthesis, anti-patterns, hierarchy
+- `LLMClusterV1` - pattern identification
+- `LLMClusterV2` - pattern identification (inline validation removed)
+- `DeepClusterV1` - semantic split
+- `DeepClusterV2` - semantic split (inline validation removed)
+
+**Event Emission:**
+
+```typescript
+// Emitted on each validation
+eventEmitter.emit('llm:aisp:validation', {
+  context: string;
+  tier: string;
+  delta: number;
+  isPrompt: boolean;
+  critique?: string;
+});
+```
+
 ---
 
 ## 5. Prompt Structure
@@ -666,6 +754,7 @@ AISP syntax is more compact than natural language:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.3.0 | 2026-01-16 | Centralized AISP validation: Section 4.11, ValidatedLLMClient wrapper, factory pattern |
 | 1.2.0 | 2026-01-16 | Clustering AISP support: FR-05, aisp-validator integration, FastClusterV3, DeepClusterV2, LLMClusterV2 AISP |
 | 1.1.0 | 2026-01-12 | Full implementation: AISP system prompts, dreaming integration, strategy encoding |
 | 1.0.0 | 2026-01-12 | Initial specification |

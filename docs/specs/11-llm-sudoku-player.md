@@ -8,6 +8,7 @@
 |-----|--------------|
 | [ADR-001: Pure LLM Solving](../adr/001-pure-llm-solving.md) | Authorizes pure LLM approach |
 | [ADR-002: Local LLM Provider](../adr/002-local-llm-provider.md) | Authorizes LM Studio integration |
+| [ADR-013: AISP Validator Integration](../adr/013-aisp-validator-integration.md) | Authorizes AISP validation and ValidatedLLMClient |
 
 ---
 
@@ -310,6 +311,9 @@ interface PlaySession {
   puzzleId: string;
   startTime: Date;
   endTime?: Date;
+
+  // AISP Mode tracking
+  aispMode: 'off' | 'aisp' | 'aisp-full';  // AISP mode used for this session
 
   // Outcome
   solved: boolean;

@@ -14,7 +14,8 @@ import type {
   MoveValidation,
   LearningContext,
 } from './types.js';
-import { LMStudioClient } from './LMStudioClient.js';
+import { ValidatedLLMClient } from './ValidatedLLMClient.js';
+import { createLLMClient } from './LLMClientFactory.js';
 import { PromptBuilder } from './PromptBuilder.js';
 import { ResponseParser } from './ResponseParser.js';
 import { MoveValidator } from './MoveValidator.js';
@@ -33,7 +34,7 @@ import { calculateImportance, calculateContext } from './ImportanceCalculator.js
  * - Memory toggle for A/B testing
  */
 export class LLMSudokuPlayer extends EventEmitter {
-  private client: LMStudioClient;
+  private client: ValidatedLLMClient;
   private promptBuilder: PromptBuilder;
   private responseParser: ResponseParser;
   private validator: MoveValidator;
@@ -53,7 +54,7 @@ export class LLMSudokuPlayer extends EventEmitter {
     private learningUnitId: string = 'default'
   ) {
     super();
-    this.client = new LMStudioClient(config);
+    this.client = createLLMClient(config);
     this.promptBuilder = new PromptBuilder(config.includeReasoning);
     this.responseParser = new ResponseParser();
     this.validator = new MoveValidator();
@@ -134,6 +135,7 @@ export class LLMSudokuPlayer extends EventEmitter {
   setAISPMode(mode: AISPMode): void {
     this.aispMode = mode;
     this.promptBuilder.setAISPMode(mode);
+    this.client.setAISPMode(mode);
   }
 
   /**
@@ -210,6 +212,13 @@ export class LLMSudokuPlayer extends EventEmitter {
       let rawResponse: string;
       let fullReasoning: string | undefined;
       try {
+        // Validation options for AISP mode
+        const validationOptions = {
+          validatePrompt: this.aispMode !== 'off',
+          validateResponse: this.aispMode === 'aisp-full',
+          context: 'move-generation',
+        };
+
         if (this.streamingEnabled) {
           // Stream tokens as they arrive
           // Optionally also stream reasoning tokens (LM Studio v0.3.9+ Developer setting)
@@ -218,6 +227,7 @@ export class LLMSudokuPlayer extends EventEmitter {
             : undefined;
           const result = await this.client.chat(
             messages,
+            validationOptions,
             (token: string) => this.emit('llm:stream', { token }),
             onReasoning
           );
@@ -228,7 +238,7 @@ export class LLMSudokuPlayer extends EventEmitter {
           }
         } else {
           // Wait for complete response
-          const result = await this.client.chat(messages);
+          const result = await this.client.chat(messages, validationOptions);
           rawResponse = result.content;
         }
         this.emit('llm:response', { rawResponse });
@@ -411,6 +421,7 @@ export class LLMSudokuPlayer extends EventEmitter {
       id: randomUUID(),
       puzzleId,
       startTime: new Date(),
+      aispMode: this.aispMode,
       solved: false,
       abandoned: false,
       totalMoves: 0,

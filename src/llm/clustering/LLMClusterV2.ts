@@ -34,9 +34,8 @@ import {
   type ClusteringResult,
 } from './ClusteringAlgorithm.js';
 import type { LLMExperience, LLMConfig } from '../types.js';
-import { LMStudioClient } from '../LMStudioClient.js';
+import { ValidatedLLMClient } from '../ValidatedLLMClient.js';
 import { AISPBuilder } from '../AISPBuilder.js';
-import { AISPValidatorService } from '../AISPValidator.js';
 
 // ES module equivalent of __filename
 const __filename = fileURLToPath(import.meta.url);
@@ -87,12 +86,10 @@ const DEFAULT_CONFIG: LLMClusterV2Config = {
  * Approach: Improved LLM-driven pattern identification with mutual exclusivity
  */
 export class LLMClusterV2 extends BaseClusteringAlgorithm {
-  private llmClient: LMStudioClient;
+  private llmClient: ValidatedLLMClient;
   private config: LLMClusterV2Config;
   private debugMode = false;
   private aispBuilder: AISPBuilder;
-  private aispValidator: AISPValidatorService;
-  private validatorInitialized = false;
 
   /**
    * Sample size for pattern identification (100-150 experiences)
@@ -106,7 +103,7 @@ export class LLMClusterV2 extends BaseClusteringAlgorithm {
   private readonly PATTERN_COUNT_MIN = 15;
   private readonly PATTERN_COUNT_MAX = 20;
 
-  constructor(llmClient: LMStudioClient, config?: Partial<LLMClusterV2Config>) {
+  constructor(llmClient: ValidatedLLMClient, config?: Partial<LLMClusterV2Config>) {
     const metadata: AlgorithmMetadata = {
       name: 'LLMCluster',
       version: 2,
@@ -119,23 +116,6 @@ export class LLMClusterV2 extends BaseClusteringAlgorithm {
     this.llmClient = llmClient;
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.aispBuilder = new AISPBuilder();
-    this.aispValidator = new AISPValidatorService();
-  }
-
-  /**
-   * Initialize AISP validator if needed
-   */
-  private async ensureValidatorInitialized(): Promise<void> {
-    if (this.validatorInitialized) return;
-
-    if (this.aispMode === 'aisp-full') {
-      try {
-        await this.aispValidator.init();
-        this.validatorInitialized = true;
-      } catch (error) {
-        console.warn(`⚠️ Failed to initialize AISP validator: ${error}`);
-      }
-    }
   }
 
   /**
@@ -160,7 +140,6 @@ export class LLMClusterV2 extends BaseClusteringAlgorithm {
     console.log(`   Target clusters: ${targetCount}`);
     if (this.aispMode === 'aisp-full') {
       console.log(`   🔤 AISP mode enabled - all prompts will use AISP syntax`);
-      await this.ensureValidatorInitialized();
     }
 
     if (experiences.length === 0) {
@@ -275,19 +254,30 @@ Think like a taxonomist creating a classification system where each item belongs
       ? this.buildAISPMutuallyExclusivePrompt(sampled, targetCount)
       : this.buildMutuallyExclusivePrompt(sampled, targetCount);
 
-    const response = await this.llmClient.chat([
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: prompt },
-    ]);
+    const response = await this.llmClient.chat(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt },
+      ],
+      {
+        validatePrompt: this.aispMode !== 'off',
+        validateResponse: this.aispMode === 'aisp-full',
+        context: 'pattern-identification',
+      }
+    );
 
     if (this.debugMode && response.content.length > 0) {
       console.log(`   📝 LLM response preview: ${response.content.substring(0, 500)}...`);
     }
 
-    // Validate and parse based on AISP mode
+    // Parse based on AISP mode - validation handled by ValidatedLLMClient
     let patterns: ReasoningPattern[];
-    if (this.aispMode === 'aisp-full' && this.validatorInitialized) {
-      patterns = await this.parseAndValidateAISPPatterns(response.content, prompt);
+    if (this.aispMode === 'aisp-full') {
+      patterns = this.parseAISPPatterns(response.content);
+      if (patterns.length === 0) {
+        // Fall back to English parsing if AISP parsing fails
+        patterns = this.parsePatterns(response.content);
+      }
     } else {
       patterns = this.parsePatterns(response.content);
     }
@@ -295,48 +285,6 @@ Think like a taxonomist creating a classification system where each item belongs
     if (patterns.length === 0) {
       console.warn(`   ⚠️  Failed to parse patterns, using fallback`);
       return this.getFallbackPatterns();
-    }
-
-    return patterns;
-  }
-
-  /**
-   * Parse and validate AISP pattern response
-   */
-  private async parseAndValidateAISPPatterns(
-    response: string,
-    originalPrompt: string
-  ): Promise<ReasoningPattern[]> {
-    // Validate response
-    const validation = await this.aispValidator.validateWithCritique(
-      response,
-      originalPrompt,
-      this.llmClient
-    );
-
-    if (validation.result.tierValue === 0) {
-      // Reject tier - log critique and fall back to English parsing
-      console.warn(`   ⚠️ AISP validation failed (δ=${validation.result.delta.toFixed(3)})`);
-      if (validation.critique) {
-        console.warn(`   Critique: ${validation.critique.substring(0, 200)}...`);
-      }
-      if (validation.guidance) {
-        console.warn(`   Guidance: ${validation.guidance.substring(0, 200)}...`);
-      }
-      console.warn(`   Falling back to English parsing`);
-      return this.parsePatterns(response);
-    } else if (validation.result.tierValue < 2) {
-      // Bronze tier - warn but continue
-      console.warn(`   ⚠️ AISP tier ${validation.result.tierName} (δ=${validation.result.delta.toFixed(3)}) - below Silver`);
-    }
-
-    // Try to parse AISP patterns
-    const patterns = this.parseAISPPatterns(response);
-
-    // If AISP parsing failed, fall back to English
-    if (patterns.length === 0) {
-      console.warn(`   ⚠️ No AISP patterns parsed, falling back to English parsing`);
-      return this.parsePatterns(response);
     }
 
     return patterns;
@@ -561,10 +509,17 @@ ${sampled.slice(0, 20).map((exp, i) => `${i + 1}. "${exp.move.reasoning}"`).join
 Your response:`;
     }
 
-    const response = await this.llmClient.chat([
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ]);
+    const response = await this.llmClient.chat(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      {
+        validatePrompt: this.aispMode !== 'off',
+        validateResponse: this.aispMode === 'aisp-full',
+        context: 'pattern-self-critique',
+      }
+    );
 
     // Check for PATTERNS_OK response (AISP or English)
     if (response.content.trim().startsWith('PATTERNS_OK') ||
@@ -575,10 +530,13 @@ Your response:`;
       return patterns;
     }
 
-    // Otherwise, try to parse revised patterns
+    // Otherwise, try to parse revised patterns - validation handled by ValidatedLLMClient
     let revisedPatterns: ReasoningPattern[];
-    if (this.aispMode === 'aisp-full' && this.validatorInitialized) {
-      revisedPatterns = await this.parseAndValidateAISPPatterns(response.content, userPrompt);
+    if (this.aispMode === 'aisp-full') {
+      revisedPatterns = this.parseAISPPatterns(response.content);
+      if (revisedPatterns.length === 0) {
+        revisedPatterns = this.parsePatterns(response.content);
+      }
     } else {
       revisedPatterns = this.parsePatterns(response.content);
     }
@@ -853,10 +811,17 @@ Output ONLY pattern numbers (1-${patterns.length}), one per line.
 For each statement, output the number of the MOST SPECIFIC matching pattern:`;
     }
 
-    const response = await this.llmClient.chat([
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ]);
+    const response = await this.llmClient.chat(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      {
+        validatePrompt: this.aispMode !== 'off',
+        validateResponse: this.aispMode === 'aisp-full',
+        context: 'pattern-categorization',
+      }
+    );
 
     // Parse response
     const lines = response.content.trim().split('\n');
@@ -994,15 +959,25 @@ CHAR: [characteristics]
 Provide 3-5 sub-patterns:`;
     }
 
-    const response = await this.llmClient.chat([
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ]);
+    const response = await this.llmClient.chat(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      {
+        validatePrompt: this.aispMode !== 'off',
+        validateResponse: this.aispMode === 'aisp-full',
+        context: 'dominant-cluster-refinement',
+      }
+    );
 
-    // Parse patterns based on AISP mode
+    // Parse patterns based on AISP mode - validation handled by ValidatedLLMClient
     let subPatterns: ReasoningPattern[];
-    if (this.aispMode === 'aisp-full' && this.validatorInitialized) {
-      subPatterns = await this.parseAndValidateAISPPatterns(response.content, userPrompt);
+    if (this.aispMode === 'aisp-full') {
+      subPatterns = this.parseAISPPatterns(response.content);
+      if (subPatterns.length === 0) {
+        subPatterns = this.parsePatterns(response.content);
+      }
     } else {
       subPatterns = this.parsePatterns(response.content);
     }

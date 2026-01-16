@@ -971,7 +971,7 @@ export function registerLLMCommand(program: Command): void {
             logger.info(`\n--- FULL PROMPT ---\n${prompt}\n--- END PROMPT ---\n`);
           }
           if (options.visualize || options.debug) {
-            // Show move history section if it exists
+            // Show move history section if it exists (standard format)
             const historyMatch = prompt.match(/YOUR PREVIOUS ATTEMPTS ON THIS PUZZLE:\n([\s\S]*?)\n\n(?:FORBIDDEN|Empty)/);
             if (historyMatch && historyMatch[1]) {
               logger.info(`\n📜 Move History:`);
@@ -980,12 +980,30 @@ export function registerLLMCommand(program: Command): void {
               });
             }
 
-            // Show forbidden moves section if it exists
+            // Show move history section if it exists (AISP format: ⟦Γ:History⟧{...})
+            const aispHistoryMatch = prompt.match(/⟦Γ:History⟧\{([\s\S]*?)\}/);
+            if (aispHistoryMatch && aispHistoryMatch[1]) {
+              logger.info(`\n📜 Move History (AISP):`);
+              aispHistoryMatch[1].split('\n').forEach((line: string) => {
+                if (line.trim()) logger.info(`   ${line.trim()}`);
+              });
+            }
+
+            // Show forbidden moves section if it exists (standard format)
             const forbiddenMatch = prompt.match(/FORBIDDEN MOVES \(do not attempt again\):\n([\s\S]*?)\n\nEmpty cells/);
             if (forbiddenMatch && forbiddenMatch[1]) {
               logger.info(`\n🚫 Forbidden Moves:`);
               forbiddenMatch[1].split('\n').forEach((line: string) => {
                 if (line.trim()) logger.info(`   ${line}`);
+              });
+            }
+
+            // Show forbidden moves section if it exists (AISP format: ⟦Χ:Forbidden⟧{...})
+            const aispForbiddenMatch = prompt.match(/⟦Χ:Forbidden⟧\{([\s\S]*?)\}/);
+            if (aispForbiddenMatch && aispForbiddenMatch[1]) {
+              logger.info(`\n🚫 Forbidden Moves (AISP):`);
+              aispForbiddenMatch[1].split('\n').forEach((line: string) => {
+                if (line.trim()) logger.info(`   ${line.trim()}`);
               });
             }
 
@@ -1537,7 +1555,7 @@ export function registerLLMCommand(program: Command): void {
   memory
     .command('list')
     .description('List all memory entries')
-    .option('--session <id>', 'Filter by session ID (puzzle ID)')
+    .option('--session <id>', 'Filter by session ID (GUID from session list)')
     .option('--puzzle <id>', 'Filter by puzzle ID')
     .option('--profile <name>', 'Filter by LLM profile name')
     .option('--outcome <type>', 'Filter by outcome (correct|invalid|valid_but_wrong)')
@@ -1556,9 +1574,11 @@ export function registerLLMCommand(program: Command): void {
         let allExperiences = await agentMemory.reasoningBank.queryMetadata('llm_experience', {}) as LLMExperience[];
 
         // Apply filters
-        if (options.session || options.puzzle) {
-          const puzzleId = options.session || options.puzzle;
-          allExperiences = allExperiences.filter(exp => exp.puzzleId === puzzleId);
+        if (options.session) {
+          allExperiences = allExperiences.filter(exp => exp.sessionId === options.session);
+        }
+        if (options.puzzle) {
+          allExperiences = allExperiences.filter(exp => exp.puzzleId === options.puzzle);
         }
 
         if (options.profile) {
@@ -3694,16 +3714,18 @@ export function registerLLMCommand(program: Command): void {
           // Learning flags from first experience
           const learningContext = firstExp.learningContext;
 
-          // Get stored session metadata for abandonReason
+          // Get stored session metadata for abandonReason and aispMode
           const storedMeta = sessionMetadataMap.get(sessionData.sessionId);
           const abandoned = storedMeta?.abandoned || false;
           const abandonReason = storedMeta?.abandonReason || null;
+          const aispMode = storedMeta?.aispMode || 'off';
 
           return {
             sessionId: sessionData.sessionId,
             puzzleId: sessionData.puzzleId,
             profileName: sessionData.profileName,
             learningUnitId: sessionData.learningUnitId,
+            aispMode,
             solved,
             abandoned,
             abandonReason,
@@ -3761,18 +3783,24 @@ export function registerLLMCommand(program: Command): void {
           if (unitId === null || unitId === undefined) return NO_LEARNING_UNIT_DISPLAY;
           return unitId || DEFAULT_LEARNING_UNIT_ID;
         };
+        // Format AISP mode for display: 'off' -> 'std', others unchanged
+        const getDisplayMode = (mode: string | null | undefined): string => {
+          if (!mode || mode === 'off') return 'std';
+          return mode;
+        };
         const maxUnitLen = Math.max(
           4, // minimum "Unit" header width
           NO_LEARNING_UNIT_DISPLAY.length,
           ...sessionsToShow.map(s => getDisplayUnit(s.learningUnitId).length)
         );
         const unitHeader = 'Unit'.padEnd(maxUnitLen);
-        logger.info(`ID                                    Profile           ${unitHeader}  Puzzle            Done%  Moves   Acc%   Exit        Learning    Date`);
-        logger.info('─'.repeat(140 + maxUnitLen));
+        logger.info(`ID                                    Profile           Mode       ${unitHeader}  Puzzle            Done%  Moves   Acc%   Exit        Learning    Date`);
+        logger.info('─'.repeat(150 + maxUnitLen));
 
         sessionsToShow.forEach(s => {
           const sessionIdShort = s.sessionId.substring(0, 36).padEnd(36);
           const profile = s.profileName.substring(0, 16).padEnd(16);
+          const mode = getDisplayMode(s.aispMode).padEnd(9);
           const unit = getDisplayUnit(s.learningUnitId).padEnd(maxUnitLen);
           const puzzle = s.puzzleId.substring(0, 16).padEnd(16);
           const donePct = `${s.completionPct.toFixed(0)}%`.padStart(5);
@@ -3812,7 +3840,7 @@ export function registerLLMCommand(program: Command): void {
             minute: '2-digit'
           });
 
-          logger.info(`${sessionIdShort}  ${profile}  ${unit}  ${puzzle}  ${donePct}  ${moves}  ${acc}   ${exitStr}  ${learningStr}  ${date}`);
+          logger.info(`${sessionIdShort}  ${profile}  ${mode}  ${unit}  ${puzzle}  ${donePct}  ${moves}  ${acc}   ${exitStr}  ${learningStr}  ${date}`);
           if (s.notes) {
             logger.info(`    📝 ${s.notes}`);
           }
@@ -3895,6 +3923,7 @@ export function registerLLMCommand(program: Command): void {
             sessionId,
             puzzleId,
             profileName,
+            aispMode: storedSession?.aispMode || 'off',
             solved,
             abandoned: storedSession?.abandoned || false,
             abandonReason: storedSession?.abandonReason || null,
@@ -3917,9 +3946,15 @@ export function registerLLMCommand(program: Command): void {
         logger.info('='.repeat(60));
         logger.info('');
 
+        // Get AISP mode from stored session metadata
+        const aispModeDisplay = (storedSession?.aispMode && storedSession.aispMode !== 'off')
+          ? storedSession.aispMode
+          : 'std';
+
         // Summary
         logger.info('📊 Summary:');
         logger.info(`  Profile: ${profileName}`);
+        logger.info(`  Mode: ${aispModeDisplay}`);
         logger.info(`  Puzzle: ${puzzleId}`);
         logger.info(`  Outcome: ${solved ? '✓ SOLVED' : '✗ UNSOLVED'}`);
         if (storedSession?.abandoned && storedSession?.abandonReason) {

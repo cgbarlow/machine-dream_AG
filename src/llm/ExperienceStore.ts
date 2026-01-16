@@ -307,6 +307,7 @@ export class ExperienceStore {
         puzzleId: session.puzzleId,
         profileName: session.profileName || this.profileName,
         learningUnitId: session.learningUnitId || 'default',
+        aispMode: session.aispMode || 'off',
         startTime: session.startTime,
         endTime: session.endTime,
         solved: session.solved,

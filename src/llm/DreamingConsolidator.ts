@@ -35,7 +35,8 @@ import {
   DOUBLED_CONSOLIDATION_COUNTS,
   DOUBLE_STRATEGY_SUFFIX,
 } from './types.js';
-import { LMStudioClient } from './LMStudioClient.js';
+import { ValidatedLLMClient } from './ValidatedLLMClient.js';
+import { createLLMClient } from './LLMClientFactory.js';
 import { ExperienceStore } from './ExperienceStore.js';
 import { LearningUnitManager } from './LearningUnitManager.js';
 import { AISPBuilder, type AISPMode } from './AISPBuilder.js';
@@ -54,7 +55,7 @@ import { AlgorithmRegistry, type ClusteringAlgorithm } from './clustering/index.
  * - Few-shot examples that TEACH strategies (not raw data)
  */
 export class DreamingConsolidator {
-  private llmClient: LMStudioClient;
+  private llmClient: ValidatedLLMClient;
   private llmConfig: LLMConfig;
   private generateAnonymousPatterns = false;
   private consolidationOptions: Required<Omit<ConsolidationOptions, 'doubleStrategies'>> = { ...DEFAULT_CONSOLIDATION_COUNTS };
@@ -69,7 +70,7 @@ export class DreamingConsolidator {
     clusteringAlgorithm?: ClusteringAlgorithm
   ) {
     this.llmConfig = config;
-    this.llmClient = new LMStudioClient(config);
+    this.llmClient = createLLMClient(config);
     this.aispBuilder = new AISPBuilder();
     this.aispEncoder = new AISPStrategyEncoder();
 
@@ -91,6 +92,7 @@ export class DreamingConsolidator {
    */
   setAISPMode(mode: AISPMode): void {
     this.aispMode = mode;
+    this.llmClient.setAISPMode(mode);
 
     // Propagate to clustering algorithm (ADR-013)
     if (this.clusteringAlgorithm.setAISPMode) {
@@ -360,10 +362,17 @@ ${i + 1}. Grid context: ${this.describeGridContext(exp.gridState, exp.move)}
     }
 
     try {
-      const result = await this.llmClient.chat([
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ]);
+      const result = await this.llmClient.chat(
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        {
+          validatePrompt: this.aispMode !== 'off',
+          validateResponse: this.aispMode === 'aisp-full',
+          context: 'pattern-synthesis',
+        }
+      );
 
       let pattern: SynthesizedPattern | null;
 
@@ -721,13 +730,20 @@ LEVEL_3_PRINCIPLES:
 Be concise. Each item should be a short phrase or sentence.`;
 
     try {
-      const result = await this.llmClient.chat([
+      const result = await this.llmClient.chat(
+        [
+          {
+            role: 'system',
+            content: 'You are organizing Sudoku strategies into an abstraction hierarchy, from specific to general.',
+          },
+          { role: 'user', content: prompt },
+        ],
         {
-          role: 'system',
-          content: 'You are organizing Sudoku strategies into an abstraction hierarchy, from specific to general.',
-        },
-        { role: 'user', content: prompt },
-      ]);
+          validatePrompt: this.aispMode !== 'off',
+          validateResponse: this.aispMode === 'aisp-full',
+          context: 'hierarchy-build',
+        }
+      );
 
       return this.parseHierarchyResponse(result.content, patterns.length, profileName);
     } catch (error) {
@@ -926,13 +942,20 @@ SELECTED: 7
 WHY_DIVERSE: Elimination approach rather than completion`;
 
     try {
-      const result = await this.llmClient.chat([
+      const result = await this.llmClient.chat(
+        [
+          {
+            role: 'system',
+            content: 'You are selecting diverse Sudoku strategies. Be strict about avoiding duplicates.',
+          },
+          { role: 'user', content: prompt },
+        ],
         {
-          role: 'system',
-          content: 'You are selecting diverse Sudoku strategies. Be strict about avoiding duplicates.',
-        },
-        { role: 'user', content: prompt },
-      ]);
+          validatePrompt: this.aispMode !== 'off',
+          validateResponse: this.aispMode === 'aisp-full',
+          context: 'fewshot-selection',
+        }
+      );
 
       // Parse selected indices from LLM response
       const selectedIndices = this.parseSelectedStrategies(result.content, patterns.length);
@@ -1013,13 +1036,20 @@ Focus on the most common/impactful mistakes. Synthesize patterns, don't just lis
 Identify at most 3 anti-patterns.`;
 
     try {
-      const result = await this.llmClient.chat([
+      const result = await this.llmClient.chat(
+        [
+          {
+            role: 'system',
+            content: 'You are analyzing your Sudoku solving mistakes to identify patterns of errors.',
+          },
+          { role: 'user', content: prompt },
+        ],
         {
-          role: 'system',
-          content: 'You are analyzing your Sudoku solving mistakes to identify patterns of errors.',
-        },
-        { role: 'user', content: prompt },
-      ]);
+          validatePrompt: this.aispMode !== 'off',
+          validateResponse: this.aispMode === 'aisp-full',
+          context: 'anti-pattern-analysis',
+        }
+      );
 
       console.log(`   ✅ LLM synthesized anti-patterns`);
       return result.content;
@@ -1104,13 +1134,20 @@ PREVENTION_STEP_1: [specific action to avoid this]
 PREVENTION_STEP_2: [another preventive action]
 PREVENTION_STEP_3: [optional third step]`;
 
-    const result = await this.llmClient.chat([
+    const result = await this.llmClient.chat(
+      [
+        {
+          role: 'system',
+          content: 'You are analyzing your Sudoku solving mistakes to identify and prevent error patterns.',
+        },
+        { role: 'user', content: prompt },
+      ],
       {
-        role: 'system',
-        content: 'You are analyzing your Sudoku solving mistakes to identify and prevent error patterns.',
-      },
-      { role: 'user', content: prompt },
-    ]);
+        validatePrompt: this.aispMode !== 'off',
+        validateResponse: this.aispMode === 'aisp-full',
+        context: 'anti-pattern-synthesis',
+      }
+    );
 
     const antiPattern = this.parseAntiPatternResponse(result.content, errorType, experiences);
 
@@ -1224,13 +1261,20 @@ CORRECTION: [how you should have reasoned instead]
 GENERAL_PRINCIPLE: [a general rule to remember, 1 sentence]
 CONFIDENCE: [0.0-1.0 how confident you are in this analysis]`;
 
-    const result = await this.llmClient.chat([
+    const result = await this.llmClient.chat(
+      [
+        {
+          role: 'system',
+          content: 'You are analyzing your own Sudoku solving reasoning to identify where you went wrong.',
+        },
+        { role: 'user', content: prompt },
+      ],
       {
-        role: 'system',
-        content: 'You are analyzing your own Sudoku solving reasoning to identify where you went wrong.',
-      },
-      { role: 'user', content: prompt },
-    ]);
+        validatePrompt: this.aispMode !== 'off',
+        validateResponse: this.aispMode === 'aisp-full',
+        context: 'reasoning-correction',
+      }
+    );
 
     return this.parseReasoningCorrectionResponse(result.content, exp);
   }
@@ -1727,13 +1771,20 @@ MERGED_STRATEGIES:
 ...`;
 
     try {
-      const result = await this.llmClient.chat([
+      const result = await this.llmClient.chat(
+        [
+          {
+            role: 'system',
+            content: 'You are reviewing Sudoku strategies to create an optimal unified set. Be selective and prioritize diversity.',
+          },
+          { role: 'user', content: prompt },
+        ],
         {
-          role: 'system',
-          content: 'You are reviewing Sudoku strategies to create an optimal unified set. Be selective and prioritize diversity.',
-        },
-        { role: 'user', content: prompt },
-      ]);
+          validatePrompt: this.aispMode !== 'off',
+          validateResponse: this.aispMode === 'aisp-full',
+          context: 'strategy-merge',
+        }
+      );
 
       // Parse the response to determine which strategies to keep
       const mergedFewShots = this.parseMergeResponse(
