@@ -355,30 +355,52 @@ Never save working files, text/mds and tests to the root folder.
 
 **CRITICAL RULE**: Always build to spec. No implementation changes unless outlined in specification documents.
 
+### Core Development Principles
+
+These principles are **NON-NEGOTIABLE** and apply to ALL work:
+
+1. **SPEC-FIRST DEVELOPMENT**
+   - Update or create specs FIRST in `docs/specs/` before ANY implementation
+   - Specs are the single source of truth
+   - Never implement unspecified behavior
+
+2. **ADR FOR ARCHITECTURE**
+   - Create/modify ADRs for architecturally significant changes
+   - **ALWAYS** follow [ADR Implementation Spec](docs/specs/17-adr-implementation-spec.md)
+   - Save ADRs to `docs/adr/`
+   - Reference ADR template: `docs/adr/000-adr-template.md`
+
+3. **DRY (Don't Repeat Yourself)**
+   - Identify reusable patterns and abstractions
+   - Extract common logic into shared utilities
+   - If you write it twice, refactor it once
+
+4. **NO MOCKS - PRODUCTION READY CODE ONLY**
+   - Write real, production-ready implementations
+   - No mock objects, fake data, or stub implementations
+   - If external dependencies are needed, use proper integration patterns
+
+5. **TDD (Test-Driven Development)**
+   - Write tests FIRST, then implement
+   - Tests define the expected behavior
+   - All code must have corresponding tests
+
+6. **DOCUMENTATION UPDATES**
+   - Review and update ALL relevant docs with every change:
+     - `README.md`
+     - User guide (`docs/user-guide.md`)
+     - CLI spec (`docs/specs/09-cli-interface-spec.md`)
+     - Any affected specification documents
+
 ### Use /plan Mode for All Planning
 
 **MANDATORY**: When any task requires planning (new features, refactors, multi-file changes, architectural decisions), you MUST use `/plan` mode. Do not skip planning and jump straight to implementation.
-
-### Planning Principles (for /plan mode)
-
-When planning in `/plan` mode, always follow these principles:
-
-1. **Spec-Based Development**: Update or create specs FIRST before implementation
-2. **ADR for Architecture**: Create/modify ADRs for architecturally significant changes (follow ADR template in `docs/adr/`)
-3. **DRY**: Don't Repeat Yourself - identify reusable patterns and abstractions
-4. **NO MOCKS**: Write production-ready code only, no mock implementations
-5. **TDD**: Plan tests alongside implementation, test-first approach
-6. **Documentation Updates**: Review and update all relevant docs including:
-   - README.md
-   - User guide
-   - CLI spec (Spec 09)
-   - Any affected specification documents
 
 ### Specification-First Workflow
 
 1. **Before implementing ANY feature**:
    - Check if feature is defined in `/docs/specs/`
-   - If NOT defined → Update the spec first, then implement
+   - If NOT defined → Create/update the spec first, then implement
    - If defined → Implement exactly as specified
 
 2. **Specification Documents** (in order of dependency):
@@ -399,6 +421,10 @@ When planning in `/plan` mode, always follow these principles:
    | 13 | [Profile Management](docs/specs/13-llm-profile-management.md) | AI model connection profiles |
    | 14 | [Console Menu](docs/specs/14-console-menu-interface-spec.md) | TUI console & help system |
    | 15 | [Batch Testing](docs/specs/15-batch-testing-spec.md) | A/B testing & iterative learning scripts |
+   | 16 | [AISP Mode](docs/specs/16-aisp-mode-spec.md) | AI Sudoku Protocol validation |
+   | 17 | [ADR Implementation](docs/specs/17-adr-implementation-spec.md) | Architecture Decision Records |
+   | 18 | [Algorithm Versioning](docs/specs/18-algorithm-versioning-system.md) | Versioned algorithm system |
+   | 19 | [Failure Learning](docs/specs/19-failure-learning-spec.md) | Learning from failures |
 
 3. **When specs conflict with implementation ideas**:
    - Specs are authoritative
@@ -411,6 +437,9 @@ When planning in `/plan` mode, always follow these principles:
    - [ ] All CLI commands match Spec 09
    - [ ] All TUI screens match Spec 10
    - [ ] Tests verify spec compliance
+   - [ ] ADR created for architectural changes (per Spec 17)
+   - [ ] Documentation updated (README, user guide, CLI spec)
+   - [ ] No mock implementations - production code only
 
 ### Why Spec-Based Development?
 
@@ -418,3 +447,4 @@ When planning in `/plan` mode, always follow these principles:
 - **Traceability**: Every feature maps to a specification
 - **Reviewability**: Changes are validated against specs
 - **Maintainability**: Specs serve as living documentation
+- **Quality**: TDD + no mocks = production-ready from day one

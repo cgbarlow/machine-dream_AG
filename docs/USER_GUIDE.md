@@ -984,8 +984,14 @@ machine-dream llm play puzzles/easy-01.json --no-memory
 # AISP mode (low-ambiguity prompts)
 machine-dream llm play puzzles/easy-01.json --aisp
 
-# Full AISP mode (end-to-end AISP)
+# AISP-lite mode (simplified AISP for smaller models)
+machine-dream llm play puzzles/easy-01.json --aisp-lite
+
+# Full AISP mode (end-to-end AISP, 16384 maxTokens)
 machine-dream llm play puzzles/easy-01.json --aisp-full
+
+# Succinct reasoning (shorter responses without full analysis)
+machine-dream llm play puzzles/easy-01.json --succinct-reasoning
 
 # Show reasoning tokens from LM Studio
 machine-dream llm play puzzles/easy-01.json --show-reasoning

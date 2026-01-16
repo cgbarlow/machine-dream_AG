@@ -677,6 +677,8 @@ Options:
   --learning-unit <id>         # Use specific learning unit (default: "default")
   --reasoning-template         # Use structured constraint-intersection system prompt
   --anonymous-patterns         # Use anonymous pattern format for learned strategies
+  --succinct-reasoning         # Request only the move without full analysis (shorter responses)
+  --aisp-lite                  # Use AISP-lite syntax (simplified AISP for smaller models)
 ```
 
 **Learning Modes:**
@@ -738,7 +740,9 @@ Options:
   --algorithm <name>           # Clustering algorithm: fastcluster, deepcluster, llmcluster, llmclusterv2
   --algorithms <list>          # Comma-separated list (default: all latest versions)
   --aisp                       # Mark learning unit as AISP mode (for naming)
+  --aisp-lite                  # Mark learning unit as AISP-lite mode (simplified AISP for smaller models)
   --aisp-full                  # Mark learning unit as AISP-full mode (AISP prompts + output)
+  --succinct-reasoning         # Request only the move without full analysis (shorter responses)
   --double-strategies          # Double the number of strategies (6-10 few-shots, 10-14 merged)
   --no-dual-unit               # Create only single learning unit (default: creates BOTH standard AND -2x)
   --debug                      # Show detailed debug output including LLM responses and pattern parsing

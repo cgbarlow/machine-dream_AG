@@ -30,7 +30,9 @@ import { AISPBuilder, type ForbiddenMove } from './AISPBuilder.js';
 export class PromptBuilder {
   private useAnonymousPatterns = false;
   private useAISP = false;
+  private useAISPLite = false;
   private useAISPFull = false;
+  private succinctReasoning = false;
   private aispBuilder: AISPBuilder | null = null;
 
   /**
@@ -56,14 +58,25 @@ export class PromptBuilder {
    * Enable AISP mode
    *
    * Spec 16: AISP mode converts prompts to AISP syntax.
-   * @param mode - 'off' | 'aisp' | 'aisp-full'
+   * @param mode - 'off' | 'aisp' | 'aisp-lite' | 'aisp-full'
    */
-  setAISPMode(mode: 'off' | 'aisp' | 'aisp-full'): void {
-    this.useAISP = mode === 'aisp' || mode === 'aisp-full';
+  setAISPMode(mode: 'off' | 'aisp' | 'aisp-lite' | 'aisp-full'): void {
+    this.useAISP = mode === 'aisp' || mode === 'aisp-lite' || mode === 'aisp-full';
+    this.useAISPLite = mode === 'aisp-lite';
     this.useAISPFull = mode === 'aisp-full';
     if (this.useAISP && !this.aispBuilder) {
       this.aispBuilder = new AISPBuilder();
     }
+  }
+
+  /**
+   * Enable succinct reasoning mode
+   *
+   * Spec 16 FR-05: When enabled, prompts instruct the model to provide ONLY
+   * the move without full candidate analysis.
+   */
+  setSuccinctReasoning(enabled: boolean): void {
+    this.succinctReasoning = enabled;
   }
 
   /**
@@ -90,6 +103,13 @@ export class PromptBuilder {
   ): string {
     // Spec 16: Route to AISP format when enabled
     if (this.useAISP && this.aispBuilder) {
+      // AISP-lite uses simplified minimal template (Spec 16 FR-06)
+      if (this.useAISPLite) {
+        // Use allExperiences for forbidden list (same as standard AISP) to prevent
+        // old forbidden moves from being "forgotten" when move history is truncated
+        return this.buildAISPLitePrompt(gridState, allExperiences || experiencesToShow, fewShots);
+      }
+      // Standard AISP or AISP-full
       return this.buildAISPPrompt(gridState, experiencesToShow, fewShots, allExperiences);
     }
 
@@ -177,6 +197,12 @@ export class PromptBuilder {
     // Add per-profile system prompt if provided (Spec 13)
     if (profileSystemPrompt) {
       prompt += profileSystemPrompt + '\n\n';
+    }
+
+    // Spec 16 FR-05: Succinct reasoning mode
+    if (this.succinctReasoning) {
+      prompt += '⚠️ IMPORTANT: Provide ONLY your chosen move. Do NOT analyze all cells.\n';
+      prompt += 'Output format: ROW: X, COL: Y, VALUE: Z with brief reasoning (1-2 sentences).\n\n';
     }
 
     prompt += 'What is your next move?';
@@ -510,6 +536,37 @@ Use the first matching pattern. Follow its template exactly.`;
         anonymousPatterns: this.useAnonymousPatterns,
       }
     );
+  }
+
+  /**
+   * Build AISP-lite prompt (minimal template)
+   *
+   * Spec 16 FR-06: AISP-lite uses simplified AISP syntax based on the Minimal
+   * template from AISP 5.1 spec. Better for smaller/weaker models.
+   */
+  private buildAISPLitePrompt(
+    gridState: number[][],
+    experiencesToShow: LLMExperience[],
+    fewShots: FewShotExample[] = []
+  ): string {
+    if (!this.aispBuilder) {
+      throw new Error('AISPBuilder not initialized');
+    }
+
+    // Extract forbidden moves from experiences
+    const forbidden: ForbiddenMove[] = [];
+    for (const exp of experiencesToShow) {
+      if (exp.validation.outcome === 'invalid' || exp.validation.outcome === 'valid_but_wrong') {
+        forbidden.push({
+          row: exp.move.row,
+          col: exp.move.col,
+          value: exp.move.value,
+          reason: exp.validation.error || exp.validation.outcome,
+        });
+      }
+    }
+
+    return this.aispBuilder.buildAISPLitePrompt(gridState, forbidden, fewShots);
   }
 
 }

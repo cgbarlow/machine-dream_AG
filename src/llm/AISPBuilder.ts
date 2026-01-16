@@ -14,7 +14,7 @@ import type { FewShotExample, LLMExperience } from './types.js';
 /**
  * AISP Mode options
  */
-export type AISPMode = 'off' | 'aisp' | 'aisp-full';
+export type AISPMode = 'off' | 'aisp' | 'aisp-lite' | 'aisp-full';
 
 /**
  * Forbidden move for AISP constraint block
@@ -174,8 +174,11 @@ export class AISPBuilder {
    * Build AISP-formatted forbidden moves
    *
    * ⟦Χ:Forbidden⟧{
+   *   ;; CRITICAL: These moves WILL be rejected. Do NOT attempt.
    *   ¬(1,1,5):"already attempted"
    *   ¬(3,7,9):"violates box"
+   *   constraint≔HARD
+   *   ¬retry(forbidden)
    * }
    */
   buildForbidden(moves: ForbiddenMove[]): string {
@@ -183,12 +186,17 @@ export class AISPBuilder {
       return '';
     }
 
-    const lines: string[] = ['⟦Χ:Forbidden⟧{'];
+    const lines: string[] = [
+      '⟦Χ:Forbidden⟧{',
+      '  ;; CRITICAL: These moves WILL be rejected. Do NOT attempt.',
+    ];
 
     for (const m of moves) {
       lines.push(`  ¬(${m.row},${m.col},${m.value}):"${m.reason}"`);
     }
 
+    lines.push(`  constraint≔HARD`);
+    lines.push(`  ¬retry(forbidden)`);
     lines.push(`}`);
     return lines.join('\n');
   }
@@ -247,7 +255,7 @@ export class AISPBuilder {
   }
 
   /**
-   * Build execution instruction block
+   * Build execution instruction block with explicit output format examples (FR-08)
    */
   private buildExecutionBlock(options?: AISPOptions): string {
     const lines: string[] = ['⟦Ε:Execute⟧{'];
@@ -259,9 +267,26 @@ export class AISPBuilder {
       lines.push(`  mode≔AISP_FULL`);
       lines.push(`  ∀reasoning:output∈AISP`);
       lines.push(`  format≔⟦Σ:Analysis⟧{...}⟦Ε:Move⟧{(r,c,v)⊢proof}`);
+      lines.push('');
+      lines.push('  ;; REQUIRED OUTPUT FORMAT - Your response MUST include:');
+      lines.push('  ;; ⟦Σ:Analysis⟧{cell≜(r,c);candidates≔{...}}');
+      lines.push('  ;; ⟦Ε:Move⟧{(r,c,v)⊢reason}');
+      lines.push('  ;; Example: ⟦Ε:Move⟧{(3,6,6)⊢candidates={6}∧|candidates|=1}');
     } else {
       // Standard AISP mode - expect normal output
-      lines.push(`  output≔"REASONING: ...\nROW: r\nCOL: c\nVALUE: v"`);
+      lines.push(`  output≔"REASONING: ...\\nROW: r\\nCOL: c\\nVALUE: v"`);
+      lines.push('');
+      lines.push('  ;; REQUIRED OUTPUT FORMAT - Your response MUST include:');
+      lines.push('  ;; ROW: <number 1-9>');
+      lines.push('  ;; COL: <number 1-9>');
+      lines.push('  ;; VALUE: <number 1-9>');
+      lines.push('  ;; REASONING: <brief explanation>');
+      lines.push('');
+      lines.push('  ;; Example output:');
+      lines.push('  ;; ROW: 3');
+      lines.push('  ;; COL: 6');
+      lines.push('  ;; VALUE: 6');
+      lines.push('  ;; REASONING: Cell (3,6) can only be 6 - all other values appear in row, column, or box.');
     }
 
     lines.push(`}`);
@@ -504,6 +529,141 @@ ${this.getAISPGenerationSpec()}
       includeSpec: true,
       gridSize,
     });
+  }
+
+  /**
+   * Build AISP-Lite prompt (FR-06)
+   *
+   * Based on AISP 5.1 Platinum Spec Minimal Template (Section 7.1):
+   * - Uses only 5 required blocks: header, ⟦Ω⟧, ⟦Σ⟧, ⟦Λ⟧, ⟦Ε⟧
+   * - Smaller reference block with core symbols only
+   * - Natural language proofs allowed in output
+   * - Target ◊⁻ (Bronze) tier minimum (δ≥0.20)
+   * - Better suited for smaller/weaker models
+   *
+   * @param grid - Current puzzle grid
+   * @param forbidden - Forbidden moves to include
+   * @param fewShots - Learning strategies to include (optional)
+   */
+  buildAISPLitePrompt(
+    grid: number[][],
+    forbidden: ForbiddenMove[] = [],
+    fewShots: FewShotExample[] = []
+  ): string {
+    const size = grid.length;
+    const date = new Date().toISOString().split('T')[0];
+
+    const lines: string[] = [];
+
+    // Header (required) - Minimal template format
+    lines.push(`𝔸1.0.sudoku-lite@${date}`);
+    lines.push(`γ≔sudoku.solving.${size}x${size}`);
+    lines.push('');
+
+    // Minimal reference block (core symbols only)
+    lines.push('⟦Ω:Ref⟧{');
+    lines.push('  ⊤≔true; ⊥≔false; ∈≔in; ¬≔not');
+    lines.push('  ≔≔assign; ⊕≔success; ⊖≔failure');
+    lines.push('}');
+    lines.push('');
+
+    // State block (simplified board notation)
+    lines.push('⟦Σ:State⟧{');
+    lines.push(`  board≜${this.formatBoardSimple(grid)}`);
+    const emptyCells = this.formatEmptyCells(grid);
+    lines.push(`  empty≔{${emptyCells}}`);
+    lines.push('}');
+    lines.push('');
+
+    // Rules block (minimal)
+    lines.push('⟦Γ:Rules⟧{');
+    lines.push('  valid(r,c,v)≔v∉row(r)∧v∉col(c)∧v∉box(r,c)');
+    lines.push('}');
+    lines.push('');
+
+    // Functions block (minimal)
+    lines.push('⟦Λ:Solve⟧{');
+    lines.push('  find_move≔select (r,c)∈empty where |candidates(r,c)|=1');
+    lines.push('}');
+    lines.push('');
+
+    // Add strategies from learning unit if available (simplified format for AISP-lite)
+    if (fewShots.length > 0) {
+      lines.push('⟦Λ:Strategies⟧{');
+      lines.push('  ;; Learned patterns from previous successes');
+      for (let i = 0; i < fewShots.length; i++) {
+        const ex = fewShots[i];
+        const strategyId = ex.strategy || `S${i + 1}`;
+        // Use AISP-encoded version if available, otherwise use simplified format
+        if (ex.aispEncoded) {
+          lines.push(`  ${this.sanitizeId(strategyId)}≔${ex.aispEncoded}`);
+        } else {
+          // Simplified natural language format for AISP-lite
+          lines.push(`  ${this.sanitizeId(strategyId)}≔"${ex.situation.slice(0, 100)}"`);
+          if (ex.move) {
+            lines.push(`    example≔(${ex.move.row},${ex.move.col},${ex.move.value})`);
+          }
+        }
+      }
+      lines.push('}');
+      lines.push('');
+    }
+
+    // Add forbidden moves if any (using stronger format)
+    if (forbidden.length > 0) {
+      lines.push('⟦Χ:Forbidden⟧{');
+      lines.push('  ;; CRITICAL: These moves WILL be rejected. Do NOT attempt.');
+      for (const m of forbidden) {
+        lines.push(`  ¬(${m.row},${m.col},${m.value}):"${m.reason}"`);
+      }
+      lines.push('  constraint≔HARD');
+      lines.push('}');
+      lines.push('');
+    }
+
+    // Execute block (with natural language allowed + explicit example)
+    lines.push('⟦Ε:Execute⟧{');
+    lines.push('  ⊢?move∈empty∧valid(move)');
+    lines.push('  output≔"ROW: r, COL: c, VALUE: v"');
+    lines.push('  proof≔natural_language_allowed');
+    lines.push('');
+    lines.push('  ;; REQUIRED OUTPUT FORMAT - Your response MUST include:');
+    lines.push('  ;; ROW: <number 1-9>');
+    lines.push('  ;; COL: <number 1-9>');
+    lines.push('  ;; VALUE: <number 1-9>');
+    lines.push('  ;; REASONING: <brief explanation>');
+    lines.push('');
+    lines.push('  ;; Example output:');
+    lines.push('  ;; ROW: 3');
+    lines.push('  ;; COL: 6');
+    lines.push('  ;; VALUE: 6');
+    lines.push('  ;; REASONING: Cell (3,6) can only be 6 - all other values appear in row, column, or box.');
+    lines.push('}');
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Format board in simple row notation for AISP-lite
+   */
+  private formatBoardSimple(grid: number[][]): string {
+    const rows = grid.map((row, i) => `R${i + 1}:[${row.join(',')}]`);
+    return `{${rows.join(';')}}`;
+  }
+
+  /**
+   * Format empty cells list
+   */
+  private formatEmptyCells(grid: number[][]): string {
+    const cells: string[] = [];
+    for (let r = 0; r < grid.length; r++) {
+      for (let c = 0; c < grid[r].length; c++) {
+        if (grid[r][c] === 0) {
+          cells.push(`(${r + 1},${c + 1})`);
+        }
+      }
+    }
+    return cells.join(',');
   }
 
   /**

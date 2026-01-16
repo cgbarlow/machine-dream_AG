@@ -310,7 +310,10 @@ machine-dream llm play <puzzle> [options]
 | `--show-reasoning` | Display full reasoning tokens | false |
 | `--save-reasoning` | Store full reasoning in memory | false |
 | `--aisp` | Use AISP syntax (low-ambiguity) | false |
-| `--aisp-full` | Use full AISP mode | false |
+| `--aisp-lite` | Use simplified AISP (better for smaller models) | false |
+| `--aisp-full` | Use full AISP mode (16384 maxTokens) | false |
+| `--succinct-reasoning` | Request shorter responses without full analysis | false |
+| `--timeout <ms>` | Request timeout (uses profile timeout if not specified) | - |
 
 **Examples:**
 ```bash
@@ -322,6 +325,12 @@ machine-dream llm play puzzles/9x9-medium.json --profile qwen3-coder --learning-
 
 # With AISP mode and reasoning storage
 machine-dream llm play puzzles/4x4-expert.json --aisp --save-reasoning
+
+# AISP-lite for smaller models (simplified format, natural language proofs allowed)
+machine-dream llm play puzzles/9x9-easy.json --aisp-lite --profile small-model
+
+# Succinct mode for faster responses
+machine-dream llm play puzzles/9x9-easy.json --succinct-reasoning
 
 # Baseline mode (no learning)
 machine-dream llm play puzzles/9x9-easy.json --no-learning
@@ -662,7 +671,9 @@ machine-dream llm dream run [options]
 | `--anonymous-patterns` | Use anonymous format | false |
 | `--double-strategies` | Double strategy count (6-10) | false |
 | `--aisp` | Mark unit as AISP mode (for naming) | false |
+| `--aisp-lite` | Mark unit as AISP-lite mode (for naming) | false |
 | `--aisp-full` | Mark unit as AISP-full mode (for naming) | false |
+| `--succinct-reasoning` | Request shorter responses | false |
 | `--no-dual-unit` | Create only single unit (default: creates BOTH standard and -2x) | false (dual enabled) |
 | `--no-failure-learning` | Disable failure learning (anti-patterns & reasoning corrections) | false (enabled) |
 | `--output <file>` | Save report to file | - |
@@ -670,10 +681,11 @@ machine-dream llm dream run [options]
 
 **Auto-generated Learning Unit Names:**
 When `--learning-unit` is not specified, a unique name is generated:
-- Format: `{profile}_{AISP|AISP-full}_{2x}_{YYYYMMDD}_{XX}`
+- Format: `{profile}_{AISP|AISP-lite|AISP-full}_{2x}_{YYYYMMDD}_{XX}`
 - Examples:
   - `qwen3-coder_20260112` (basic)
   - `qwen3-coder_AISP_20260112` (with --aisp)
+  - `qwen3-coder_AISP-lite_20260112` (with --aisp-lite)
   - `qwen3-coder_AISP-full_2x_20260112` (with --aisp-full --double-strategies)
   - `qwen3-coder_20260112_01` (increment if exists)
 

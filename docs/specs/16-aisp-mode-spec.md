@@ -27,6 +27,7 @@ AISP (AI Specification Protocol) mode integrates the low-ambiguity AI-to-AI comm
 | Flag | System Prompt | User Prompt | Model Output | Strategy Storage |
 |------|---------------|-------------|--------------|------------------|
 | `--aisp` | Pure AISP | Pure AISP | Normal text (ROW/COL/VALUE) | Natural language |
+| `--aisp-lite` | Minimal AISP | Minimal AISP | Normal text (ROW/COL/VALUE) | Natural language |
 | `--aisp-full` | Pure AISP + Gen Spec | Pure AISP | Pure AISP | AISP-encoded |
 
 **Critical Distinction:**
@@ -82,7 +83,74 @@ Both modes are supported in:
 - `scripts/training-run.sh`
 - `scripts/abx-test.sh`
 
-### FR-05: Clustering Algorithm AISP Mode
+### FR-05: Succinct Reasoning Mode (`--succinct-reasoning`)
+
+When `--succinct-reasoning` is enabled:
+- Prompts instruct the model to provide ONLY the move without full candidate analysis
+- Output format is streamlined to ROW/COL/VALUE with brief 1-2 sentence reasoning
+- Reduces token usage and response time for models that over-explain
+- Compatible with all AISP modes (off, aisp, aisp-lite, aisp-full)
+
+**CLI:**
+```bash
+npx machine-dream llm play puzzle.json --succinct-reasoning
+npx machine-dream llm play puzzle.json --aisp --succinct-reasoning
+```
+
+### FR-06: AISP-Lite Mode (`--aisp-lite`)
+
+A simplified AISP format based on the AISP 5.1 Platinum Spec Minimal Template (Section 7.1 line 389):
+- Uses only 5 required blocks: header, `⟦Ω⟧`, `⟦Σ⟧`, `⟦Λ⟧`, `⟦Ε⟧`
+- Smaller reference block with core symbols only
+- Natural language proofs allowed in output
+- Target ◊⁻ (Bronze) tier minimum (δ≥0.20)
+- Better suited for smaller/weaker models that struggle with full AISP syntax
+
+| Aspect | `--aisp` | `--aisp-lite` | `--aisp-full` |
+|--------|----------|---------------|---------------|
+| Template | Full | Minimal | Full + Gen Spec |
+| Blocks | All | 5 required | All + enforcement |
+| Output | Text | Text | AISP |
+| Target Tier | Silver (δ≥0.40) | Bronze (δ≥0.20) | Gold (δ≥0.60) |
+| Best For | General use | Smaller models | Capable models |
+
+**CLI:**
+```bash
+npx machine-dream llm play puzzle.json --aisp-lite
+```
+
+### FR-07: Increased maxTokens for AISP-Full
+
+When `--aisp-full` is enabled:
+- `maxTokens` is automatically increased to 16384 (from default 2048)
+- AISP-full responses require more tokens due to formal notation
+- Only applied if current maxTokens < 16384
+- Logged when applied for transparency
+
+### FR-08: Explicit Output Format Examples
+
+All AISP prompts now include explicit output format examples to improve model compliance:
+- `--aisp` and `--aisp-lite`: Show ROW/COL/VALUE example in `⟦Ε:Execute⟧` block
+- `--aisp-full`: Show `⟦Σ:Analysis⟧{...}⟦Ε:Move⟧{...}` example
+
+Example in prompt:
+```aisp
+;; REQUIRED OUTPUT FORMAT - Your response MUST include:
+;; ROW: 3
+;; COL: 6
+;; VALUE: 6
+;; REASONING: Cell (3,6) can only be 6 - all other values appear in row, column, or box.
+```
+
+### FR-09: Stronger Forbidden Move Warnings
+
+AISP `⟦Χ:Forbidden⟧` block now includes:
+- `constraint≔HARD` declaration
+- `¬retry(forbidden)` directive
+- CRITICAL comment emphasizing rejection
+- Stronger language to prevent models from attempting forbidden moves
+
+### FR-10: Clustering Algorithm AISP Mode
 
 When `--aisp-full` is enabled during dreaming consolidation:
 - `DreamingConsolidator.setAISPMode()` propagates mode to clustering algorithm
@@ -173,7 +241,7 @@ When `--aisp-full` is enabled during dreaming consolidation:
 Converts prompt sections to AISP syntax (`src/llm/AISPBuilder.ts`):
 
 ```typescript
-export type AISPMode = 'off' | 'aisp' | 'aisp-full';
+export type AISPMode = 'off' | 'aisp' | 'aisp-lite' | 'aisp-full';
 
 export class AISPBuilder {
   // Grid conversion - tensor notation
@@ -245,7 +313,7 @@ interface SynthesizedPattern {
 
 ```typescript
 // src/llm/config.ts
-export type AISPMode = 'off' | 'aisp' | 'aisp-full';
+export type AISPMode = 'off' | 'aisp' | 'aisp-lite' | 'aisp-full';
 
 export interface SystemPromptOptions {
   useReasoningTemplate?: boolean;

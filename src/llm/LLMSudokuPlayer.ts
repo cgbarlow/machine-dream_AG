@@ -128,14 +128,26 @@ export class LLMSudokuPlayer extends EventEmitter {
    * Spec 16: AISP mode converts prompts to low-ambiguity AISP syntax.
    * - 'off': Normal natural language prompts
    * - 'aisp': User prompt in AISP, system prompt in natural language
+   * - 'aisp-lite': Simplified AISP using Minimal template (better for smaller models)
    * - 'aisp-full': BOTH system and user prompts in pure AISP
    *
-   * @param mode - 'off' | 'aisp' | 'aisp-full'
+   * @param mode - 'off' | 'aisp' | 'aisp-lite' | 'aisp-full'
    */
   setAISPMode(mode: AISPMode): void {
     this.aispMode = mode;
     this.promptBuilder.setAISPMode(mode);
     this.client.setAISPMode(mode);
+  }
+
+  /**
+   * Enable succinct reasoning mode
+   *
+   * Spec 16 FR-05: When enabled, prompts instruct the model to provide ONLY
+   * the move without full candidate analysis. Reduces token usage and response
+   * time for models that over-explain.
+   */
+  enableSuccinctReasoning(enabled: boolean): void {
+    this.promptBuilder.setSuccinctReasoning(enabled);
   }
 
   /**

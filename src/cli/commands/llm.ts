@@ -775,7 +775,7 @@ export function registerLLMCommand(program: Command): void {
     .option('--learning', 'Enable few-shot learning injection (default when available)')
     .option('--model <model>', 'Override model name')
     .option('--endpoint <url>', 'Override LLM endpoint')
-    .option('--timeout <ms>', 'Request timeout in milliseconds', '300000')
+    .option('--timeout <ms>', 'Request timeout in milliseconds')
     .option('--max-moves <n>', 'Maximum moves before abandoning', '200')
     .option('--visualize', 'Show live solving visualization with board')
     .option('--visualize-basic', 'Show compact move outcomes only (no board)')
@@ -788,7 +788,9 @@ export function registerLLMCommand(program: Command): void {
     .option('--no-streaming', 'Disable streaming mode (wait for full response)')
     .option('--show-reasoning', 'Display full reasoning tokens from LM Studio (requires Developer setting in LM Studio)')
     .option('--aisp', 'Use AISP syntax for prompts (low-ambiguity format, normal output)')
+    .option('--aisp-lite', 'Use simplified AISP syntax (minimal template, better for smaller models)')
     .option('--aisp-full', 'Use full AISP mode (includes spec, expects AISP output)')
+    .option('--succinct-reasoning', 'Request only the move without full analysis (shorter responses)')
     .option('--no-save-reasoning', 'Disable storing full reasoning tokens in experience memory')
     .action(async (puzzleFile, options) => {
       try {
@@ -815,9 +817,12 @@ export function registerLLMCommand(program: Command): void {
           config.baseUrl = options.endpoint;
           logger.info(`Endpoint override: ${options.endpoint}`);
         }
-        if (options.timeout) {
+        // Only override timeout if explicitly provided on CLI (not using default)
+        if (options.timeout !== undefined) {
           config.timeout = parseInt(options.timeout, 10);
           logger.info(`Timeout override: ${config.timeout}ms`);
+        } else {
+          logger.info(`Using profile timeout: ${config.timeout}ms`);
         }
 
         // Memory setting
@@ -920,9 +925,24 @@ export function registerLLMCommand(program: Command): void {
         if (options.aispFull) {
           player.setAISPMode('aisp-full');
           logger.info('𝔸 AISP-Full mode enabled (includes spec, expects AISP output)');
+          // FR-07: Increase maxTokens for AISP-full mode (responses need more tokens)
+          if (config.maxTokens < 16384) {
+            const originalMaxTokens = config.maxTokens;
+            config.maxTokens = 16384;
+            logger.info(`AISP-full mode: maxTokens increased from ${originalMaxTokens} to ${config.maxTokens}`);
+          }
+        } else if (options.aispLite) {
+          player.setAISPMode('aisp-lite');
+          logger.info('𝔸 AISP-Lite mode enabled (simplified AISP, better for smaller models)');
         } else if (options.aisp) {
           player.setAISPMode('aisp');
           logger.info('𝔸 AISP mode enabled (low-ambiguity prompts, normal output)');
+        }
+
+        // Enable succinct reasoning if requested (Spec 16 FR-05)
+        if (options.succinctReasoning) {
+          player.enableSuccinctReasoning(true);
+          logger.info('📝 Succinct reasoning mode enabled (shorter responses)');
         }
 
         // Enable full reasoning storage by default (unless --no-save-reasoning)

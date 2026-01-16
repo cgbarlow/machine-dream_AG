@@ -94,6 +94,13 @@ export function buildSystemPrompt(gridSize: number, options: SystemPromptOptions
     return buildAISPSystemPromptBasic(gridSize);
   }
 
+  if (options.aispMode === 'aisp-lite') {
+    // AISP-lite mode: Minimal system prompt - rules are in user message (AISP format)
+    // The user message contains complete AISP-lite spec with rules embedded
+    return `You are a Sudoku solver. Follow the AISP specification in the user message.
+Output your move in the exact format specified in the ⟦Ε:Execute⟧ block.`;
+  }
+
   const boxSize = Math.sqrt(gridSize);
   const maxValue = gridSize;
 

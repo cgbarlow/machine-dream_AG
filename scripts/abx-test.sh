@@ -94,6 +94,19 @@ echo "Results dir: $RESULTS_DIR"
 if [[ -n "$DEBUG_FLAG" ]]; then
   echo "Debug mode: enabled"
 fi
+echo ""
+echo "Configurations to test:"
+for i in $(seq 0 $((NUM_CONFIGS - 1))); do
+  CFG_NAME=$(jq -r ".configurations[$i].name" "$CONFIG")
+  CFG_PROFILE=$(jq -r ".configurations[$i].profile" "$CONFIG")
+  CFG_UNIT=$(jq -r ".configurations[$i].learningUnit // \"none\"" "$CONFIG")
+  CFG_OPTIONS=$(jq -r ".configurations[$i].options // [] | join(\" \")" "$CONFIG")
+  echo "  $((i + 1)). $CFG_NAME"
+  echo "     Profile: $CFG_PROFILE | Unit: $CFG_UNIT"
+  if [[ -n "$CFG_OPTIONS" ]]; then
+    echo "     Options: $CFG_OPTIONS"
+  fi
+done
 echo "=============================================="
 echo ""
 

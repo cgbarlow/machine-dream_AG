@@ -63,6 +63,12 @@ export interface LLMConfig {
   // Debugging
   debug?: boolean; // Show detailed debug output (e.g., LLM responses, pattern parsing)
 
+  // Spec 16 FR-05: Succinct Reasoning Mode
+  succinctReasoning?: boolean; // Request only the move without full analysis
+
+  // Spec 16 Fix 5: Thinking Timeout for Reasoning Models
+  thinkingMaxTokens?: number;  // Max tokens before forcing think closure (default: 4096)
+
   // No hints, no fallback - these are NOT configurable
 }
 
@@ -149,7 +155,7 @@ export interface PlaySession {
   endTime?: Date;
 
   // AISP Mode tracking (Spec 11, ADR-014)
-  aispMode?: AISPMode;              // AISP mode used for this session ('off' | 'aisp' | 'aisp-full')
+  aispMode?: AISPMode;              // AISP mode used for this session ('off' | 'aisp' | 'aisp-lite' | 'aisp-full')
 
   // Outcome
   solved: boolean;

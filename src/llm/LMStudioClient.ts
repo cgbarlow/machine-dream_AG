@@ -205,6 +205,13 @@ export class LMStudioClient {
     let fullReasoning = '';
     let finishReason: string | null = null;
 
+    // Spec 16 Fix 5: Thinking timeout for reasoning models
+    // Tracks <think> blocks in content and truncates if they exceed limit
+    let thinkingTokenCount = 0;
+    let inThinkingBlock = false;
+    let thinkingTruncated = false;
+    const thinkingMaxTokens = this.config.thinkingMaxTokens ?? 4096;
+
     try {
       while (true) {
         // Check if request was aborted (timeout or manual cancellation)
@@ -241,6 +248,34 @@ export class LMStudioClient {
               // Extract content tokens
               const token = delta?.content;
               if (token) {
+                // Spec 16 Fix 5: Track <think> blocks for thinking timeout
+                if (token.includes('<think>')) {
+                  inThinkingBlock = true;
+                  thinkingTokenCount = 0;
+                }
+
+                // Count tokens and check for truncation while in thinking block
+                if (inThinkingBlock && !thinkingTruncated) {
+                  thinkingTokenCount++;
+                  if (thinkingTokenCount > thinkingMaxTokens) {
+                    // Force closure - append </think> and continue to answer
+                    fullContent += '</think>\n[Thinking truncated at ' + thinkingMaxTokens + ' tokens - producing answer]\n';
+                    onStream('</think>\n[Thinking truncated - producing answer]\n');
+                    inThinkingBlock = false;
+                    thinkingTruncated = true;
+                    continue; // Skip adding this token to content
+                  }
+                }
+
+                if (token.includes('</think>')) {
+                  inThinkingBlock = false;
+                }
+
+                // Skip content tokens while truncated and still in thinking
+                if (thinkingTruncated && inThinkingBlock) {
+                  continue;
+                }
+
                 fullContent += token;
                 onStream(token);
               }
