@@ -183,6 +183,12 @@ export class ExperienceStore {
    * Get few-shot examples for prompts
    * Loads from profile+unit storage: llm_fewshots:${profileName}:${learningUnitId}
    *
+   * Cross-Profile Support (2026-01-17):
+   * Learning units are portable across profiles. If strategies aren't found for
+   * the current profile, we extract the source profile from the unit ID and
+   * load strategies from there. This enables using a learning unit created by
+   * one profile (e.g., gpt-oss-120b) with any other profile (e.g., deepseek-r1).
+   *
    * @param profileName - Profile name (defaults to constructor profile)
    * @param learningUnitId - Learning unit ID (defaults to 'default')
    * @param limit - Maximum examples to return
@@ -198,6 +204,21 @@ export class ExperienceStore {
     );
 
     if (!data || !Array.isArray((data as any).examples)) {
+      // Cross-profile fallback: Extract source profile from unit ID
+      // Unit IDs follow pattern: {sourceProfile}_{mode}_{algorithm}_{date}_{version}
+      // e.g., "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7"
+      const sourceProfile = this.extractSourceProfile(unitId);
+      if (sourceProfile && sourceProfile !== profile) {
+        const crossProfileKey = LLM_STORAGE_KEYS.getFewShotsKey(sourceProfile, unitId);
+        const crossProfileData = await this.agentMemory.reasoningBank.getMetadata(
+          crossProfileKey,
+          'fewshot_examples'
+        );
+        if (crossProfileData && Array.isArray((crossProfileData as any).examples)) {
+          return (crossProfileData as any).examples.slice(0, limit);
+        }
+      }
+
       // Fall back to legacy key format for backward compatibility
       const legacyData = await this.agentMemory.reasoningBank.getMetadata(
         `llm_fewshots:${profile}`,
@@ -210,6 +231,51 @@ export class ExperienceStore {
     }
 
     return (data as any).examples.slice(0, limit);
+  }
+
+  /**
+   * Extract source profile name from learning unit ID
+   *
+   * Learning unit IDs follow the pattern: {profile}_{mode}_{algorithm}_{date}_{version}
+   * e.g., "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7" → "gpt-oss-120b"
+   *
+   * @returns Source profile name or null if not extractable
+   */
+  private extractSourceProfile(unitId: string): string | null {
+    if (!unitId || unitId === DEFAULT_LEARNING_UNIT_ID) {
+      return null;
+    }
+
+    // Known suffixes that indicate mode/algorithm segments
+    const knownModes = ['aisp-full', 'aisp', 'anonymous', 'standard'];
+    const knownAlgorithms = ['llmclusterv1', 'llmclusterv2', 'fastclusterv2', 'fastclusterv3'];
+
+    // Try to find where the profile name ends by looking for known patterns
+    for (const mode of knownModes) {
+      const modeIdx = unitId.indexOf(`_${mode}_`);
+      if (modeIdx > 0) {
+        return unitId.substring(0, modeIdx);
+      }
+    }
+
+    // Fallback: Split by underscore and take segments until we hit a known algorithm or date pattern
+    const parts = unitId.split('_');
+    const profileParts: string[] = [];
+
+    for (const part of parts) {
+      // Stop if we hit a known algorithm
+      if (knownAlgorithms.includes(part.toLowerCase())) break;
+      // Stop if we hit a known mode
+      if (knownModes.includes(part.toLowerCase())) break;
+      // Stop if we hit a date pattern (8 digits like 20260116)
+      if (/^\d{8}$/.test(part)) break;
+      // Stop if we hit a version number (single digit)
+      if (/^\d+$/.test(part) && part.length <= 2) break;
+
+      profileParts.push(part);
+    }
+
+    return profileParts.length > 0 ? profileParts.join('_') : null;
   }
 
   /**

@@ -358,6 +358,12 @@ export class AISPBuilder {
   ∀response:Ambig(response)<0.02∧δ≥0.40
   ∀output:syntax∈AISP
 
+  ;; REASONING MODE - Use AISP notation in ALL thinking
+  ;; Including <think> blocks, chain-of-thought, scratchpad
+  ∀reasoning_block:syntax∈AISP
+  think_format≜⟦Σ:Analysis⟧{constraints}⟦Λ:Deduce⟧{steps}
+  ¬(verbose_prose∈think); ¬(narrative∈think)
+
   ;; Output structure
   Output≜⟦Σ:Analysis⟧{...}⟦Ε:Move⟧{(r,c,v)⊢proof}
 
@@ -429,11 +435,16 @@ ${this.getAISPGenerationSpec()}
     (r,c,v)⊢proof
   }
 
-  ;; Enforcement
+  ;; Enforcement - applies to ALL output including <think> blocks
   ∀reasoning:syntax∈AISP
   ∀output:Ambig<0.02
-  ¬prose; ¬natural_language
+  ¬prose; ¬natural_language; ¬verbose_explanation
   ¬restart; ¬second_guess
+
+  ;; Reasoning example (use this style, not prose):
+  ;; ⟦Σ⟧{cell≜(1,1);row[1]≔{8,2,5,1,3};col[1]≔{2,7,8,5};box[1]≔{2,3,5,8,9}}
+  ;; ⟦Λ⟧{candidates≔{1..9}∖{8,2,5,1,3,7}≔{4,6,9};∩(row,col,box)≔{4,6}}
+  ;; ⟦Ε⟧{(1,1,4)⊢|candidates|=2∧scan(col1)⇒6@(3,1)}
 }`;
   }
 

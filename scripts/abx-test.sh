@@ -145,27 +145,73 @@ for i in $(seq 0 $((NUM_CONFIGS - 1))); do
         CMD="$CMD $DEBUG_FLAG"
       fi
 
-      # Run and capture output
+      # Run and capture output - show moves in real-time
       LOG_FILE="$RESULTS_DIR/${NAME}_${PUZZLE_NAME}_run${run}.log"
-      OUTPUT=$(eval $CMD 2>&1 | tee "$LOG_FILE")
+      echo ""
+      echo "      ─────────────────────────────────────────────"
+      echo "      Run $run: Starting... (logging to ${LOG_FILE##*/})"
+      echo "      ─────────────────────────────────────────────"
 
-      # Parse results
+      # Run with output streaming - filter to show key events
+      eval $CMD 2>&1 | tee "$LOG_FILE" | while IFS= read -r line; do
+        # Show move attempts and results
+        if [[ "$line" =~ ^Move[[:space:]] ]] || \
+           [[ "$line" =~ CORRECT ]] || \
+           [[ "$line" =~ INVALID ]] || \
+           [[ "$line" =~ VALID_BUT_WRONG ]] || \
+           [[ "$line" =~ SOLVED ]] || \
+           [[ "$line" =~ "Session Results" ]] || \
+           [[ "$line" =~ "Total moves:" ]] || \
+           [[ "$line" =~ "Correct moves:" ]] || \
+           [[ "$line" =~ "Accuracy:" ]] || \
+           [[ "$line" =~ "Session ended:" ]] || \
+           [[ "$line" =~ "Reason:" ]] || \
+           [[ "$line" =~ "timeout" ]] || \
+           [[ "$line" =~ "Error" ]] || \
+           [[ "$line" =~ "strategies" ]] || \
+           [[ "$line" =~ "Learning unit:" ]]; then
+          echo "      | $line"
+        fi
+      done
+
+      # Parse results from log file
+      OUTPUT=$(cat "$LOG_FILE")
+
       if echo "$OUTPUT" | grep -q "SOLVED"; then
         SOLVED=$((SOLVED + 1))
-        STATUS="SOLVED"
+        STATUS="✅ SOLVED"
+      elif echo "$OUTPUT" | grep -q "timeout"; then
+        STATUS="⏱️ TIMEOUT"
+      elif echo "$OUTPUT" | grep -q "Error"; then
+        STATUS="❌ ERROR"
       else
-        STATUS="FAIL"
+        STATUS="❌ FAIL"
       fi
 
       # Extract moves and accuracy from output
-      MOVES=$(echo "$OUTPUT" | grep -oP 'Moves:\s*\K\d+' | tail -1 || echo "0")
+      MOVES=$(echo "$OUTPUT" | grep -oP 'Total moves:\s*\K\d+' | tail -1 || echo "0")
+      if [[ -z "$MOVES" || "$MOVES" == "0" ]]; then
+        MOVES=$(echo "$OUTPUT" | grep -oP 'Moves:\s*\K\d+' | tail -1 || echo "0")
+      fi
+      CORRECT=$(echo "$OUTPUT" | grep -oP 'Correct moves:\s*\K\d+' | tail -1 || echo "0")
       ACC=$(echo "$OUTPUT" | grep -oP 'Accuracy:\s*\K[\d.]+' | tail -1 || echo "0")
 
-      TOTAL_MOVES=$((TOTAL_MOVES + MOVES))
-      TOTAL_ACCURACY=$(echo "$TOTAL_ACCURACY + $ACC" | bc)
+      # Extract strategy count if present
+      STRATEGIES=$(echo "$OUTPUT" | grep -oP 'Learned strategies:\s*\K\d+' | tail -1 || echo "0")
 
-      echo "      Run $run: $STATUS (moves: $MOVES, acc: ${ACC}%)"
-      echo "[$NAME] $PUZZLE_NAME run $run: $STATUS (moves: $MOVES, acc: ${ACC}%)" >> "$DETAIL_LOG"
+      TOTAL_MOVES=$((TOTAL_MOVES + ${MOVES:-0}))
+      TOTAL_ACCURACY=$(echo "$TOTAL_ACCURACY + ${ACC:-0}" | bc 2>/dev/null || echo "0")
+
+      echo "      ─────────────────────────────────────────────"
+      echo "      Run $run: $STATUS"
+      echo "        Moves: ${MOVES:-0} total, ${CORRECT:-0} correct"
+      echo "        Accuracy: ${ACC:-0}%"
+      if [[ -n "$STRATEGIES" && "$STRATEGIES" != "0" ]]; then
+        echo "        Strategies loaded: $STRATEGIES"
+      fi
+      echo ""
+
+      echo "[$NAME] $PUZZLE_NAME run $run: $STATUS (moves: ${MOVES:-0}, correct: ${CORRECT:-0}, acc: ${ACC:-0}%)" >> "$DETAIL_LOG"
     done
 
     # Calculate averages
