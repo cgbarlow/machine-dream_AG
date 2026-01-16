@@ -1,6 +1,6 @@
 # Specification 16: AISP Mode Integration
 
-**Version:** 1.3.1
+**Version:** 1.3.2
 **Date:** 2026-01-16
 **Status:** Implemented
 **Depends On:** Spec 11 (LLM Sudoku Player), Spec 05 (Dreaming Pipeline), Spec 18 (Algorithm Versioning)
@@ -494,6 +494,23 @@ This ensures:
 - Embedded natural language doesn't affect delta score
 - Prompts with embedded data can still achieve high tiers
 
+**Chunked Validation for Large Documents:**
+
+The AISP validator WASM has a 1KB document limit. For larger documents, `ValidatedLLMClient` splits content into ≤1KB chunks and aggregates results:
+
+```typescript
+private validateInChunks(text: string): AISPValidationResult {
+  // Split into ~1000 byte chunks
+  // Validate each chunk
+  // Aggregate: weighted average delta, minimum tier (weakest link)
+}
+```
+
+Aggregation rules:
+- `delta`: weighted average by chunk size
+- `tier`: minimum tier across all chunks (weakest link principle)
+- `valid`: true only if ALL chunks pass
+
 **Tier-Based Logging:**
 - Platinum/Gold/Silver: `✓ AISP [context] tier (δ=X.XXX)`
 - Bronze: `⚠️ AISP [context] Bronze (δ=X.XXX)`
@@ -777,6 +794,7 @@ AISP syntax is more compact than natural language:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.3.2 | 2026-01-16 | Chunked validation for large documents (Section 4.11) |
 | 1.3.1 | 2026-01-16 | Natural language stripping for prompt validation (Section 4.11) |
 | 1.3.0 | 2026-01-16 | Centralized AISP validation: Section 4.11, ValidatedLLMClient wrapper, factory pattern |
 | 1.2.0 | 2026-01-16 | Clustering AISP support: FR-05, aisp-validator integration, FastClusterV3, DeepClusterV2, LLMClusterV2 AISP |

@@ -119,7 +119,8 @@ export class ValidatedLLMClient {
 
         // Strip embedded natural language before validating AISP structure
         const strippedContent = this.stripNaturalLanguageForValidation(promptContent);
-        promptValidation = this.validator.validate(strippedContent);
+        // Validate in chunks (AISP validator has 1KB WASM limit)
+        promptValidation = this.validateInChunks(strippedContent);
         this.logValidation(promptValidation, context, true);
         this.emitValidationEvent(promptValidation, context, true);
       }
@@ -213,6 +214,84 @@ export class ValidatedLLMClient {
     // Replace content in double-quoted strings with ellipsis stub
     // Preserves AISP structure (e1≔"…") while removing natural language
     return text.replace(/"[^"]*"/g, '"…"');
+  }
+
+  /**
+   * Validate content in chunks to handle AISP validator's 1KB WASM limit.
+   *
+   * Splits content into ≤1KB chunks, validates each, and aggregates:
+   * - delta: weighted average across chunks
+   * - tier: minimum tier (weakest link)
+   * - valid: true only if all chunks valid
+   *
+   * @param text - Full content to validate
+   * @returns Aggregated validation result
+   */
+  private validateInChunks(text: string): AISPValidationResult {
+    const CHUNK_SIZE = 1000; // Leave margin under 1024 limit
+    const chunks: string[] = [];
+
+    // Split into chunks
+    for (let i = 0; i < text.length; i += CHUNK_SIZE) {
+      chunks.push(text.substring(i, i + CHUNK_SIZE));
+    }
+
+    if (chunks.length === 0) {
+      return {
+        valid: false,
+        tier: '⊘',
+        tierValue: 0,
+        tierName: 'Reject',
+        delta: 0,
+        pureDensity: 0,
+        error: 'Empty content',
+      };
+    }
+
+    // Validate each chunk
+    const results = chunks.map(chunk => this.validator.validate(chunk));
+
+    // Aggregate results
+    const totalLength = text.length;
+    let weightedDelta = 0;
+    let weightedPureDensity = 0;
+    let minTierValue = 4; // Start with max (Platinum)
+    let minTier = '◊⁺⁺';
+    let minTierName = 'Platinum';
+    let allValid = true;
+    const errors: string[] = [];
+
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      const chunkLength = chunks[i].length;
+      const weight = chunkLength / totalLength;
+
+      // Weighted average for delta and pureDensity
+      weightedDelta += (result.delta ?? 0) * weight;
+      weightedPureDensity += (result.pureDensity ?? 0) * weight;
+
+      // Track minimum tier (weakest link)
+      const tierValue = result.tierValue ?? 0;
+      if (tierValue < minTierValue) {
+        minTierValue = tierValue;
+        minTier = result.tier ?? '⊘';
+        minTierName = result.tierName ?? 'Reject';
+      }
+
+      // Track validity and errors
+      if (!result.valid) allValid = false;
+      if (result.error) errors.push(`Chunk ${i + 1}: ${result.error}`);
+    }
+
+    return {
+      valid: allValid,
+      tier: minTier,
+      tierValue: minTierValue,
+      tierName: minTierName,
+      delta: weightedDelta,
+      pureDensity: weightedPureDensity,
+      error: errors.length > 0 ? errors.join('; ') : undefined,
+    };
   }
 
   /**
