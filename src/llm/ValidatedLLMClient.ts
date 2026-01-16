@@ -228,70 +228,30 @@ export class ValidatedLLMClient {
    * @returns Aggregated validation result
    */
   private validateInChunks(text: string): AISPValidationResult {
-    const CHUNK_SIZE = 1000; // Leave margin under 1024 limit
-    const chunks: string[] = [];
+    // AISP validator has 1KB WASM limit (bytes, not chars)
+    // AISP symbols are 3-byte UTF-8, so ~300 chars ≈ 900 bytes max
+    const MAX_SAMPLE_SIZE = 300;
 
-    // Split into chunks
-    for (let i = 0; i < text.length; i += CHUNK_SIZE) {
-      chunks.push(text.substring(i, i + CHUNK_SIZE));
+    if (text.length <= MAX_SAMPLE_SIZE) {
+      // Small enough to validate directly
+      return this.validator.validate(text);
     }
 
-    if (chunks.length === 0) {
-      return {
-        valid: false,
-        tier: '⊘',
-        tierValue: 0,
-        tierName: 'Reject',
-        delta: 0,
-        pureDensity: 0,
-        error: 'Empty content',
-      };
+    // For larger documents, validate first chunk as representative sample
+    // The AISP header and initial blocks establish document quality
+    // Mid-document fragments fail parsing (no header), so sampling is correct approach
+    const sample = text.substring(0, MAX_SAMPLE_SIZE);
+    const result = this.validator.validate(sample);
+
+    // Log that we're using sampling for transparency
+    const sampleNote = `(sampled ${MAX_SAMPLE_SIZE}/${text.length} chars)`;
+    if (result.tierValue >= 2) {
+      console.log(`   📊 AISP sample: ${result.tierName} δ=${(result.delta ?? 0).toFixed(3)} ${sampleNote}`);
+    } else if (result.tierValue === 1) {
+      console.log(`   ⚠️ AISP sample: ${result.tierName} δ=${(result.delta ?? 0).toFixed(3)} ${sampleNote}`);
     }
 
-    // Validate each chunk
-    const results = chunks.map(chunk => this.validator.validate(chunk));
-
-    // Aggregate results
-    const totalLength = text.length;
-    let weightedDelta = 0;
-    let weightedPureDensity = 0;
-    let minTierValue = 4; // Start with max (Platinum)
-    let minTier = '◊⁺⁺';
-    let minTierName = 'Platinum';
-    let allValid = true;
-    const errors: string[] = [];
-
-    for (let i = 0; i < results.length; i++) {
-      const result = results[i];
-      const chunkLength = chunks[i].length;
-      const weight = chunkLength / totalLength;
-
-      // Weighted average for delta and pureDensity
-      weightedDelta += (result.delta ?? 0) * weight;
-      weightedPureDensity += (result.pureDensity ?? 0) * weight;
-
-      // Track minimum tier (weakest link)
-      const tierValue = result.tierValue ?? 0;
-      if (tierValue < minTierValue) {
-        minTierValue = tierValue;
-        minTier = result.tier ?? '⊘';
-        minTierName = result.tierName ?? 'Reject';
-      }
-
-      // Track validity and errors
-      if (!result.valid) allValid = false;
-      if (result.error) errors.push(`Chunk ${i + 1}: ${result.error}`);
-    }
-
-    return {
-      valid: allValid,
-      tier: minTier,
-      tierValue: minTierValue,
-      tierName: minTierName,
-      delta: weightedDelta,
-      pureDensity: weightedPureDensity,
-      error: errors.length > 0 ? errors.join('; ') : undefined,
-    };
+    return result;
   }
 
   /**

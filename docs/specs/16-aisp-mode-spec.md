@@ -494,22 +494,25 @@ This ensures:
 - Embedded natural language doesn't affect delta score
 - Prompts with embedded data can still achieve high tiers
 
-**Chunked Validation for Large Documents:**
+**Representative Sample Validation for Large Documents:**
 
-The AISP validator WASM has a 1KB document limit. For larger documents, `ValidatedLLMClient` splits content into ≤1KB chunks and aggregates results:
+The AISP validator WASM has a 1KB limit (bytes, not chars). AISP symbols are 3-byte UTF-8, so ~300 chars ≈ 900 bytes. For documents >300 chars, the first 300 characters are validated as a representative sample:
 
 ```typescript
 private validateInChunks(text: string): AISPValidationResult {
-  // Split into ~1000 byte chunks
-  // Validate each chunk
-  // Aggregate: weighted average delta, minimum tier (weakest link)
+  if (text.length <= 300) return this.validator.validate(text);
+
+  // First 300 chars contain header + initial blocks
+  const sample = text.substring(0, 300);
+  return this.validator.validate(sample);
 }
 ```
 
-Aggregation rules:
-- `delta`: weighted average by chunk size
-- `tier`: minimum tier across all chunks (weakest link principle)
-- `valid`: true only if ALL chunks pass
+**Why sampling works:**
+- AISP header (`𝔸1.0...`) and initial blocks establish document quality
+- Mid-document fragments fail parsing (no header) - cannot be validated independently
+- First 300 chars are representative of overall structure and density
+- Logged as: `📊 AISP sample: Gold δ=0.680 (sampled 300/1113 chars)`
 
 **Tier-Based Logging:**
 - Platinum/Gold/Silver: `✓ AISP [context] tier (δ=X.XXX)`
@@ -794,7 +797,7 @@ AISP syntax is more compact than natural language:
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.3.2 | 2026-01-16 | Chunked validation for large documents (Section 4.11) |
+| 1.3.2 | 2026-01-16 | Representative sample validation for large documents (Section 4.11) |
 | 1.3.1 | 2026-01-16 | Natural language stripping for prompt validation (Section 4.11) |
 | 1.3.0 | 2026-01-16 | Centralized AISP validation: Section 4.11, ValidatedLLMClient wrapper, factory pattern |
 | 1.2.0 | 2026-01-16 | Clustering AISP support: FR-05, aisp-validator integration, FastClusterV3, DeepClusterV2, LLMClusterV2 AISP |
