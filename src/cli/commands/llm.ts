@@ -792,6 +792,7 @@ export function registerLLMCommand(program: Command): void {
     .option('--aisp-full', 'Use full AISP mode (includes spec, expects AISP output)')
     .option('--succinct-reasoning', 'Request only the move without full analysis (shorter responses)')
     .option('--no-save-reasoning', 'Disable storing full reasoning tokens in experience memory')
+    .option('--dream', 'Run dream consolidation after play completes')
     .action(async (puzzleFile, options) => {
       try {
         logger.info('🤖 Starting LLM Sudoku Player...');
@@ -978,7 +979,12 @@ export function registerLLMCommand(program: Command): void {
           `Memory: ${config.memoryEnabled ? '✓ ENABLED' : '✗ DISABLED (baseline)'}`
         );
         if (config.memoryEnabled && options.learning !== false) {
-          logger.info(`Learning unit: ${learningUnitId}`);
+          // Show actual unit name only if explicitly specified, otherwise show "none"
+          const displayUnitId = options.learningUnit ? learningUnitId : NO_LEARNING_UNIT_DISPLAY;
+          logger.info(`Learning unit: ${displayUnitId}`);
+        }
+        if (options.dream) {
+          logger.info(`🌙 Dream: will consolidate after play completes`);
         }
 
         // Set up event listeners for debugging
@@ -1371,6 +1377,32 @@ export function registerLLMCommand(program: Command): void {
         }
         logger.info(`Exit code: ${exitCode}`);
         logger.info('─'.repeat(50));
+
+        // Run dream consolidation if --dream flag is set
+        if (options.dream) {
+          logger.info('\n🌙 Running dream consolidation...\n');
+
+          // Build dream command with matching AISP mode
+          let dreamCmd = `npx machine-dream llm dream run --profile "${profileName}"`;
+          if (options.aispFull) {
+            dreamCmd += ' --aisp-full';
+          } else if (options.aispLite || options.aisp) {
+            dreamCmd += ' --aisp';
+          }
+
+          try {
+            const { stdout, stderr } = await execAsync(dreamCmd, {
+              cwd: process.cwd(),
+              timeout: 600000, // 10 minute timeout for dream
+            });
+            if (stdout) console.log(stdout);
+            if (stderr) console.error(stderr);
+            logger.info('\n✨ Dream consolidation complete');
+          } catch (dreamError) {
+            logger.warn(`\n⚠️ Dream consolidation failed: ${dreamError instanceof Error ? dreamError.message : String(dreamError)}`);
+            logger.info(`   You can run manually: ${dreamCmd}`);
+          }
+        }
       } catch (error) {
         // Final catch for any unhandled errors
         if (error instanceof CLIError) {

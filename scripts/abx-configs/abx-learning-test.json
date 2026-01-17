@@ -1,0 +1,96 @@
+{
+  "testName": "All Profiles with LLMClusterV2 Learning Unit (AISP-lite + succinct)",
+  "description": "Compare all model profiles using gpt-oss-120b_aisp-full_llmclusterv2_20260116_7 learning unit in AISP-lite mode and succinct-reasoning",
+  "runsPerConfig": 1,
+  "puzzles": [
+    "puzzles/9x9-easy.json"
+  ],
+  "configurations": [
+    {
+      "name": "deepseek-r1_learning_aisp-lite",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": ["--aisp-lite"]
+    },
+    {
+      "name": "deepseek-r1_learning_aisp-lite_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": ["--aisp-lite --succinct-reasoning"]
+    },
+    {
+      "name": "gpt-oss-120b_learning_aisp-lite_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": ["--aisp-lite --succinct-reasoning"]
+    },
+    {
+      "name": "nemotron-nano_learning_aisp-lite_succinct",
+      "profile": "nemotron-nano",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": ["--aisp-lite --succinct-reasoning"]
+    },
+    {
+      "name": "qwen3-coder_learning_aisp-lite_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": ["--aisp-lite --succinct-reasoning"]
+    },
+    {
+      "name": "qwq-32b_learning_aisp-lite_succinct",
+      "profile": "qwq-32b",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": ["--aisp-lite --succinct-reasoning"]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite",
+      "profile": "deepseek-r1",
+      "options": ["--aisp-lite"]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite",
+      "profile": "gpt-oss-120b",
+      "options": ["--aisp-lite"]
+    },
+    {
+      "name": "nemotron-nano_aisp-lite",
+      "profile": "nemotron-nano",
+      "options": ["--aisp-lite"]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite",
+      "profile": "qwen3-coder",
+      "options": ["--aisp-lite"]
+    },
+    {
+      "name": "qwq-32b_aisp-lite",
+      "profile": "qwq-32b",
+      "options": ["--aisp-lite"]
+    },
+       {
+      "name": "deepseek-r1_aisp-lite_succinct",
+      "profile": "deepseek-r1",
+      "options": ["--aisp-lite --succinct-reasoning"]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_succinct",
+      "profile": "gpt-oss-120b",
+      "options": ["--aisp-lite --succinct-reasoning"]
+    },
+    {
+      "name": "nemotron-nano_aisp-lite_succinct",
+      "profile": "nemotron-nano",
+      "options": ["--aisp-lite --succinct-reasoning"]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_succinct",
+      "profile": "qwen3-coder",
+      "options": ["--aisp-lite --succinct-reasoning"]
+    },
+    {
+      "name": "qwq-32b_aisp-lite_succinct",
+      "profile": "qwq-32b",
+      "options": ["--aisp-lite --succinct-reasoning"]
+    }
+  ]
+}

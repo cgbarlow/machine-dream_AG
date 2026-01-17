@@ -59,6 +59,9 @@ machine-dream system status
 machine-dream llm play puzzles/9x9-easy.json    # Play a puzzle
 machine-dream llm dream run                      # Consolidate experiences
 machine-dream llm learning list                  # View learning units
+
+# Play + dream in one command
+machine-dream llm play --profile gpt-oss-120b --visualize-basic --dream puzzles/9x9-easy.json
 ```
 
 ---
@@ -79,6 +82,9 @@ machine-dream llm profile test
 ```bash
 # Single play
 machine-dream llm play puzzles/9x9-easy.json
+
+# Play + auto-consolidate (same as play && dream run)
+machine-dream llm play --dream puzzles/9x9-easy.json
 
 # Training batch (10 runs)
 ./scripts/training-run.sh --profile qwen3 --puzzle puzzles/9x9-easy.json --runs 10

@@ -1,0 +1,1767 @@
+{
+  "testName": "Full ABX Matrix - All Profiles, Modes, Algorithms, Learning Intensities",
+  "runsPerConfig": 1,
+  "puzzles": [
+    "puzzles/9x9-easy.json"
+  ],
+  "_comment_learning_units": {
+    "NL_PLACEHOLDER": "Natural language learning unit for default mode - TO BE CREATED",
+    "aisp_llmclusterv2": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+    "aisp_llmclusterv2_2x": "PLACEHOLDER - 2x iteration of llmclusterv2",
+    "aisp_fastclusterv3": "PLACEHOLDER - FastClusterV3 generated unit",
+    "aisp_fastclusterv3_2x": "PLACEHOLDER - 2x iteration of fastclusterv3",
+    "aisp_deepclusterv2": "PLACEHOLDER - DeepClusterV2 generated unit",
+    "aisp_deepclusterv2_2x": "PLACEHOLDER - 2x iteration of deepclusterv2"
+  },
+  "_comment_profiles": [
+    "deepseek-r1 = deepseek-r1-distill-qwen-32b",
+    "gpt-oss-120b = gpt-oss-120b",
+    "nemotron-nano = nvidia_llama-3.1-nemotron-nano-8b-v1",
+    "qwen3-coder = qwen3-coder-30b-a3b-instruct",
+    "qwq-32b = qwq-32b"
+  ],
+  "configurations": [
+    {
+      "_section": "========== DEEPSEEK-R1 (42 configs) =========="
+    },
+    {
+      "_subsection": "--- default mode (14 configs) ---"
+    },
+    {
+      "name": "deepseek-r1_default_no-learning",
+      "profile": "deepseek-r1",
+      "learningUnit": null,
+      "options": []
+    },
+    {
+      "name": "deepseek-r1_default_no-learning_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": null,
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_default_llmclusterv2",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_NL_llmclusterv2",
+      "options": []
+    },
+    {
+      "name": "deepseek-r1_default_llmclusterv2_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_NL_llmclusterv2",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_default_llmclusterv2-2x",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_NL_llmclusterv2_2x",
+      "options": []
+    },
+    {
+      "name": "deepseek-r1_default_llmclusterv2-2x_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_NL_llmclusterv2_2x",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_default_fastclusterv3",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_NL_fastclusterv3",
+      "options": []
+    },
+    {
+      "name": "deepseek-r1_default_fastclusterv3_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_NL_fastclusterv3",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_default_fastclusterv3-2x",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_NL_fastclusterv3_2x",
+      "options": []
+    },
+    {
+      "name": "deepseek-r1_default_fastclusterv3-2x_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_NL_fastclusterv3_2x",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_default_deepclusterv2",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_NL_deepclusterv2",
+      "options": []
+    },
+    {
+      "name": "deepseek-r1_default_deepclusterv2_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_NL_deepclusterv2",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_default_deepclusterv2-2x",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_NL_deepclusterv2_2x",
+      "options": []
+    },
+    {
+      "name": "deepseek-r1_default_deepclusterv2-2x_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_NL_deepclusterv2_2x",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "_subsection": "--- aisp-lite mode (14 configs) ---"
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_no-learning",
+      "profile": "deepseek-r1",
+      "learningUnit": null,
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_no-learning_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": null,
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_llmclusterv2",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_llmclusterv2_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_llmclusterv2-2x",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_llmclusterv2-2x_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_fastclusterv3",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_fastclusterv3_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_fastclusterv3-2x",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_fastclusterv3-2x_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_deepclusterv2",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_deepclusterv2_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_deepclusterv2-2x",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_deepclusterv2-2x_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "_subsection": "--- aisp-full mode (14 configs) ---"
+    },
+    {
+      "name": "deepseek-r1_aisp-full_no-learning",
+      "profile": "deepseek-r1",
+      "learningUnit": null,
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_no-learning_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": null,
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_llmclusterv2",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_llmclusterv2_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_llmclusterv2-2x",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_llmclusterv2-2x_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_fastclusterv3",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_fastclusterv3_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_fastclusterv3-2x",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_fastclusterv3-2x_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_deepclusterv2",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_deepclusterv2_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_deepclusterv2-2x",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_deepclusterv2-2x_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "_section": "========== GPT-OSS-120B (42 configs) =========="
+    },
+    {
+      "_subsection": "--- default mode (14 configs) ---"
+    },
+    {
+      "name": "gpt-oss-120b_default_no-learning",
+      "profile": "gpt-oss-120b",
+      "learningUnit": null,
+      "options": []
+    },
+    {
+      "name": "gpt-oss-120b_default_no-learning_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": null,
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_default_llmclusterv2",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_NL_llmclusterv2",
+      "options": []
+    },
+    {
+      "name": "gpt-oss-120b_default_llmclusterv2_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_NL_llmclusterv2",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_default_llmclusterv2-2x",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_NL_llmclusterv2_2x",
+      "options": []
+    },
+    {
+      "name": "gpt-oss-120b_default_llmclusterv2-2x_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_NL_llmclusterv2_2x",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_default_fastclusterv3",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_NL_fastclusterv3",
+      "options": []
+    },
+    {
+      "name": "gpt-oss-120b_default_fastclusterv3_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_NL_fastclusterv3",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_default_fastclusterv3-2x",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_NL_fastclusterv3_2x",
+      "options": []
+    },
+    {
+      "name": "gpt-oss-120b_default_fastclusterv3-2x_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_NL_fastclusterv3_2x",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_default_deepclusterv2",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_NL_deepclusterv2",
+      "options": []
+    },
+    {
+      "name": "gpt-oss-120b_default_deepclusterv2_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_NL_deepclusterv2",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_default_deepclusterv2-2x",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_NL_deepclusterv2_2x",
+      "options": []
+    },
+    {
+      "name": "gpt-oss-120b_default_deepclusterv2-2x_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_NL_deepclusterv2_2x",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "_subsection": "--- aisp-lite mode (14 configs) ---"
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_no-learning",
+      "profile": "gpt-oss-120b",
+      "learningUnit": null,
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_no-learning_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": null,
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_llmclusterv2",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_llmclusterv2_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_llmclusterv2-2x",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_llmclusterv2-2x_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_fastclusterv3",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_fastclusterv3_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_fastclusterv3-2x",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_fastclusterv3-2x_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_deepclusterv2",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_deepclusterv2_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_deepclusterv2-2x",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_deepclusterv2-2x_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "_subsection": "--- aisp-full mode (14 configs) ---"
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_no-learning",
+      "profile": "gpt-oss-120b",
+      "learningUnit": null,
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_no-learning_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": null,
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_llmclusterv2",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_llmclusterv2_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_llmclusterv2-2x",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_llmclusterv2-2x_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_fastclusterv3",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_fastclusterv3_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_fastclusterv3-2x",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_fastclusterv3-2x_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_deepclusterv2",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_deepclusterv2_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_deepclusterv2-2x",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_deepclusterv2-2x_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "_subsection": "--- default mode (14 configs) ---"
+    },
+    {
+      "_subsection": "--- aisp-lite mode (14 configs) ---"
+    },
+    {
+      "_subsection": "--- aisp-full mode (14 configs) ---"
+    },
+    {
+      "_section": "========== QWEN3-CODER (42 configs) =========="
+    },
+    {
+      "_subsection": "--- default mode (14 configs) ---"
+    },
+    {
+      "name": "qwen3-coder_default_no-learning",
+      "profile": "qwen3-coder",
+      "learningUnit": null,
+      "options": []
+    },
+    {
+      "name": "qwen3-coder_default_no-learning_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": null,
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_default_llmclusterv2",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_NL_llmclusterv2",
+      "options": []
+    },
+    {
+      "name": "qwen3-coder_default_llmclusterv2_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_NL_llmclusterv2",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_default_llmclusterv2-2x",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_NL_llmclusterv2_2x",
+      "options": []
+    },
+    {
+      "name": "qwen3-coder_default_llmclusterv2-2x_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_NL_llmclusterv2_2x",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_default_fastclusterv3",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_NL_fastclusterv3",
+      "options": []
+    },
+    {
+      "name": "qwen3-coder_default_fastclusterv3_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_NL_fastclusterv3",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_default_fastclusterv3-2x",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_NL_fastclusterv3_2x",
+      "options": []
+    },
+    {
+      "name": "qwen3-coder_default_fastclusterv3-2x_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_NL_fastclusterv3_2x",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_default_deepclusterv2",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_NL_deepclusterv2",
+      "options": []
+    },
+    {
+      "name": "qwen3-coder_default_deepclusterv2_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_NL_deepclusterv2",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_default_deepclusterv2-2x",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_NL_deepclusterv2_2x",
+      "options": []
+    },
+    {
+      "name": "qwen3-coder_default_deepclusterv2-2x_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_NL_deepclusterv2_2x",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "_subsection": "--- aisp-lite mode (14 configs) ---"
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_no-learning",
+      "profile": "qwen3-coder",
+      "learningUnit": null,
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_no-learning_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": null,
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_llmclusterv2",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_llmclusterv2_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_llmclusterv2-2x",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_llmclusterv2-2x_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_fastclusterv3",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_fastclusterv3_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_fastclusterv3-2x",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_fastclusterv3-2x_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_deepclusterv2",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_deepclusterv2_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_deepclusterv2-2x",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_deepclusterv2-2x_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "_subsection": "--- aisp-full mode (14 configs) ---"
+    },
+    {
+      "name": "qwen3-coder_aisp-full_no-learning",
+      "profile": "qwen3-coder",
+      "learningUnit": null,
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_no-learning_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": null,
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_llmclusterv2",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_llmclusterv2_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_llmclusterv2-2x",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_llmclusterv2-2x_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_fastclusterv3",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_fastclusterv3_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_fastclusterv3-2x",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_fastclusterv3-2x_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_deepclusterv2",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_deepclusterv2_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_deepclusterv2-2x",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_deepclusterv2-2x_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "_subsection": "--- default mode (14 configs) ---"
+    },
+    {
+      "_subsection": "--- aisp-lite mode (14 configs) ---"
+    },
+    {
+      "_subsection": "--- aisp-full mode (14 configs) ---"
+    }
+  ],
+  "_disabled_configurations": [
+    {
+      "_section": "========== NEMOTRON-NANO (42 configs) =========="
+    },
+    {
+      "name": "nemotron-nano_default_no-learning",
+      "profile": "nemotron-nano",
+      "learningUnit": null,
+      "options": []
+    },
+    {
+      "name": "nemotron-nano_default_no-learning_succinct",
+      "profile": "nemotron-nano",
+      "learningUnit": null,
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "nemotron-nano_default_llmclusterv2",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_NL_llmclusterv2",
+      "options": []
+    },
+    {
+      "name": "nemotron-nano_default_llmclusterv2_succinct",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_NL_llmclusterv2",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "nemotron-nano_default_llmclusterv2-2x",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_NL_llmclusterv2_2x",
+      "options": []
+    },
+    {
+      "name": "nemotron-nano_default_llmclusterv2-2x_succinct",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_NL_llmclusterv2_2x",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "nemotron-nano_default_fastclusterv3",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_NL_fastclusterv3",
+      "options": []
+    },
+    {
+      "name": "nemotron-nano_default_fastclusterv3_succinct",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_NL_fastclusterv3",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "nemotron-nano_default_fastclusterv3-2x",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_NL_fastclusterv3_2x",
+      "options": []
+    },
+    {
+      "name": "nemotron-nano_default_fastclusterv3-2x_succinct",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_NL_fastclusterv3_2x",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "nemotron-nano_default_deepclusterv2",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_NL_deepclusterv2",
+      "options": []
+    },
+    {
+      "name": "nemotron-nano_default_deepclusterv2_succinct",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_NL_deepclusterv2",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "nemotron-nano_default_deepclusterv2-2x",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_NL_deepclusterv2_2x",
+      "options": []
+    },
+    {
+      "name": "nemotron-nano_default_deepclusterv2-2x_succinct",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_NL_deepclusterv2_2x",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-lite_no-learning",
+      "profile": "nemotron-nano",
+      "learningUnit": null,
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-lite_no-learning_succinct",
+      "profile": "nemotron-nano",
+      "learningUnit": null,
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-lite_llmclusterv2",
+      "profile": "nemotron-nano",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-lite_llmclusterv2_succinct",
+      "profile": "nemotron-nano",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-lite_llmclusterv2-2x",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-lite_llmclusterv2-2x_succinct",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-lite_fastclusterv3",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-lite_fastclusterv3_succinct",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-lite_fastclusterv3-2x",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-lite_fastclusterv3-2x_succinct",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-lite_deepclusterv2",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-lite_deepclusterv2_succinct",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-lite_deepclusterv2-2x",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-lite_deepclusterv2-2x_succinct",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-full_no-learning",
+      "profile": "nemotron-nano",
+      "learningUnit": null,
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-full_no-learning_succinct",
+      "profile": "nemotron-nano",
+      "learningUnit": null,
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-full_llmclusterv2",
+      "profile": "nemotron-nano",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-full_llmclusterv2_succinct",
+      "profile": "nemotron-nano",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-full_llmclusterv2-2x",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-full_llmclusterv2-2x_succinct",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-full_fastclusterv3",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-full_fastclusterv3_succinct",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-full_fastclusterv3-2x",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-full_fastclusterv3-2x_succinct",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-full_deepclusterv2",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-full_deepclusterv2_succinct",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-full_deepclusterv2-2x",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "nemotron-nano_aisp-full_deepclusterv2-2x_succinct",
+      "profile": "nemotron-nano",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "_section": "========== QWQ-32B (42 configs) =========="
+    },
+    {
+      "name": "qwq-32b_default_no-learning",
+      "profile": "qwq-32b",
+      "learningUnit": null,
+      "options": []
+    },
+    {
+      "name": "qwq-32b_default_no-learning_succinct",
+      "profile": "qwq-32b",
+      "learningUnit": null,
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwq-32b_default_llmclusterv2",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_NL_llmclusterv2",
+      "options": []
+    },
+    {
+      "name": "qwq-32b_default_llmclusterv2_succinct",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_NL_llmclusterv2",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwq-32b_default_llmclusterv2-2x",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_NL_llmclusterv2_2x",
+      "options": []
+    },
+    {
+      "name": "qwq-32b_default_llmclusterv2-2x_succinct",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_NL_llmclusterv2_2x",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwq-32b_default_fastclusterv3",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_NL_fastclusterv3",
+      "options": []
+    },
+    {
+      "name": "qwq-32b_default_fastclusterv3_succinct",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_NL_fastclusterv3",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwq-32b_default_fastclusterv3-2x",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_NL_fastclusterv3_2x",
+      "options": []
+    },
+    {
+      "name": "qwq-32b_default_fastclusterv3-2x_succinct",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_NL_fastclusterv3_2x",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwq-32b_default_deepclusterv2",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_NL_deepclusterv2",
+      "options": []
+    },
+    {
+      "name": "qwq-32b_default_deepclusterv2_succinct",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_NL_deepclusterv2",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwq-32b_default_deepclusterv2-2x",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_NL_deepclusterv2_2x",
+      "options": []
+    },
+    {
+      "name": "qwq-32b_default_deepclusterv2-2x_succinct",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_NL_deepclusterv2_2x",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-lite_no-learning",
+      "profile": "qwq-32b",
+      "learningUnit": null,
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-lite_no-learning_succinct",
+      "profile": "qwq-32b",
+      "learningUnit": null,
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-lite_llmclusterv2",
+      "profile": "qwq-32b",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-lite_llmclusterv2_succinct",
+      "profile": "qwq-32b",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-lite_llmclusterv2-2x",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-lite_llmclusterv2-2x_succinct",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-lite_fastclusterv3",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-lite_fastclusterv3_succinct",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-lite_fastclusterv3-2x",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-lite_fastclusterv3-2x_succinct",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-lite_deepclusterv2",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-lite_deepclusterv2_succinct",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-lite_deepclusterv2-2x",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-lite_deepclusterv2-2x_succinct",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-full_no-learning",
+      "profile": "qwq-32b",
+      "learningUnit": null,
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-full_no-learning_succinct",
+      "profile": "qwq-32b",
+      "learningUnit": null,
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-full_llmclusterv2",
+      "profile": "qwq-32b",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-full_llmclusterv2_succinct",
+      "profile": "qwq-32b",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-full_llmclusterv2-2x",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-full_llmclusterv2-2x_succinct",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-full_fastclusterv3",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-full_fastclusterv3_succinct",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-full_fastclusterv3-2x",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-full_fastclusterv3-2x_succinct",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-full_deepclusterv2",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-full_deepclusterv2_succinct",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-full_deepclusterv2-2x",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
+      "options": [
+        "--aisp"
+      ]
+    },
+    {
+      "name": "qwq-32b_aisp-full_deepclusterv2-2x_succinct",
+      "profile": "qwq-32b",
+      "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
+      "options": [
+        "--aisp",
+        "--succinct-reasoning"
+      ]
+    }
+  ]
+}

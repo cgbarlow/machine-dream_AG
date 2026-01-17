@@ -34,7 +34,6 @@ hive-mind-prompt-*.txt
 # Test coverage and results
 coverage/
 test-results*.txt
-ab-test-results/
 abx-results/
 comprehensive-results/
 batch-results/
