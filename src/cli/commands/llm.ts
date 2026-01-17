@@ -1383,7 +1383,7 @@ export function registerLLMCommand(program: Command): void {
           logger.info('\n🌙 Running dream consolidation...\n');
 
           // Build dream command with matching AISP mode
-          let dreamCmd = `npx machine-dream llm dream run --profile "${profileName}"`;
+          let dreamCmd = `npx machine-dream llm dream run --profile ${profileName}`;
           if (options.aispFull) {
             dreamCmd += ' --aisp-full';
           } else if (options.aispLite || options.aisp) {
