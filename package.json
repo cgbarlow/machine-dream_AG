@@ -1,6 +1,6 @@
 {
   "name": "machine-dream-poc",
-  "version": "0.2.0",
+  "version": "0.2.0-alpha",
   "description": "Proof-of-Concept: Continuous Thinking and Machine Dreaming with Cognitive Puzzle Solver",
   "main": "dist/index.js",
   "type": "module",
