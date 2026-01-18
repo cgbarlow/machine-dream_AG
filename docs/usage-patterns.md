@@ -8,13 +8,14 @@ Comprehensive patterns for Machine Dream's LLM dreaming and learning unit workfl
 
 1. [Basic Dreaming Workflow](#basic-dreaming-workflow)
 2. [Multi-Algorithm Dreaming](#multi-algorithm-dreaming)
-3. [Learning Unit Management](#learning-unit-management)
-4. [Re-running Consolidation](#re-running-consolidation)
-5. [Experience Management](#experience-management)
-6. [Dual Mode (Standard + 2x)](#dual-mode-standard--2x)
-7. [Named Learning Units](#named-learning-units)
-8. [A/B Testing Workflows](#ab-testing-workflows)
-9. [Troubleshooting](#troubleshooting)
+3. [AISP Modes](#aisp-modes)
+4. [Learning Unit Management](#learning-unit-management)
+5. [Re-running Consolidation](#re-running-consolidation)
+6. [Experience Management](#experience-management)
+7. [Dual Mode (Standard + 2x)](#dual-mode-standard--2x)
+8. [Named Learning Units](#named-learning-units)
+9. [A/B Testing Workflows](#ab-testing-workflows)
+10. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -73,6 +74,108 @@ machine-dream llm dream run --profile gpt-oss-120b --algorithms llmclusterv3,fas
 ```bash
 # Exclude deepcluster (slow)
 machine-dream llm dream run --profile gpt-oss-120b --exclude-algorithms deepcluster
+```
+
+---
+
+## AISP Modes
+
+[AI Specification Protocol (AISP)](https://github.com/bar181/aisp-open-core) reduces prompt ambiguity through structured, low-ambiguity communication between AI systems.
+
+### Mode Overview
+
+| Mode | Flag | Validation | Use Case |
+|------|------|------------|----------|
+| **Standard** | (none) | None | Default, natural language |
+| **AISP-Lite** | `--aisp` | Prompts only | Structured prompts, natural responses |
+| **AISP-Full** | `--aisp-full` | Prompts + responses | Full protocol compliance |
+
+### AISP-Lite Mode (`--aisp`)
+
+Validates prompts use AISP syntax; responses can be natural language:
+
+```bash
+# Play with AISP-validated prompts
+machine-dream llm play puzzles/9x9-easy.json --aisp
+
+# Dream with AISP prompts
+machine-dream llm dream run --profile gpt-oss-120b --aisp
+
+# Learning unit naming includes mode
+# Creates: gpt-oss-120b_aisp_fastclusterv3_20260119_1
+```
+
+### AISP-Full Mode (`--aisp-full`)
+
+Validates both prompts AND responses; triggers critique workflow on low scores:
+
+```bash
+# Play with full AISP validation
+machine-dream llm play puzzles/9x9-easy.json --aisp-full
+
+# Dream with full validation
+machine-dream llm dream run --profile gpt-oss-120b --aisp-full
+
+# Learning unit naming includes mode
+# Creates: gpt-oss-120b_aisp-full_fastclusterv3_20260119_1
+```
+
+### Validation Tiers
+
+AISP responses are scored and tiered:
+
+| Tier | Score (δ) | Behavior |
+|------|-----------|----------|
+| Platinum | δ ≥ 0.75 | Accepted |
+| Gold | δ ≥ 0.60 | Accepted |
+| Silver | δ ≥ 0.40 | Accepted with warning |
+| Bronze | δ ≥ 0.20 | Accepted with warning |
+| Reject | δ < 0.20 | Triggers critique workflow |
+
+### Session Mode Tracking
+
+Session AISP mode is tracked and visible:
+
+```bash
+# List sessions with mode column
+machine-dream llm session list
+# Output shows: ID | Puzzle | Moves | Mode | Status
+#               ...                    aisp-full
+
+# Show session details including AISP mode
+machine-dream llm session show <session-id>
+```
+
+### AISP + Learning Units
+
+Play with a learning unit in AISP mode:
+
+```bash
+# Use AISP-full learning unit with AISP-full mode
+machine-dream llm play puzzles/9x9-easy.json \
+  --learning-unit gpt-oss-120b_aisp-full_llmclusterv3_20260118_1 \
+  --aisp-full
+```
+
+### A/B Testing: Standard vs AISP
+
+Compare performance between modes:
+
+```bash
+# Generate standard experiences
+machine-dream llm play puzzles/9x9-easy.json --profile gpt-oss-120b
+# ... repeat for N runs
+
+# Generate AISP-full experiences
+machine-dream llm play puzzles/9x9-easy.json --profile gpt-oss-120b --aisp-full
+# ... repeat for N runs
+
+# Dream creates separate units by mode
+machine-dream llm dream run --profile gpt-oss-120b
+# Creates: gpt-oss-120b_standard_... and gpt-oss-120b_aisp-full_...
+
+# Compare in ABX tests
+./scripts/abx-test.sh scripts/abx-configs/standard-vs-aisp.json
 ```
 
 ---
