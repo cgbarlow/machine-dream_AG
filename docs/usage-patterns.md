@@ -84,16 +84,16 @@ machine-dream llm dream run --profile gpt-oss-120b --exclude-algorithms deepclus
 
 ### Mode Overview
 
-| Mode | Flag | Prompts | Output | Best For |
-|------|------|---------|--------|----------|
-| **Standard** | (none) | Natural language | Natural language | Default |
-| **AISP** | `--aisp` | Pure AISP | Normal text | General use |
-| **AISP-Lite** | `--aisp-lite` | Minimal AISP (5 blocks) | Normal text | Smaller models |
-| **AISP-Full** | `--aisp-full` | Pure AISP + Gen Spec | Pure AISP | Capable models |
+| Mode | Flag | Prompts | Validates Responses | Output Format |
+|------|------|---------|---------------------|---------------|
+| **Standard** | (none) | Natural language | No | Natural language |
+| **AISP** | `--aisp` | Pure AISP (all blocks) | No | Normal text |
+| **AISP-Lite** | `--aisp-lite` | Minimal AISP (5 blocks) | Yes | Normal text |
+| **AISP-Full** | `--aisp-full` | Pure AISP + Gen Spec | Yes | Pure AISP |
 
 ### AISP Mode (`--aisp`)
 
-Sends pure AISP-formatted prompts; model responds in normal text format (ROW/COL/VALUE):
+Sends pure AISP-formatted prompts with all blocks; model responds in normal text format (ROW/COL/VALUE). Validates prompts only (warns on low tier):
 
 ```bash
 # Play with AISP prompts
@@ -108,13 +108,13 @@ machine-dream llm dream run --profile gpt-oss-120b --aisp
 
 ### AISP-Lite Mode (`--aisp-lite`)
 
-Simplified AISP format using only 5 required blocks (`⟦Ω⟧`, `⟦Σ⟧`, `⟦Λ⟧`, `⟦Ε⟧`). Better for smaller/weaker models that struggle with full AISP syntax:
+Simplified AISP prompts using only 5 required blocks (`⟦Ω⟧`, `⟦Σ⟧`, `⟦Λ⟧`, `⟦Ε⟧`), but validates BOTH prompts AND responses. Good for smaller models that struggle with full AISP syntax while still getting response validation:
 
 ```bash
-# Play with minimal AISP prompts
+# Play with minimal AISP prompts + response validation
 machine-dream llm play puzzles/9x9-easy.json --aisp-lite
 
-# Target tier: Bronze (δ≥0.20) vs Silver (δ≥0.40) for --aisp
+# Target tier: Bronze (δ≥0.20) for prompts
 ```
 
 ### AISP-Full Mode (`--aisp-full`)
