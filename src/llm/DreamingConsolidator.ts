@@ -58,7 +58,8 @@ export class DreamingConsolidator {
   private llmClient: ValidatedLLMClient;
   private llmConfig: LLMConfig;
   private generateAnonymousPatterns = false;
-  private consolidationOptions: Required<Omit<ConsolidationOptions, 'doubleStrategies'>> = { ...DEFAULT_CONSOLIDATION_COUNTS };
+  private consolidationOptions: Required<Omit<ConsolidationOptions, 'doubleStrategies' | 'preserveExperiences'>> = { ...DEFAULT_CONSOLIDATION_COUNTS };
+  private preserveExperiences = false;  // For multi-algorithm workflows (Spec 05 Section 8.6.1)
   private aispMode: AISPMode = 'off';
   private aispBuilder: AISPBuilder;
   private aispEncoder: AISPStrategyEncoder;
@@ -120,7 +121,16 @@ export class DreamingConsolidator {
         mergeMax: options.mergeMax ?? DEFAULT_CONSOLIDATION_COUNTS.mergeMax,
       };
     }
+
+    // Handle preserveExperiences option (Spec 05 Section 8.6.1)
+    if (options.preserveExperiences !== undefined) {
+      this.preserveExperiences = options.preserveExperiences;
+    }
+
     console.log(`📊 Consolidation options: few-shots ${this.consolidationOptions.fewShotMin}-${this.consolidationOptions.fewShotMax}, merge ${this.consolidationOptions.mergeMin}-${this.consolidationOptions.mergeMax}`);
+    if (this.preserveExperiences) {
+      console.log(`📦 Experience preservation mode enabled (originals kept after absorbing)`);
+    }
   }
 
   /**
@@ -1112,7 +1122,7 @@ Be concise. Each item should be a short phrase or sentence.`;
       : 'You are selecting diverse Sudoku strategies. Be strict about avoiding duplicates.';
 
     const prompt = this.aispMode === 'aisp-full'
-      ? this.buildAISPFewShotSelectionPrompt(patterns, this.consolidationOptions.fewShotMin)
+      ? this.buildAISPFewShotSelectionPrompt(patterns, this.consolidationOptions.fewShotMax)
       : this.buildEnglishFewShotSelectionPrompt(patterns);
 
     try {
@@ -1209,8 +1219,10 @@ ${patternList}
 }
 
 ⟦Ω:Task⟧{
-  task≜select(${count},diverse_strategies)
+  task≜select(EXACTLY:${count},diverse_strategies)
   rule≜∀s₁,s₂∈selected:different(s₁.approach,s₂.approach)
+  target≔${count}
+  ;; MUST select exactly ${count} strategies - do not stop early
   ;; Pick strategies that cover different reasoning techniques
 }
 
@@ -1236,9 +1248,12 @@ ${patternList}
 Your strategies:
 ${patterns.map((p, i) => `${i + 1}. ${p.strategyName}: ${p.whenToUse}`).join('\n')}
 
-Now select ${this.consolidationOptions.fewShotMin}-${this.consolidationOptions.fewShotMax} DIVERSE strategies to remember as few-shot examples.
+Now select EXACTLY ${this.consolidationOptions.fewShotMax} DIVERSE strategies to remember as few-shot examples.
+(Target: ${this.consolidationOptions.fewShotMax} strategies, minimum acceptable: ${this.consolidationOptions.fewShotMin})
 
-CRITICAL: Ensure diversity!
+CRITICAL: Select the FULL ${this.consolidationOptions.fewShotMax} strategies!
+- You MUST provide ${this.consolidationOptions.fewShotMax} selections to maximize learning diversity
+- Do NOT stop early - find ${this.consolidationOptions.fewShotMax} distinct approaches
 - Do NOT select strategies that use the same underlying technique
 - If multiple strategies are variations of "last digit in row/column/box", pick only ONE
 - Aim for variety: completion strategies, elimination strategies, constraint checking, etc.
@@ -1916,7 +1931,8 @@ CONFIDENCE: [0.0-1.0 how confident you are in this analysis]`;
         learningUnitId,
         newExperiences.map((e) => e.id),
         this.computePuzzleBreakdown(newExperiences),
-        newExperiences  // Full experiences for unit-bound copies
+        newExperiences,  // Full experiences for unit-bound copies
+        { preserveOriginals: this.preserveExperiences }
       );
       return this.createEmptyReport();
     }
@@ -2032,7 +2048,8 @@ CONFIDENCE: [0.0-1.0 how confident you are in this analysis]`;
       learningUnitId,
       experienceIds,
       this.computePuzzleBreakdown(newExperiences),
-      newExperiences  // Full experiences for unit-bound copies
+      newExperiences,  // Full experiences for unit-bound copies
+      { preserveOriginals: this.preserveExperiences }
     );
 
     // Note: markConsolidated is no longer needed since sticky experience model
@@ -2060,11 +2077,13 @@ CONFIDENCE: [0.0-1.0 how confident you are in this analysis]`;
    * Dual consolidation: Create both standard and doubled (-2x) learning units
    *
    * Spec 05 Section 8.4: Dual Mode Support
-   * Processes the same experiences twice:
-   * 1. Standard consolidation (3-5 strategies)
-   * 2. Doubled consolidation (6-10 strategies) with -2x suffix
    *
-   * This allows A/B testing between standard and doubled strategy counts.
+   * IMPORTANT: Runs clustering ONCE and creates BOTH units from the same patterns.
+   * This ensures consistent pattern coverage between standard (3-5) and doubled (6-10).
+   *
+   * Previous bug: Running clustering twice produced different patterns for each unit,
+   * leading to 2x units having far fewer strategies than expected when the second
+   * clustering pass produced only 2 valid patterns.
    *
    * @param learningUnitManager - Manager for the learning unit
    * @param learningUnitId - Base ID for the learning unit (without -2x suffix)
@@ -2079,11 +2098,14 @@ CONFIDENCE: [0.0-1.0 how confident you are in this analysis]`;
   ): Promise<DualConsolidationResult> {
     console.log(`\n🔄 Starting DUAL consolidation for "${learningUnitId}"`);
     console.log(`   Will create: "${learningUnitId}" (standard) + "${learningUnitId}${DOUBLE_STRATEGY_SUFFIX}" (doubled)`);
+    console.log(`   🔧 Using SHARED clustering (v2 fix): Both units use same patterns`);
 
-    // Get all unconsolidated experiences before we start
+    const originalPreserveExperiences = this.preserveExperiences;
+    console.log(`   Experience preservation: ${originalPreserveExperiences ? 'user-requested (keep after dual)' : 'delete after dual'}`);
+
+    // Get all unconsolidated experiences
     let experiences = await this.experienceStore.getUnconsolidated(profileName);
 
-    // BUGFIX: When --rerun is used, restrict to only the specified unit's experiences
     if (restrictToExperienceIds && restrictToExperienceIds.length > 0) {
       const beforeCount = experiences.length;
       experiences = experiences.filter(exp => restrictToExperienceIds.includes(exp.id));
@@ -2091,8 +2113,6 @@ CONFIDENCE: [0.0-1.0 how confident you are in this analysis]`;
         console.log(`📦 Restricted to ${experiences.length} experiences (from ${beforeCount} total unconsolidated)`);
       }
     }
-
-    const experienceIds = experiences.map(e => e.id);
 
     if (experiences.length === 0) {
       console.log(`⚠️  No unconsolidated experiences to process`);
@@ -2104,37 +2124,229 @@ CONFIDENCE: [0.0-1.0 how confident you are in this analysis]`;
 
     console.log(`📊 Found ${experiences.length} unconsolidated experiences`);
 
-    // Phase 1: Standard consolidation (3-5 strategies)
-    console.log(`\n📦 Phase 1: Standard consolidation (${DEFAULT_CONSOLIDATION_COUNTS.fewShotMin}-${DEFAULT_CONSOLIDATION_COUNTS.fewShotMax} strategies)`);
-    this.setConsolidationOptions({ doubleStrategies: false });
-    const standardReport = await this.reConsolidate(
-      learningUnitManager,
-      learningUnitId,
-      profileName,
-      restrictToExperienceIds
-    );
-    console.log(`   ✅ Standard: ${standardReport.fewShotsUpdated} strategies created`);
+    // ============================================================
+    // SHARED PHASE: Cluster and synthesize patterns ONCE
+    // ============================================================
+    console.log(`\n🔍 SHARED PHASE: Clustering and pattern synthesis (used by both units)`);
 
-    // Phase 2: Reset consolidated status to process same experiences again
-    console.log(`\n🔄 Resetting consolidated status for ${experienceIds.length} experiences...`);
-    await this.experienceStore.resetConsolidatedStatus(experienceIds);
+    // Filter by importance
+    const importantExperiences = experiences
+      .sort((a, b) => (b.importance ?? 0.5) - (a.importance ?? 0.5))
+      .filter((e) => (e.importance ?? 0.5) >= 0.5);
 
-    // Phase 3: Doubled consolidation (6-10 strategies) with -2x suffix
-    const doubledUnitId = `${learningUnitId}${DOUBLE_STRATEGY_SUFFIX}`;
-    console.log(`\n📦 Phase 2: Doubled consolidation (${DOUBLED_CONSOLIDATION_COUNTS.fewShotMin}-${DOUBLED_CONSOLIDATION_COUNTS.fewShotMax} strategies)`);
-    console.log(`   Target unit: "${doubledUnitId}"`);
+    const lowImportanceCount = experiences.length - importantExperiences.length;
+    if (lowImportanceCount > 0) {
+      console.log(`   ↳ Filtered ${lowImportanceCount} low-importance experiences (< 0.5)`);
+    }
+
+    if (importantExperiences.length < 3) {
+      console.log(`⚠️  Only ${importantExperiences.length} important experiences - need at least 3`);
+      // Mark experiences as absorbed anyway
+      await learningUnitManager.markExperiencesAbsorbed(
+        learningUnitId,
+        experiences.map((e) => e.id),
+        this.computePuzzleBreakdown(experiences),
+        experiences,
+        { preserveOriginals: originalPreserveExperiences }
+      );
+      return {
+        standard: this.createEmptyReport(),
+        doubled: this.createEmptyReport(),
+      };
+    }
+
+    // Group by outcome
+    const successful = importantExperiences.filter((e) => e.validation.isCorrect);
+    const invalid = importantExperiences.filter((e) => !e.validation.isValid);
+    const validButWrong = importantExperiences.filter((e) => e.validation.isValid && !e.validation.isCorrect);
+
+    console.log(`   ↳ Correct: ${successful.length}, Invalid: ${invalid.length}, Valid-but-wrong: ${validButWrong.length}`);
+
+    // Use DOUBLED mode cluster target for more pattern diversity
+    // This gives us enough patterns to select 6-10 for 2x mode
     this.setConsolidationOptions({ doubleStrategies: true });
-    const doubledReport = await this.reConsolidate(
-      learningUnitManager,
-      doubledUnitId,
-      profileName,
-      restrictToExperienceIds
+    const clusterTarget = this.getClusterTarget(successful.length);
+    console.log(`🔍 Clustering ${successful.length} experiences with ${this.clusteringAlgorithm.getIdentifier()}...`);
+    console.log(`   Cluster target: ${clusterTarget} (using 2x target for diversity)`);
+
+    const clusterResult = await this.clusteringAlgorithm.cluster(
+      successful,
+      clusterTarget,
+      this.llmConfig
     );
-    console.log(`   ✅ Doubled: ${doubledReport.fewShotsUpdated} strategies created`);
+    const clusters = clusterResult.clusters;
+    console.log(`✅ Created ${clusters.size} clusters in ${clusterResult.metadata.processingTimeMs}ms`);
+
+    // Synthesize patterns from clusters (ONCE, shared by both units)
+    const sharedPatterns: SynthesizedPattern[] = [];
+    for (const [clusterName, cluster] of clusters.entries()) {
+      if (cluster.length >= 2) {
+        console.log(`🧠 Synthesizing pattern from "${clusterName}" (${cluster.length} experiences)...`);
+        try {
+          const pattern = await this.synthesizePattern(cluster, clusterName);
+          if (pattern) {
+            sharedPatterns.push(pattern);
+          }
+        } catch (error) {
+          console.warn(`⚠️  Failed to synthesize pattern:`, error);
+        }
+      }
+    }
+
+    console.log(`✅ Synthesized ${sharedPatterns.length} SHARED patterns for both units`);
+
+    if (sharedPatterns.length === 0) {
+      console.log(`⚠️  No valid patterns synthesized - cannot create learning units`);
+      // Mark experiences as absorbed anyway
+      await learningUnitManager.markExperiencesAbsorbed(
+        learningUnitId,
+        experiences.map((e) => e.id),
+        this.computePuzzleBreakdown(experiences),
+        experiences,
+        { preserveOriginals: originalPreserveExperiences }
+      );
+      return {
+        standard: this.createEmptyReport(),
+        doubled: this.createEmptyReport(),
+      };
+    }
+
+    // Failure learning (shared)
+    let antiPatterns: SynthesizedAntiPattern[] = [];
+    let reasoningCorrections: ReasoningCorrection[] = [];
+
+    if (invalid.length >= 3) {
+      console.log(`   Clustering ${invalid.length} invalid moves by error type...`);
+      antiPatterns = await this.synthesizeAntiPatternsFromClusters(invalid);
+      console.log(`   ↳ Generated ${antiPatterns.length} anti-patterns`);
+    }
+
+    if (validButWrong.length >= 2) {
+      console.log(`   Analyzing ${validButWrong.length} valid-but-wrong moves...`);
+      reasoningCorrections = await this.analyzeWrongReasoning(validButWrong);
+      console.log(`   ↳ Generated ${reasoningCorrections.length} reasoning corrections`);
+    }
+
+    // ============================================================
+    // PHASE 1: Create STANDARD unit (3-5 strategies)
+    // ============================================================
+    console.log(`\n📦 Phase 1: Standard unit (${DEFAULT_CONSOLIDATION_COUNTS.fewShotMin}-${DEFAULT_CONSOLIDATION_COUNTS.fewShotMax} strategies)`);
+    console.log(`   Selecting from ${sharedPatterns.length} shared patterns...`);
+
+    this.setConsolidationOptions({ doubleStrategies: false });
+    const standardFewShots = await this.generateFewShotsFromPatterns(sharedPatterns);
+    console.log(`   ✅ Selected ${standardFewShots.length} strategies for standard unit`);
+
+    // Save standard unit
+    await learningUnitManager.saveFewShots(learningUnitId, standardFewShots);
+    if (standardFewShots.length >= 2) {
+      try {
+        const patternsForHierarchy = this.fewShotsToPatterns(standardFewShots);
+        const hierarchy = await this.buildAbstractionHierarchy(patternsForHierarchy, profileName);
+        await learningUnitManager.saveHierarchy(learningUnitId, hierarchy);
+        console.log(`   ✅ Built ${hierarchy.levels.length}-level hierarchy`);
+      } catch (error) {
+        console.warn(`   ⚠️  Failed to build hierarchy:`, error);
+      }
+    }
+
+    // Save failure learning for standard unit
+    if (antiPatterns.length > 0) {
+      await learningUnitManager.saveAntiPatterns(learningUnitId, antiPatterns);
+    }
+    if (reasoningCorrections.length > 0) {
+      await learningUnitManager.saveReasoningCorrections(learningUnitId, reasoningCorrections);
+    }
+
+    // ============================================================
+    // PHASE 2: Create DOUBLED (-2x) unit (6-10 strategies)
+    // ============================================================
+    const doubledUnitId = `${learningUnitId}${DOUBLE_STRATEGY_SUFFIX}`;
+    console.log(`\n📦 Phase 2: Doubled unit (${DOUBLED_CONSOLIDATION_COUNTS.fewShotMin}-${DOUBLED_CONSOLIDATION_COUNTS.fewShotMax} strategies)`);
+    console.log(`   Target unit: "${doubledUnitId}"`);
+    console.log(`   Selecting from ${sharedPatterns.length} shared patterns...`);
+
+    this.setConsolidationOptions({ doubleStrategies: true });
+    const doubledFewShots = await this.generateFewShotsFromPatterns(sharedPatterns);
+    console.log(`   ✅ Selected ${doubledFewShots.length} strategies for doubled unit`);
+
+    // Save doubled unit
+    await learningUnitManager.saveFewShots(doubledUnitId, doubledFewShots);
+    if (doubledFewShots.length >= 2) {
+      try {
+        const patternsForHierarchy = this.fewShotsToPatterns(doubledFewShots);
+        const hierarchy = await this.buildAbstractionHierarchy(patternsForHierarchy, profileName);
+        await learningUnitManager.saveHierarchy(doubledUnitId, hierarchy);
+        console.log(`   ✅ Built ${hierarchy.levels.length}-level hierarchy`);
+      } catch (error) {
+        console.warn(`   ⚠️  Failed to build hierarchy:`, error);
+      }
+    }
+
+    // Save failure learning for doubled unit (same data)
+    if (antiPatterns.length > 0) {
+      await learningUnitManager.saveAntiPatterns(doubledUnitId, antiPatterns);
+    }
+    if (reasoningCorrections.length > 0) {
+      await learningUnitManager.saveReasoningCorrections(doubledUnitId, reasoningCorrections);
+    }
+
+    // ============================================================
+    // PHASE 3: Mark experiences as absorbed (ONCE for both)
+    // ============================================================
+    console.log(`\n📦 Phase 3: Marking ${experiences.length} experiences as absorbed...`);
+
+    // Mark absorbed for standard unit (with preservation for potential other algorithms)
+    await learningUnitManager.markExperiencesAbsorbed(
+      learningUnitId,
+      experiences.map((e) => e.id),
+      this.computePuzzleBreakdown(experiences),
+      experiences,
+      { preserveOriginals: true }  // Keep for doubled unit
+    );
+
+    // Mark absorbed for doubled unit (use original preservation setting)
+    await learningUnitManager.markExperiencesAbsorbed(
+      doubledUnitId,
+      experiences.map((e) => e.id),
+      this.computePuzzleBreakdown(experiences),
+      experiences,
+      { preserveOriginals: originalPreserveExperiences }
+    );
+
+    // Build reports
+    const standardReport: ConsolidationReport = {
+      patterns: {
+        successStrategies: sharedPatterns.slice(0, standardFewShots.length),
+        commonErrors: [],
+        wrongPathPatterns: [],
+      },
+      antiPatterns,
+      reasoningCorrections,
+      insights: `Created standard unit with ${standardFewShots.length} strategies from ${experiences.length} experiences`,
+      fewShotsUpdated: standardFewShots.length,
+      experiencesConsolidated: experiences.length,
+      compressionRatio: sharedPatterns.length > 0 ? experiences.length / sharedPatterns.length : 0,
+    };
+
+    const doubledReport: ConsolidationReport = {
+      patterns: {
+        successStrategies: sharedPatterns.slice(0, doubledFewShots.length),
+        commonErrors: [],
+        wrongPathPatterns: [],
+      },
+      antiPatterns,
+      reasoningCorrections,
+      insights: `Created doubled unit with ${doubledFewShots.length} strategies from ${experiences.length} experiences`,
+      fewShotsUpdated: doubledFewShots.length,
+      experiencesConsolidated: experiences.length,
+      compressionRatio: sharedPatterns.length > 0 ? experiences.length / sharedPatterns.length : 0,
+    };
 
     console.log(`\n✅ DUAL consolidation complete:`);
-    console.log(`   Standard "${learningUnitId}": ${standardReport.fewShotsUpdated} strategies`);
-    console.log(`   Doubled "${doubledUnitId}": ${doubledReport.fewShotsUpdated} strategies`);
+    console.log(`   Standard "${learningUnitId}": ${standardFewShots.length} strategies`);
+    console.log(`   Doubled "${doubledUnitId}": ${doubledFewShots.length} strategies`);
+    console.log(`   Shared patterns: ${sharedPatterns.length}`);
 
     return {
       standard: standardReport,

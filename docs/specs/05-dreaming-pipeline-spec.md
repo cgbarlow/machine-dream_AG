@@ -1573,6 +1573,22 @@ The `--dual-unit` flag creates both standard and doubled units from the same exp
 
 This enables A/B testing between standard and doubled strategy counts without re-running experiences.
 
+#### Shared Clustering Implementation (Updated 2026-01-19)
+
+Dual consolidation uses **shared clustering** to ensure consistent pattern coverage:
+
+1. **SHARED PHASE**: Clustering and pattern synthesis runs ONCE using doubled mode targets (for maximum diversity)
+2. **Phase 1**: Select 3-5 strategies from shared patterns → create standard unit
+3. **Phase 2**: Select 6-10 strategies from shared patterns → create doubled unit
+4. **Phase 3**: Mark experiences as absorbed (once for both units)
+
+This design ensures:
+- Both units use the **same patterns** (consistent coverage)
+- The 2x unit is a **superset** of the standard unit's patterns
+- LLM clustering cost is halved (runs once, not twice)
+
+**Previous behavior (bug)**: Running clustering twice independently caused the 2x unit to receive completely different (and often fewer) patterns when the second LLM pass produced only 2 valid clusters.
+
 #### Rationale
 
 Doubling strategy counts is useful when:
@@ -1696,6 +1712,76 @@ Legacy units (pre-ADR-016) continue to work:
 - `getUnitExperiences()` checks unit-bound storage first
 - Falls back to `absorbedExperienceIds` + global lookup
 - `migrateToNewExperienceModel()` migrates legacy units on demand
+
+### 8.6.1 Experience Preservation Mode (Added 2026-01-19)
+
+The `--preserve-experiences` flag modifies the sticky experience model to keep original experiences after absorption, enabling multiple dream runs with different algorithms on the same experience pool.
+
+#### Problem Statement
+
+When running multiple dream commands to create learning units with different algorithms (e.g., LLMClusterV3 vs FastClusterV3), the first dream run consumes all experiences:
+
+```
+1. First dream run: Absorbs ALL experiences, deletes originals
+2. Second+ dream runs: Find no unconsolidated experiences, create nothing
+```
+
+#### Solution: Preserve Experiences Flag
+
+```bash
+# Run first dream with preserve flag
+npx machine-dream llm dream run --algorithm llmclusterv3 --learning-unit unit1 --preserve-experiences
+
+# Run second dream - experiences are still available
+npx machine-dream llm dream run --algorithm fastclusterv3 --learning-unit unit2 --preserve-experiences
+
+# Run final dream without preserve (consumes experiences)
+npx machine-dream llm dream run --algorithm deepclusterv3 --learning-unit unit3
+```
+
+#### Behavior
+
+| Flag | After Absorption | Experiences Available for Next Dream |
+|------|------------------|--------------------------------------|
+| Default (no flag) | Original deleted | No (consumed) |
+| `--preserve-experiences` | Original retained | Yes (still unconsolidated) |
+
+#### Implementation
+
+The flag modifies `markExperiencesAbsorbed()` behavior:
+
+```typescript
+async markExperiencesAbsorbed(
+  unitId: string,
+  experienceIds: string[],
+  options: { preserveOriginals?: boolean } = {}
+): Promise<number> {
+  // ... copy experiences to unit storage ...
+
+  if (!options.preserveOriginals) {
+    // Delete original from global storage (existing behavior)
+    await this.agentMemory.reasoningBank.deleteMetadata(expId, EXPERIENCE_TYPE);
+  }
+  // If preserveOriginals=true, keep originals for subsequent dream runs
+}
+```
+
+#### Use Cases
+
+1. **Multi-Algorithm A/B Testing**: Create learning units with different clustering algorithms from the same experience set
+2. **Iterative Refinement**: Re-run dreaming with adjusted parameters without losing experiences
+3. **Backup Before Experimentation**: Preserve experiences before trying new consolidation approaches
+
+#### Cleanup After Multi-Run Sessions
+
+After running multiple dream commands with `--preserve-experiences`, the final run should omit the flag to properly consume the experiences:
+
+```bash
+# Final run without preserve - marks experiences as consumed
+npx machine-dream llm dream run --algorithm llmclusterv3 --learning-unit final-unit
+```
+
+Alternatively, use `llm learning unconsolidate` to restore experiences from a unit back to the global pool.
 
 ---
 

@@ -302,7 +302,7 @@ machine-dream llm play <puzzle> [options]
 | `--visualize` | Show live solving visualization | false |
 | `--debug` | Show detailed debug output | false |
 | `--include-reasoning` | Include reasoning in history | false |
-| `--history-limit <n>` | Limit move history | 20 |
+| `--history-limit <n>` | Limit move history to last N moves (0=unlimited) | 3 |
 | `--learning-unit <id>` | Use specific learning unit | "default" |
 | `--reasoning-template` | Use structured reasoning format | false |
 | `--no-anonymous-patterns` | Disable anonymous pattern format | false (enabled) |
@@ -625,6 +625,49 @@ machine-dream llm learning delete <unit-id>
 
 Delete a learning unit.
 
+#### llm learning clone
+
+```bash
+machine-dream llm learning clone <source-id> <target-id>
+```
+
+Clone a learning unit and all its data (strategies, experiences, hierarchy).
+
+**Options:**
+| Option | Description |
+|--------|-------------|
+| `--profile <name>` | LLM profile (searches all if not specified) |
+
+**Example:**
+```bash
+# Create backup before modifications
+machine-dream llm learning clone my-unit my-unit-backup
+```
+
+#### llm learning unconsolidate
+
+```bash
+machine-dream llm learning unconsolidate <unit-id>
+```
+
+Restore unit-bound experiences back to the global unconsolidated pool. Useful for re-dreaming with different algorithms.
+
+**Options:**
+| Option | Description |
+|--------|-------------|
+| `--profile <name>` | LLM profile (searches all if not specified) |
+| `--delete-unit` | Delete the learning unit after unconsolidating |
+| `--yes` | Skip confirmation prompt |
+
+**Example:**
+```bash
+# Restore experiences for re-consolidation
+machine-dream llm learning unconsolidate my-unit
+
+# Restore and delete the unit
+machine-dream llm learning unconsolidate my-unit --delete-unit --yes
+```
+
 #### llm learning rename
 
 ```bash
@@ -676,6 +719,7 @@ machine-dream llm dream run [options]
 | `--succinct-reasoning` | Request shorter responses | false |
 | `--no-dual-unit` | Create only single unit (default: creates BOTH standard and -2x) | false (dual enabled) |
 | `--no-failure-learning` | Disable failure learning (anti-patterns & reasoning corrections) | false (enabled) |
+| `--preserve-experiences` | Keep original experiences after absorbing (for multi-algorithm workflows) | false |
 | `--output <file>` | Save report to file | - |
 | `--debug` | Show detailed debug output | false |
 

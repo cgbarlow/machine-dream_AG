@@ -270,9 +270,11 @@ else
 
   # Dream consolidation with explicit learning unit names
   # Run each algorithm separately to create distinct learning units
+  # First dream uses --preserve-experiences so second dream can access same experiences
   run_cmd "Dream consolidation (standard mode, llmclusterv3)" \
-    npx machine-dream llm dream run --profile gpt-oss-120b --algorithm llmclusterv3 --learning-unit "$UNIT_STANDARD_LLM" --debug
+    npx machine-dream llm dream run --profile gpt-oss-120b --algorithm llmclusterv3 --learning-unit "$UNIT_STANDARD_LLM" --preserve-experiences --debug
 
+  # Last dream in phase omits --preserve-experiences to mark experiences as consumed
   run_cmd "Dream consolidation (standard mode, fastclusterv3)" \
     npx machine-dream llm dream run --profile gpt-oss-120b --algorithm fastclusterv3 --learning-unit "$UNIT_STANDARD_FAST" --debug
 
@@ -314,9 +316,11 @@ else
 
   # Dream consolidation with explicit learning unit names and --aisp-full flag
   # Run each algorithm separately to create distinct learning units
+  # First dream uses --preserve-experiences so second dream can access same experiences
   run_cmd "Dream consolidation (aisp-full mode, llmclusterv3)" \
-    npx machine-dream llm dream run --profile gpt-oss-120b --aisp-full --algorithm llmclusterv3 --learning-unit "$UNIT_AISP_LLM" --debug
+    npx machine-dream llm dream run --profile gpt-oss-120b --aisp-full --algorithm llmclusterv3 --learning-unit "$UNIT_AISP_LLM" --preserve-experiences --debug
 
+  # Last dream in phase omits --preserve-experiences to mark experiences as consumed
   run_cmd "Dream consolidation (aisp-full mode, fastclusterv3)" \
     npx machine-dream llm dream run --profile gpt-oss-120b --aisp-full --algorithm fastclusterv3 --learning-unit "$UNIT_AISP_FAST" --debug
 

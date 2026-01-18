@@ -1044,6 +1044,62 @@ This model ensures:
 - No cross-unit interference
 - Consistent metadata (unit experience count = actual copies)
 
+### Experience Preservation Mode (Added 2026-01-19)
+
+The `--preserve-experiences` flag modifies the sticky experience model to support multi-algorithm dreaming workflows where the same experience pool is used to create multiple learning units.
+
+#### Problem: Experience Consumption Blocks Multi-Algorithm Runs
+
+By default, experiences are "consumed" (deleted from global pool) when absorbed into a learning unit. This prevents subsequent dream commands from finding experiences:
+
+```
+# Without --preserve-experiences:
+1. npx machine-dream llm dream run --algorithm llmclusterv3 --learning-unit unit1
+   → Absorbs ALL experiences, deletes originals
+2. npx machine-dream llm dream run --algorithm fastclusterv3 --learning-unit unit2
+   → Finds 0 unconsolidated experiences, creates nothing
+```
+
+#### Solution: Preserve Experiences Flag
+
+```bash
+# With --preserve-experiences:
+1. npx machine-dream llm dream run --algorithm llmclusterv3 --learning-unit unit1 --preserve-experiences
+   → Copies experiences to unit1, keeps originals in global pool
+2. npx machine-dream llm dream run --algorithm fastclusterv3 --learning-unit unit2 --preserve-experiences
+   → Copies same experiences to unit2, keeps originals in global pool
+3. npx machine-dream llm dream run --algorithm deepclusterv3 --learning-unit unit3
+   → Final run consumes experiences (no --preserve-experiences)
+```
+
+#### Supporting Commands
+
+| Command | Purpose |
+|---------|---------|
+| `llm learning clone <src> <dst>` | Create backup of learning unit before changes |
+| `llm learning unconsolidate <id>` | Restore unit experiences back to global pool |
+| `llm learning delete <id>` | Delete unit and its bound experiences |
+
+#### Typical Multi-Algorithm Workflow
+
+```bash
+# Phase 1: Generate experiences (play sessions)
+# ... play sessions generate experiences ...
+
+# Phase 2: Run multiple algorithms with preserve flag
+npx machine-dream llm dream run --algorithm llmclusterv3 --learning-unit model_llmv3 --preserve-experiences
+npx machine-dream llm dream run --algorithm fastclusterv3 --learning-unit model_fastv3 --preserve-experiences
+npx machine-dream llm dream run --algorithm deepclusterv3 --learning-unit model_deepv3 --preserve-experiences
+
+# Phase 3: Run final variant without preserve (consumes experiences)
+npx machine-dream llm dream run --algorithm llmclusterv3 --learning-unit model_llmv3_2x --double-strategies
+
+# Phase 4: Compare units with ABX testing
+./scripts/abx-test.sh --unit model_llmv3 --runs 5
+./scripts/abx-test.sh --unit model_fastv3 --runs 5
+./scripts/abx-test.sh --unit model_deepv3 --runs 5
+```
+
 ### Default Learning Unit
 
 For backwards compatibility, a "default" unit exists for each profile:

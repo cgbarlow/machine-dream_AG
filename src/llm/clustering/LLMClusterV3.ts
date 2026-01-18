@@ -864,7 +864,7 @@ For each statement, output the number of the MOST SPECIFIC matching pattern:`;
     }
 
     // Parsing stats for debug and validation
-    const parseStats = { aisp: 0, fallback: 0, uncategorized: 0 };
+    const parseStats = { aisp: 0, standard: 0, uncategorized: 0 };
 
     for (let i = 0; i < batch.length; i++) {
       const line = lines[i]?.trim() || '';
@@ -877,11 +877,11 @@ For each statement, output the number of the MOST SPECIFIC matching pattern:`;
         patternNum = parseInt(aispMatch[1], 10);
         parseStats.aisp++;
       } else {
-        // Fallback to raw number
+        // Standard format: raw number (e.g., "2", "1", "3")
         const parsed = parseInt(line || '0', 10);
         if (!isNaN(parsed)) {
           patternNum = parsed;
-          parseStats.fallback++;
+          parseStats.standard++;
         } else {
           patternNum = 0;
           parseStats.uncategorized++;
@@ -899,7 +899,7 @@ For each statement, output the number of the MOST SPECIFIC matching pattern:`;
 
     // Debug: Log parsing summary (Spec 16 Section 4.13.3)
     if (this.debugMode) {
-      console.log(`   📊 Parse results: ${parseStats.aisp} AISP, ${parseStats.fallback} fallback, ${parseStats.uncategorized} uncategorized`);
+      console.log(`   📊 Parse results: ${parseStats.aisp} AISP, ${parseStats.standard} standard, ${parseStats.uncategorized} uncategorized`);
     }
 
     // Validation: Warn if too many uncategorized (Spec 16 Section 4.13.4)

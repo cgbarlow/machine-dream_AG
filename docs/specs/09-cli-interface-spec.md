@@ -679,6 +679,8 @@ Options:
   --anonymous-patterns         # Use anonymous pattern format for learned strategies
   --succinct-reasoning         # Request only the move without full analysis (shorter responses)
   --aisp-lite                  # Use AISP-lite syntax (simplified AISP for smaller models)
+  --history-limit <n>          # Maximum number of recent moves to include in context (default: 3)
+                               # Set to 0 for unlimited history (legacy behavior)
 ```
 
 **Learning Modes:**
@@ -737,7 +739,7 @@ Options:
   --output <file>              # Save consolidation report
   --learning-unit <id>         # Update specific learning unit (default: "default")
   --anonymous-patterns         # Generate patterns in anonymous format (no strategy names)
-  --algorithm <name>           # Clustering algorithm: fastcluster, deepcluster, llmcluster, llmclusterv2
+  --algorithm <name>           # Clustering algorithm: fastcluster, deepcluster, llmcluster, llmclusterv2, llmclusterv3
   --algorithms <list>          # Comma-separated list (default: all latest versions)
   --aisp                       # Mark learning unit as AISP mode (for naming)
   --aisp-lite                  # Mark learning unit as AISP-lite mode (simplified AISP for smaller models)
@@ -745,6 +747,9 @@ Options:
   --succinct-reasoning         # Request only the move without full analysis (shorter responses)
   --double-strategies          # Double the number of strategies (6-10 few-shots, 10-14 merged)
   --no-dual-unit               # Create only single learning unit (default: creates BOTH standard AND -2x)
+  --preserve-experiences       # Keep original experiences after absorption (don't consume them)
+                               # Useful when running multiple dream commands with different algorithms
+                               # on the same experience pool (see Section 8.6.1)
   --debug                      # Show detailed debug output including LLM responses and pattern parsing
                                # (Spec 16 Section 4.13: categorization response preview, parse stats, validation warnings)
 ```
@@ -1139,6 +1144,113 @@ machine-dream llm session delete --unit my-test-unit --yes
 ```
 
 **Note:** For clearing ALL memory data, use `llm memory clear` instead.
+
+#### 3.8.11 `llm learning` - Learning Unit Management
+
+Commands for managing learning units (consolidated knowledge packages).
+
+##### 3.8.11.1 `llm learning list` - List Learning Units
+
+```bash
+machine-dream llm learning list [options]
+
+Options:
+  --profile <name>             # Filter by LLM profile name
+  --format <format>            # Output format (text|json), default: text
+```
+
+##### 3.8.11.2 `llm learning show` - Show Learning Unit Details
+
+```bash
+machine-dream llm learning show <unit-id> [options]
+
+Arguments:
+  <unit-id>                    # Learning unit ID
+
+Options:
+  --format <format>            # Output format (text|json), default: text
+```
+
+##### 3.8.11.3 `llm learning clone` - Clone Learning Unit
+
+Create a complete copy of a learning unit including all its associated experiences, few-shots, and hierarchy. Useful for backup before making changes or for creating variations.
+
+```bash
+machine-dream llm learning clone <source-unit-id> <target-unit-id> [options]
+
+Arguments:
+  <source-unit-id>             # ID of the learning unit to clone
+  <target-unit-id>             # ID for the new cloned unit
+
+Options:
+  --profile <name>             # LLM profile (default: active profile)
+```
+
+**Behavior:**
+- Copies all learning unit metadata
+- Copies all few-shot examples
+- Copies hierarchy if it exists
+- Copies all unit-bound experiences
+- Target unit name is set to "{source name} (clone)"
+- Fails if target unit ID already exists
+
+**Examples:**
+```bash
+# Clone a learning unit for backup
+machine-dream llm learning clone gpt-oss-120b_standard_llmclusterv3_20260118_1 gpt-oss-120b_standard_llmclusterv3_20260118_1_backup
+
+# Clone to create a variation
+machine-dream llm learning clone my-training-unit my-experiment-unit
+```
+
+##### 3.8.11.4 `llm learning unconsolidate` - Restore Experiences to Global Pool
+
+Restore unit-bound experiences back to the global unconsolidated pool, enabling re-dreaming with the same experiences. This reverses the "sticky" experience model absorption.
+
+```bash
+machine-dream llm learning unconsolidate <unit-id> [options]
+
+Arguments:
+  <unit-id>                    # Learning unit ID
+
+Options:
+  --delete-unit                # Delete the learning unit after restoring experiences
+  --profile <name>             # LLM profile (default: active profile)
+  --yes                        # Skip confirmation prompt
+```
+
+**Behavior:**
+- Copies each unit-bound experience back to the global pool
+- Removes unit binding metadata (boundToUnit, boundAt)
+- Resets consolidated flag to false
+- Original unit retains its copies unless `--delete-unit` is specified
+- Requires confirmation unless `--yes` is provided
+
+**Use Cases:**
+- Re-run dreaming with different algorithm after experiences were consumed
+- Fix issues with a consolidation run
+- Merge experiences from multiple units
+
+**Examples:**
+```bash
+# Restore experiences to allow re-dreaming
+machine-dream llm learning unconsolidate gpt-oss-120b_standard_llmclusterv3_20260118_1
+
+# Restore and delete the unit
+machine-dream llm learning unconsolidate gpt-oss-120b_standard_llmclusterv3_20260118_1 --delete-unit --yes
+```
+
+##### 3.8.11.5 `llm learning delete` - Delete Learning Unit
+
+```bash
+machine-dream llm learning delete <unit-id> [options]
+
+Arguments:
+  <unit-id>                    # Learning unit ID
+
+Options:
+  --confirm                    # Skip confirmation prompt
+```
 
 ---
 

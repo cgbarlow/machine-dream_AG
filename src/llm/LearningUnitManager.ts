@@ -626,12 +626,15 @@ export class LearningUnitManager {
    * @param experienceIds - Experience IDs to mark as absorbed
    * @param puzzleBreakdown - Breakdown of puzzle types absorbed
    * @param experiences - Optional: Full experience objects to copy to unit storage
+   * @param options - Additional options
+   * @param options.preserveOriginals - If true, keep original experiences after copying (for multi-algorithm dreaming)
    */
   async markExperiencesAbsorbed(
     unitId: string,
     experienceIds: string[],
     puzzleBreakdown?: Record<string, number>,
-    experiences?: LLMExperience[]
+    experiences?: LLMExperience[],
+    options: { preserveOriginals?: boolean } = {}
   ): Promise<void> {
     let unit = await this.get(unitId);
     if (!unit) {
@@ -654,15 +657,22 @@ export class LearningUnitManager {
 
     // NEW: Create unit-bound copies of experiences (Sticky Experience Model)
     // After copying, delete the originals (experiences are "consumed" by the unit)
+    // Unless preserveOriginals is true (for multi-algorithm dreaming workflows)
     if (experiences && experiences.length > 0) {
       await this.copyExperiencesToUnit(unitId, experiences, unit.metadata.version + 1);
       // Delete original global experiences (1b: consumed after absorption)
-      await this.deleteGlobalExperiences(experiences.map(e => e.id));
+      // Skip if preserveOriginals is true (enables multiple dream runs on same experiences)
+      if (!options.preserveOriginals) {
+        await this.deleteGlobalExperiences(experiences.map(e => e.id));
+      }
     } else if (newIds.length > 0) {
       // Fallback: Load experiences from global storage and copy them
       await this.copyExperiencesByIdToUnit(unitId, newIds, unit.metadata.version + 1);
       // Delete original global experiences (1b: consumed after absorption)
-      await this.deleteGlobalExperiences(newIds);
+      // Skip if preserveOriginals is true (enables multiple dream runs on same experiences)
+      if (!options.preserveOriginals) {
+        await this.deleteGlobalExperiences(newIds);
+      }
     }
 
     // Update unit
@@ -1254,6 +1264,138 @@ export class LearningUnitManager {
     }
 
     return defaultUnit;
+  }
+
+  // ============================================================================
+  // Clone and Unconsolidate Operations (Plan Priority 1)
+  // ============================================================================
+
+  /**
+   * Clone a learning unit to a new ID
+   *
+   * Creates a complete copy of the learning unit including:
+   * - All learning unit metadata
+   * - All few-shot examples
+   * - Hierarchy (if exists)
+   * - All unit-bound experiences
+   *
+   * Spec: docs/specs/09-cli-interface-spec.md Section 3.8.11.3
+   *
+   * @param sourceId - ID of the learning unit to clone
+   * @param targetId - ID for the new cloned unit
+   * @returns The cloned learning unit
+   * @throws Error if source doesn't exist or target already exists
+   */
+  async clone(sourceId: string, targetId: string): Promise<LearningUnit> {
+    // Get source unit
+    const source = await this.get(sourceId);
+    if (!source) {
+      throw new Error(`Source unit '${sourceId}' not found`);
+    }
+
+    // Check target doesn't exist
+    const existing = await this.get(targetId);
+    if (existing) {
+      throw new Error(`Target unit '${targetId}' already exists`);
+    }
+
+    // Clone unit metadata
+    const cloned: LearningUnit = {
+      ...source,
+      id: targetId,
+      name: `${source.name} (clone)`,
+      createdAt: new Date(),
+      lastUpdatedAt: new Date(),
+      metadata: {
+        ...source.metadata,
+        version: 1, // Reset version for new unit
+      },
+    };
+
+    // Save the cloned unit metadata
+    await this.saveUnitMetadata(cloned);
+
+    // Clone few-shots
+    if (source.fewShots && source.fewShots.length > 0) {
+      await this.saveFewShots(targetId, source.fewShots);
+    }
+
+    // Clone hierarchy if exists
+    if (source.hierarchy) {
+      await this.saveHierarchy(targetId, source.hierarchy);
+    }
+
+    // Clone unit-bound experiences
+    const sourceExperiences = await this.getUnitExperiences(sourceId);
+    if (sourceExperiences.length > 0) {
+      for (const exp of sourceExperiences) {
+        const clonedExp = {
+          ...exp,
+          boundToUnit: targetId,
+          boundAt: new Date().toISOString(),
+        };
+        const key = LLM_STORAGE_KEYS.getUnitExperienceKey(targetId, exp.id);
+        await this.agentMemory.reasoningBank.storeMetadata(
+          key,
+          LLM_STORAGE_KEYS.UNIT_EXPERIENCE_TYPE,
+          clonedExp
+        );
+      }
+    }
+
+    // Return the full cloned unit with all data loaded
+    // (use get() to ensure fewShots and hierarchy are included)
+    const fullCloned = await this.get(targetId);
+    return fullCloned || cloned;
+  }
+
+  /**
+   * Restore unit-bound experiences back to the global unconsolidated pool
+   *
+   * This reverses the "sticky" experience model absorption, enabling:
+   * - Re-dreaming with different algorithms on the same experiences
+   * - Fixing issues with a consolidation run
+   * - Merging experiences from multiple units
+   *
+   * Spec: docs/specs/09-cli-interface-spec.md Section 3.8.11.4
+   *
+   * @param unitId - Learning unit ID
+   * @returns Number of experiences restored to global pool
+   * @throws Error if unit doesn't exist
+   */
+  async unconsolidateExperiences(unitId: string): Promise<number> {
+    // Get unit to verify it exists
+    const unit = await this.get(unitId);
+    if (!unit) {
+      throw new Error(`Learning unit '${unitId}' not found`);
+    }
+
+    // Get unit-bound experiences
+    const unitExperiences = await this.getUnitExperiences(unitId);
+    if (unitExperiences.length === 0) {
+      return 0;
+    }
+
+    // Restore each experience to global pool
+    let restoredCount = 0;
+    for (const exp of unitExperiences) {
+      // Create global experience without unit binding
+      const globalExp = { ...exp };
+      delete (globalExp as any).boundToUnit;
+      delete (globalExp as any).boundAt;
+      delete (globalExp as any).unitVersion;
+      (globalExp as any).consolidated = false;
+
+      // Store in global pool
+      await this.agentMemory.reasoningBank.storeMetadata(
+        exp.id,
+        LLM_STORAGE_KEYS.EXPERIENCE_TYPE,
+        globalExp
+      );
+      restoredCount++;
+    }
+
+    return restoredCount;
   }
 }
 

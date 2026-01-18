@@ -457,6 +457,7 @@ export interface ConsolidationOptions {
   fewShotMax?: number;          // Max strategies for few-shot selection (default: 5, doubled: 10)
   mergeMin?: number;            // Min strategies for merge output (default: 5, doubled: 10)
   mergeMax?: number;            // Max strategies for merge output (default: 7, doubled: 14)
+  preserveExperiences?: boolean; // If true, keep original experiences after absorbing (for multi-algorithm workflows)
 }
 
 /**

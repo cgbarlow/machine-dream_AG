@@ -781,7 +781,7 @@ export function registerLLMCommand(program: Command): void {
     .option('--visualize-basic', 'Show compact move outcomes only (no board)')
     .option('--debug', 'Show detailed debug output including prompts')
     .option('--include-reasoning', 'Include reasoning snippets in move history (default: off)')
-    .option('--history-limit <n>', 'Limit move history to last N moves (default: 20, 0=unlimited)', '20')
+    .option('--history-limit <n>', 'Limit move history to last N moves (default: 3, 0=unlimited)', '3')
     .option('--learning-unit <id>', 'Use specific learning unit (default: "default")')
     .option('--reasoning-template', 'Use structured constraint-intersection reasoning format (improves accuracy)')
     .option('--no-anonymous-patterns', 'Disable anonymous pattern format (use named strategies)')
@@ -2317,6 +2317,7 @@ export function registerLLMCommand(program: Command): void {
     .option('--hybrid', 'Use hybrid keyword/LLM categorization for LLMCluster')
     .option('--no-cache', 'Disable pattern caching for LLMCluster')
     .option('--no-failure-learning', 'Disable failure learning phase (Spec 19)')
+    .option('--preserve-experiences', 'Keep original experiences after absorbing into unit (for multi-algorithm workflows)')
     .action(async (options) => {
       try {
         const manager = new LLMProfileManager();
@@ -2619,10 +2620,18 @@ export function registerLLMCommand(program: Command): void {
               logger.info('𝔸 AISP mode enabled');
             }
 
-            // Set consolidation options (strategy counts)
-            if (options.doubleStrategies) {
-              consolidator.setConsolidationOptions({ doubleStrategies: true });
-              logger.info('📊 Double strategies mode enabled (6-10 few-shots, 10-14 merged)');
+            // Set consolidation options (strategy counts and experience preservation)
+            if (options.doubleStrategies || options.preserveExperiences) {
+              consolidator.setConsolidationOptions({
+                doubleStrategies: options.doubleStrategies,
+                preserveExperiences: options.preserveExperiences,
+              });
+              if (options.doubleStrategies) {
+                logger.info('📊 Double strategies mode enabled (6-10 few-shots, 10-14 merged)');
+              }
+              if (options.preserveExperiences) {
+                logger.info('📦 Experience preservation mode enabled (originals kept after absorbing)');
+              }
             }
 
             // Generate learning unit ID with algorithm identifier
@@ -3603,6 +3612,153 @@ export function registerLLMCommand(program: Command): void {
         }
       } catch (error) {
         throw new CLIError('Failed to delete learning unit', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm learning clone (Plan: Step C1)
+  learning
+    .command('clone')
+    .description('Clone a learning unit and all its data')
+    .argument('<source>', 'Source learning unit ID')
+    .argument('<target>', 'Target learning unit ID')
+    .option('--profile <name>', 'LLM profile (searches all profiles if not specified)')
+    .action(async (source, target, options) => {
+      try {
+        const agentMemory = new AgentMemory(createDefaultMemoryConfig());
+
+        let profileName = options.profile;
+        let sourceUnit = null;
+        let unitManager: LearningUnitManager;
+
+        if (profileName) {
+          // Profile specified - search only in that profile
+          unitManager = new LearningUnitManager(agentMemory, profileName);
+          sourceUnit = await unitManager.get(source);
+        } else {
+          // No profile specified - search across ALL profiles to find the unit
+          const { LLM_STORAGE_KEYS } = await import('../../llm/storage-keys.js');
+          const allUnits = await agentMemory.reasoningBank.queryMetadata(
+            LLM_STORAGE_KEYS.LEARNING_UNIT_TYPE,
+            {}
+          ) as any[];
+
+          // Find unit by ID across all profiles
+          const matchingUnit = allUnits.find((u) => u.id === source);
+          if (matchingUnit) {
+            profileName = matchingUnit.profileName;
+            unitManager = new LearningUnitManager(agentMemory, profileName);
+            sourceUnit = await unitManager.get(source);
+          } else {
+            // Fallback for error message
+            const profileManager = new LLMProfileManager();
+            profileName = profileManager.getActive()?.name || 'unknown';
+            unitManager = new LearningUnitManager(agentMemory, profileName);
+          }
+        }
+
+        if (!sourceUnit) {
+          throw new CLIError(`Source learning unit not found: ${source}`, 1);
+        }
+
+        logger.info(`🔄 Cloning learning unit: ${source} → ${target}`);
+        logger.info(`   Profile: ${profileName}`);
+
+        const cloned = await unitManager.clone(source, target);
+
+        logger.info(`\n✅ Learning unit cloned successfully`);
+        logger.info(`   Source: ${source} (${sourceUnit.fewShots.length} strategies, ${sourceUnit.metadata.totalExperiences} experiences)`);
+        logger.info(`   Target: ${cloned.id} - ${cloned.name}`);
+        logger.info(`   Strategies: ${cloned.fewShots.length}`);
+        logger.info(`   Experiences: ${cloned.metadata.totalExperiences}`);
+        if (cloned.hierarchy) {
+          logger.info(`   Hierarchy: ${cloned.hierarchy.levels?.length || 0} levels`);
+        }
+      } catch (error) {
+        throw new CLIError('Failed to clone learning unit', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm learning unconsolidate (Plan: Step C3)
+  learning
+    .command('unconsolidate')
+    .description('Restore unit-bound experiences back to global unconsolidated pool')
+    .argument('<id>', 'Learning unit ID')
+    .option('--profile <name>', 'LLM profile (searches all profiles if not specified)')
+    .option('--delete-unit', 'Delete the learning unit after unconsolidating')
+    .option('--yes', 'Skip confirmation')
+    .action(async (id, options) => {
+      try {
+        const agentMemory = new AgentMemory(createDefaultMemoryConfig());
+
+        let profileName = options.profile;
+        let unit = null;
+        let unitManager: LearningUnitManager;
+
+        if (profileName) {
+          // Profile specified - search only in that profile
+          unitManager = new LearningUnitManager(agentMemory, profileName);
+          unit = await unitManager.get(id);
+        } else {
+          // No profile specified - search across ALL profiles to find the unit
+          const { LLM_STORAGE_KEYS } = await import('../../llm/storage-keys.js');
+          const allUnits = await agentMemory.reasoningBank.queryMetadata(
+            LLM_STORAGE_KEYS.LEARNING_UNIT_TYPE,
+            {}
+          ) as any[];
+
+          // Find unit by ID across all profiles
+          const matchingUnit = allUnits.find((u) => u.id === id);
+          if (matchingUnit) {
+            profileName = matchingUnit.profileName;
+            unitManager = new LearningUnitManager(agentMemory, profileName);
+            unit = await unitManager.get(id);
+          } else {
+            // Fallback for error message
+            const profileManager = new LLMProfileManager();
+            profileName = profileManager.getActive()?.name || 'unknown';
+            unitManager = new LearningUnitManager(agentMemory, profileName);
+          }
+        }
+
+        if (!unit) {
+          throw new CLIError(`Learning unit not found: ${id}`, 1);
+        }
+
+        // Confirmation
+        if (!options.yes) {
+          const rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout,
+          });
+
+          const info = `(${unit.fewShots.length} strategies, ${unit.metadata.totalExperiences} experiences)`;
+          const warningText = options.deleteUnit
+            ? `⚠️  Unconsolidate AND DELETE learning unit "${id}" ${info}?`
+            : `⚠️  Unconsolidate experiences from "${id}" ${info}?`;
+          const answer = await rl.question(`\n${warningText} (y/N): `);
+          rl.close();
+
+          if (answer.toLowerCase() !== 'y' && answer.toLowerCase() !== 'yes') {
+            logger.info('Cancelled.');
+            return;
+          }
+        }
+
+        logger.info(`\n🔄 Unconsolidating experiences from: ${id}`);
+
+        const restoredCount = await unitManager.unconsolidateExperiences(id);
+
+        logger.info(`\n✅ Restored ${restoredCount} experience(s) to global pool`);
+        logger.info('   These experiences are now available for re-consolidation');
+
+        if (options.deleteUnit) {
+          const deleted = await unitManager.delete(id);
+          if (deleted) {
+            logger.info(`\n✅ Learning unit deleted: ${id}`);
+          }
+        }
+      } catch (error) {
+        throw new CLIError('Failed to unconsolidate experiences', 1, error instanceof Error ? error.message : String(error));
       }
     });
 

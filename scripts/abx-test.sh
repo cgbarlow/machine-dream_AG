@@ -319,16 +319,18 @@ for i in $CONFIG_INDICES; do
       SHOWN_RESULTS=false
       while kill -0 $CMD_PID 2>/dev/null; do
         if [[ -f "$LOG_FILE" ]]; then
-          # Check for new moves
+          # Check for new moves - support both standard and AISP formats
+          # Standard: "Move 1: value=5, row=0, col=0"
+          # AISP: "move[1]≔(1,4,9)⊕CORRECT"
           while IFS= read -r line; do
-            if [[ "$line" =~ ^Move\ ([0-9]+): ]]; then
+            if [[ "$line" =~ ^Move\ ([0-9]+): ]] || [[ "$line" =~ move\[([0-9]+)\] ]]; then
               MOVE_NUM="${BASH_REMATCH[1]}"
               if (( MOVE_NUM > LAST_MOVE )); then
                 LAST_MOVE=$MOVE_NUM
                 echo "      | $line"
               fi
             fi
-          done < <(grep "^Move [0-9]" "$LOG_FILE" 2>/dev/null)
+          done < <(grep -E "^Move [0-9]|move\[[0-9]+\]" "$LOG_FILE" 2>/dev/null)
         fi
         sleep 1
       done
