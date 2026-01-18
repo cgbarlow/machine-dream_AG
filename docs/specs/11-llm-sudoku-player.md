@@ -1003,7 +1003,46 @@ const metadataKey = `llm_learning_unit:${profileName}:${learningUnitId}`;
 // - llm_fewshots:qwen3-coder:default
 // - llm_fewshots:qwen3-coder:easy-puzzles
 // - llm_learning_unit:qwen3-coder:advanced-techniques
+
+// Unit-bound experiences (ADR-016: Sticky Experience Model)
+const unitExpKey = `unit_exp:${learningUnitId}:${experienceId}`;
+// Example: unit_exp:easy-puzzles:exp-abc123
 ```
+
+### Sticky Experience Model (ADR-016)
+
+Experiences are "sticky" to learning units - when absorbed during dreaming, they become bound to that unit:
+
+| Lifecycle Stage | Behavior |
+|-----------------|----------|
+| **Play Session** | Experiences stored globally as `llm_experience` (unconsolidated) |
+| **Absorption** | Experiences copied to unit storage (`unit_experience`), originals deleted |
+| **Unit Deletion** | Unit-bound copies deleted, other units unaffected |
+| **Session Deletion** | Only affects unconsolidated global experiences |
+
+Key behaviors:
+- **1b**: Original experience is **consumed** (deleted) when absorbed into a unit
+- **2a/2b**: Session deletion deletes unconsolidated experiences but **retains** unit-bound copies
+- **3a**: Re-consolidation (`--rerun`) re-analyzes existing unit experiences only
+
+Storage pattern:
+```typescript
+// Unit-bound experience storage
+type: 'unit_experience'
+key: `unit_exp:${unitId}:${experienceId}`
+data: {
+  ...fullExperienceData,
+  boundToUnit: string,      // Unit that owns this copy
+  boundAt: string,          // ISO timestamp
+  unitVersion: number       // Unit version at absorption
+}
+```
+
+This model ensures:
+- Clear ownership (each unit owns its experience copies)
+- Clean deletion (deleting a unit only affects its copies)
+- No cross-unit interference
+- Consistent metadata (unit experience count = actual copies)
 
 ### Default Learning Unit
 

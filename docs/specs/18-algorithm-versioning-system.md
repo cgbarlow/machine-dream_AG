@@ -660,6 +660,48 @@ When `aispMode === 'aisp-full'`, all four prompt types use AISP syntax:
 - ✅ aisp-validator reports tier ≥ ◊⁻ for generated prompts
 - ✅ LLM critique logged on validation failure
 
+### 3.7 LLMCluster v3 (Scale-Aware Pattern Diversity)
+
+#### 3.7.1 Overview
+
+**Name**: LLMCluster
+**Version**: 3
+**Identifier**: `llmclusterv3`
+**Approach**: Scale-aware LLM-driven pattern identification with diversity breadth
+
+**Performance Targets**:
+- Speed: <180s for 500 experiences (same as v2)
+- Quality: 10-25 highly semantic clusters with diverse reasoning approaches
+- Memory: <300MB peak usage
+
+#### 3.7.2 Improvements over v2
+
+1. **Explicit 1-indexed pattern numbering**: All prompts emphasize that patterns are numbered P1 through PN, never P0. This fixes categorization bugs where LLMs incorrectly used P0.
+
+2. **Broader pattern definitions**: Pattern identification prompts emphasize REASONING APPROACHES (constraint-based, elimination-based, completion-based, multi-constraint) rather than constraint variations. Prevents creating separate patterns for "row constraint" vs "column constraint" vs "box constraint".
+
+3. **Self-critique breadth checking**: The self-critique step now checks for pattern BREADTH across different reasoning approaches, not just mutual exclusivity. If 5+ patterns are all variations of "constraint", the critique requests revision.
+
+4. **AISP 1-indexed emphasis**: All AISP prompts include explicit comments that pattern numbers are 1-indexed (P1, P2, P3...) and never P0.
+
+#### 3.7.3 When to Use
+
+**Use LLMCluster v3 when**:
+- Running 10x or larger batches (371+ experiences)
+- AISP mode is enabled and categorization has been producing too many "uncategorized" results
+- Pattern diversity has been insufficient (all patterns are variations of the same technique)
+
+**Default**: LLMCluster v3 replaces v2 for new consolidations.
+
+#### 3.7.4 Validation Criteria
+
+**Success Criteria**:
+- ✅ All LLMClusterV2 tests pass (backward compatible)
+- ✅ 1x mode produces 3-5 strategies (not 1)
+- ✅ 2x mode produces 6-10 strategies
+- ✅ No P0 pattern assignments in categorization output
+- ✅ Patterns span at least 2 different reasoning approaches
+
 ---
 
 ## 4. Learning Unit Naming Convention

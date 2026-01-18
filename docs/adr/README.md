@@ -32,6 +32,7 @@ Architecture Decision Records capture important architectural decisions along wi
 |-----|-------|--------|-------------|
 | [ADR-003](003-memory-persistence.md) | Memory Persistence (AgentDB) | accepted | SQLite-based cognitive memory layer |
 | [ADR-005](005-learning-units.md) | Learning Units | accepted | Discrete knowledge packages for isolated learning contexts |
+| [ADR-016](016-sticky-experience-model.md) | Sticky Experience Model | accepted | Unit-bound experience copies with clear ownership |
 
 ### Core Architecture
 
@@ -54,6 +55,21 @@ Architecture Decision Records capture important architectural decisions along wi
 |-----|-------|--------|-------------|
 | [ADR-009](009-cli-first-interface.md) | CLI-First Interface | accepted | Command-line as primary interface |
 | [ADR-004](004-spec-first-development.md) | Specification-First Development | accepted | No implementation without specification |
+
+### Algorithm & Learning
+
+| ADR | Title | Status | Description |
+|-----|-------|--------|-------------|
+| [ADR-011](011-versioned-algorithms.md) | Versioned Algorithms | accepted | Pluggable clustering algorithms with version tracking |
+| [ADR-012](012-failure-learning.md) | Failure Learning | accepted | Learning from invalid and wrong moves (Spec 19) |
+
+### AISP Integration
+
+| ADR | Title | Status | Description |
+|-----|-------|--------|-------------|
+| [ADR-013](013-aisp-validator-integration.md) | AISP Validator Integration | accepted | Validation of AISP-formatted prompts and responses |
+| [ADR-014](014-aisp-prompt-completeness.md) | AISP Prompt Completeness | accepted | Complete context in AISP prompts |
+| [ADR-015](015-aisp-response-parsing.md) | AISP Response Parsing | accepted | Robust parsing of AISP responses |
 
 ## Decision Graph
 
@@ -165,4 +181,4 @@ When making significant architectural decisions:
 
 ---
 
-**Last Updated:** 2026-01-13
+**Last Updated:** 2026-01-18

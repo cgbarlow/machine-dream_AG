@@ -112,6 +112,65 @@ export const LLM_STORAGE_KEYS = {
   /** Type identifier for reasoning corrections metadata (Spec 19) */
   CORRECTIONS_TYPE: 'reasoning_corrections' as const,
 
+  // ============================================================================
+  // Unit-Bound Experiences (Sticky Experience Model)
+  // ============================================================================
+
+  /** Prefix for unit-bound experience storage keys */
+  UNIT_EXPERIENCE_PREFIX: 'unit_exp:' as const,
+
+  /** Type identifier for unit-bound experience metadata */
+  UNIT_EXPERIENCE_TYPE: 'unit_experience' as const,
+
+  /**
+   * Generate unit-bound experience storage key
+   *
+   * When experiences are absorbed into a learning unit, they are copied
+   * to unit-specific storage. This enables:
+   * - Per-unit ownership (deleting unit only deletes its copies)
+   * - Independence from global experience pool
+   * - Backwards-compatible (legacy units fall back to absorbedExperienceIds)
+   *
+   * @param unitId - Learning unit ID
+   * @param experienceId - Original experience ID
+   * @returns Storage key (e.g., "unit_exp:my-unit:exp-abc123")
+   */
+  getUnitExperienceKey: (unitId: string, experienceId: string): string => {
+    return `unit_exp:${unitId}:${experienceId}`;
+  },
+
+  /**
+   * Generate prefix for querying all experiences in a unit
+   * @param unitId - Learning unit ID
+   * @returns Key prefix for querying (e.g., "unit_exp:my-unit:")
+   */
+  getUnitExperiencePrefix: (unitId: string): string => {
+    return `unit_exp:${unitId}:`;
+  },
+
+  /**
+   * Parse a unit experience key to extract unit ID and experience ID
+   * @param key - Storage key (e.g., "unit_exp:my-unit:exp-abc123")
+   * @returns Object with unitId and experienceId, or null if not a valid key
+   */
+  parseUnitExperienceKey: (key: string): { unitId: string; experienceId: string } | null => {
+    const prefix = 'unit_exp:';
+    if (!key.startsWith(prefix)) {
+      return null;
+    }
+    const remainder = key.substring(prefix.length);
+    const colonIndex = remainder.indexOf(':');
+
+    if (colonIndex === -1) {
+      return null; // Invalid format - must have both unit and experience
+    }
+
+    return {
+      unitId: remainder.substring(0, colonIndex),
+      experienceId: remainder.substring(colonIndex + 1),
+    };
+  },
+
   /**
    * Generate few-shot storage key for a profile and learning unit
    * @param profileName - LLM profile name

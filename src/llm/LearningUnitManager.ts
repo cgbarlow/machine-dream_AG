@@ -17,6 +17,7 @@ import type {
   AbstractionHierarchy,
   SynthesizedAntiPattern,
   ReasoningCorrection,
+  LLMExperience,
 } from './types.js';
 import { DEFAULT_LEARNING_UNIT_ID } from './types.js';
 import { LLM_STORAGE_KEYS } from './storage-keys.js';
@@ -215,7 +216,53 @@ export class LearningUnitManager {
       'abstraction_hierarchy'
     );
 
+    // Delete anti-patterns (Spec 19)
+    const antiPatternsKey = LLM_STORAGE_KEYS.getAntiPatternsKey(this.profileName, id);
+    await this.agentMemory.reasoningBank.deleteMetadata(antiPatternsKey, LLM_STORAGE_KEYS.ANTIPATTERNS_TYPE);
+
+    // Delete reasoning corrections (Spec 19)
+    const correctionsKey = LLM_STORAGE_KEYS.getCorrectionsKey(this.profileName, id);
+    await this.agentMemory.reasoningBank.deleteMetadata(correctionsKey, LLM_STORAGE_KEYS.CORRECTIONS_TYPE);
+
+    // NEW: Delete unit-bound experiences (Sticky Experience Model)
+    await this.deleteUnitExperiences(id);
+
     return true;
+  }
+
+  /**
+   * Delete all unit-bound experiences for a learning unit (Sticky Experience Model)
+   *
+   * This only deletes unit-specific copies. Global experiences in llm_experience
+   * are NOT affected - they remain available for other units or future use.
+   *
+   * @param unitId - Learning unit ID
+   * @returns Number of experiences deleted
+   */
+  async deleteUnitExperiences(unitId: string): Promise<number> {
+    // Query all experiences bound to this unit
+    const unitExperiences = await this.agentMemory.reasoningBank.queryMetadata(
+      LLM_STORAGE_KEYS.UNIT_EXPERIENCE_TYPE,
+      { boundToUnit: unitId }
+    ) as any[];
+
+    let deletedCount = 0;
+    for (const exp of unitExperiences) {
+      try {
+        const key = LLM_STORAGE_KEYS.getUnitExperienceKey(unitId, exp.id);
+        const deleted = await this.agentMemory.reasoningBank.deleteMetadata(
+          key,
+          LLM_STORAGE_KEYS.UNIT_EXPERIENCE_TYPE
+        );
+        if (deleted) {
+          deletedCount++;
+        }
+      } catch {
+        // Continue on error
+      }
+    }
+
+    return deletedCount;
   }
 
   /**
@@ -468,15 +515,123 @@ export class LearningUnitManager {
   }
 
   /**
+   * Get all experiences bound to a learning unit (Sticky Experience Model)
+   *
+   * This method provides the new "sticky" experience retrieval:
+   * 1. First checks unit-specific storage (new model)
+   * 2. Falls back to loading from global storage via absorbedExperienceIds (legacy)
+   *
+   * This ensures backwards compatibility with existing data while supporting
+   * the new unit-bound experience model.
+   *
+   * @param unitId - Learning unit ID
+   * @returns Array of experiences (either unit-bound or from global storage)
+   */
+  async getUnitExperiences(unitId: string): Promise<LLMExperience[]> {
+    // Try new model first: query unit-specific storage
+    const unitExperiences = await this.agentMemory.reasoningBank.queryMetadata(
+      LLM_STORAGE_KEYS.UNIT_EXPERIENCE_TYPE,
+      { boundToUnit: unitId }
+    ) as LLMExperience[];
+
+    if (unitExperiences.length > 0) {
+      return unitExperiences;
+    }
+
+    // Fall back to legacy model: load from global storage via absorbedExperienceIds
+    const unit = await this.get(unitId);
+    if (!unit || unit.absorbedExperienceIds.length === 0) {
+      return [];
+    }
+
+    const legacyExperiences: LLMExperience[] = [];
+    for (const expId of unit.absorbedExperienceIds) {
+      try {
+        const exp = await this.agentMemory.reasoningBank.getMetadata(
+          expId,
+          LLM_STORAGE_KEYS.EXPERIENCE_TYPE
+        ) as LLMExperience | null;
+        if (exp) {
+          legacyExperiences.push(exp);
+        }
+      } catch {
+        // Experience no longer exists
+      }
+    }
+
+    return legacyExperiences;
+  }
+
+  /**
+   * Get count of unit-bound experiences (new model only)
+   *
+   * @param unitId - Learning unit ID
+   * @returns Count of unit-bound experiences, or 0 if using legacy model
+   */
+  async getUnitExperienceCount(unitId: string): Promise<number> {
+    const unitExperiences = await this.agentMemory.reasoningBank.queryMetadata(
+      LLM_STORAGE_KEYS.UNIT_EXPERIENCE_TYPE,
+      { boundToUnit: unitId }
+    ) as any[];
+    return unitExperiences.length;
+  }
+
+  /**
+   * Check if a unit has migrated to the new sticky experience model
+   *
+   * @param unitId - Learning unit ID
+   * @returns true if unit has unit-bound experiences (new model)
+   */
+  async isUsingNewExperienceModel(unitId: string): Promise<boolean> {
+    const count = await this.getUnitExperienceCount(unitId);
+    return count > 0;
+  }
+
+  /**
+   * Migrate a legacy unit to the new sticky experience model
+   *
+   * Copies all experiences from global storage to unit-specific storage.
+   * This is idempotent - running on an already-migrated unit does nothing.
+   *
+   * @param unitId - Learning unit ID
+   * @returns Number of experiences migrated, or 0 if already migrated
+   */
+  async migrateToNewExperienceModel(unitId: string): Promise<number> {
+    // Check if already migrated
+    if (await this.isUsingNewExperienceModel(unitId)) {
+      return 0;
+    }
+
+    const unit = await this.get(unitId);
+    if (!unit || unit.absorbedExperienceIds.length === 0) {
+      return 0;
+    }
+
+    // Copy experiences to unit-specific storage
+    await this.copyExperiencesByIdToUnit(unitId, unit.absorbedExperienceIds, unit.metadata.version);
+
+    return unit.absorbedExperienceIds.length;
+  }
+
+  /**
    * Mark experiences as absorbed by a learning unit
+   *
+   * NEW (Sticky Experience Model): Also creates unit-bound copies of the experiences
+   * in unit-specific storage. This allows:
+   * - Deleting a unit only deletes its copies
+   * - Unit experiences are independent from global pool
+   * - Backwards compatible (legacy data still works via absorbedExperienceIds)
+   *
    * @param unitId - Learning unit ID
    * @param experienceIds - Experience IDs to mark as absorbed
    * @param puzzleBreakdown - Breakdown of puzzle types absorbed
+   * @param experiences - Optional: Full experience objects to copy to unit storage
    */
   async markExperiencesAbsorbed(
     unitId: string,
     experienceIds: string[],
-    puzzleBreakdown?: Record<string, number>
+    puzzleBreakdown?: Record<string, number>,
+    experiences?: LLMExperience[]
   ): Promise<void> {
     let unit = await this.get(unitId);
     if (!unit) {
@@ -497,6 +652,19 @@ export class LearningUnitManager {
       }
     }
 
+    // NEW: Create unit-bound copies of experiences (Sticky Experience Model)
+    // After copying, delete the originals (experiences are "consumed" by the unit)
+    if (experiences && experiences.length > 0) {
+      await this.copyExperiencesToUnit(unitId, experiences, unit.metadata.version + 1);
+      // Delete original global experiences (1b: consumed after absorption)
+      await this.deleteGlobalExperiences(experiences.map(e => e.id));
+    } else if (newIds.length > 0) {
+      // Fallback: Load experiences from global storage and copy them
+      await this.copyExperiencesByIdToUnit(unitId, newIds, unit.metadata.version + 1);
+      // Delete original global experiences (1b: consumed after absorption)
+      await this.deleteGlobalExperiences(newIds);
+    }
+
     // Update unit
     const updatedUnit: LearningUnit = {
       ...unit,
@@ -512,6 +680,319 @@ export class LearningUnitManager {
     };
 
     await this.saveUnitMetadata(updatedUnit);
+  }
+
+  /**
+   * Copy experiences to unit-specific storage (Sticky Experience Model)
+   *
+   * Creates independent copies of experiences bound to this unit.
+   * These copies are deleted when the unit is deleted.
+   *
+   * @param unitId - Learning unit ID
+   * @param experiences - Full experience objects to copy
+   * @param unitVersion - Current unit version (for tracking)
+   */
+  private async copyExperiencesToUnit(
+    unitId: string,
+    experiences: LLMExperience[],
+    unitVersion: number
+  ): Promise<void> {
+    for (const exp of experiences) {
+      const key = LLM_STORAGE_KEYS.getUnitExperienceKey(unitId, exp.id);
+      await this.agentMemory.reasoningBank.storeMetadata(
+        key,
+        LLM_STORAGE_KEYS.UNIT_EXPERIENCE_TYPE,
+        {
+          ...exp,
+          // Add unit binding metadata
+          boundToUnit: unitId,
+          boundAt: new Date().toISOString(),
+          unitVersion,
+          // Ensure dates are serializable
+          timestamp: exp.timestamp instanceof Date ? exp.timestamp.toISOString() : exp.timestamp,
+        }
+      );
+    }
+  }
+
+  /**
+   * Copy experiences by ID to unit-specific storage
+   * Falls back to loading from global storage first
+   *
+   * @param unitId - Learning unit ID
+   * @param experienceIds - Experience IDs to copy
+   * @param unitVersion - Current unit version (for tracking)
+   */
+  private async copyExperiencesByIdToUnit(
+    unitId: string,
+    experienceIds: string[],
+    unitVersion: number
+  ): Promise<void> {
+    for (const expId of experienceIds) {
+      try {
+        // Load from global storage
+        const exp = await this.agentMemory.reasoningBank.getMetadata(
+          expId,
+          LLM_STORAGE_KEYS.EXPERIENCE_TYPE
+        ) as LLMExperience | null;
+
+        if (exp) {
+          const key = LLM_STORAGE_KEYS.getUnitExperienceKey(unitId, expId);
+          await this.agentMemory.reasoningBank.storeMetadata(
+            key,
+            LLM_STORAGE_KEYS.UNIT_EXPERIENCE_TYPE,
+            {
+              ...exp,
+              boundToUnit: unitId,
+              boundAt: new Date().toISOString(),
+              unitVersion,
+            }
+          );
+        }
+      } catch {
+        // Experience doesn't exist, skip
+      }
+    }
+  }
+
+  /**
+   * Delete global experiences after they've been absorbed (Sticky Experience Model)
+   *
+   * This implements decision 1b: experiences are "consumed" when absorbed into a unit.
+   * The unit-bound copy becomes the authoritative source; the global copy is deleted.
+   *
+   * @param experienceIds - Experience IDs to delete from global storage
+   * @returns Number of experiences deleted
+   */
+  private async deleteGlobalExperiences(experienceIds: string[]): Promise<number> {
+    let deletedCount = 0;
+    for (const expId of experienceIds) {
+      try {
+        const deleted = await this.agentMemory.reasoningBank.deleteMetadata(
+          expId,
+          LLM_STORAGE_KEYS.EXPERIENCE_TYPE
+        );
+        if (deleted) {
+          deletedCount++;
+        }
+      } catch {
+        // Continue on error
+      }
+    }
+    return deletedCount;
+  }
+
+  /**
+   * Sync learning unit metadata with actual database state
+   *
+   * This method recalculates metadata based on which absorbed experiences
+   * still exist in the database. Supports both:
+   * - New sticky model: checks unit-bound experiences (unit_experience type)
+   * - Legacy model: checks global experiences (llm_experience type)
+   *
+   * @param unitId - Learning unit ID to sync
+   * @returns Updated metadata counts, or null if unit not found
+   */
+  async syncMetadata(unitId: string): Promise<{
+    before: number;
+    after: number;
+    removed: number;
+    puzzleBreakdown: Record<string, number>;
+  } | null> {
+    const unit = await this.get(unitId);
+    if (!unit) {
+      return null;
+    }
+
+    const beforeCount = unit.absorbedExperienceIds.length;
+
+    // First, check if unit uses new sticky model (has unit-bound experiences)
+    const unitBoundExperiences = await this.agentMemory.reasoningBank.queryMetadata(
+      LLM_STORAGE_KEYS.UNIT_EXPERIENCE_TYPE,
+      { boundToUnit: unitId }
+    ) as any[];
+
+    let existingIds: string[] = [];
+    const newBreakdown: Record<string, number> = {};
+
+    if (unitBoundExperiences.length > 0) {
+      // New sticky model: count from unit-bound experiences
+      for (const exp of unitBoundExperiences) {
+        existingIds.push(exp.id);
+        const puzzleKey = exp.puzzleId || 'unknown';
+        const puzzleName = puzzleKey.replace(/_[^_]+$/, '');
+        newBreakdown[puzzleName] = (newBreakdown[puzzleName] || 0) + 1;
+      }
+    } else {
+      // Legacy model: check global experiences via absorbedExperienceIds
+      for (const expId of unit.absorbedExperienceIds) {
+        try {
+          const exp = await this.agentMemory.reasoningBank.getMetadata(
+            expId,
+            LLM_STORAGE_KEYS.EXPERIENCE_TYPE
+          ) as any;
+
+          if (exp) {
+            existingIds.push(expId);
+            const puzzleKey = exp.puzzleId || 'unknown';
+            const puzzleName = puzzleKey.replace(/_[^_]+$/, '');
+            newBreakdown[puzzleName] = (newBreakdown[puzzleName] || 0) + 1;
+          }
+        } catch {
+          // Experience no longer exists
+        }
+      }
+    }
+
+    const afterCount = existingIds.length;
+    const removedCount = beforeCount - afterCount;
+
+    // Only update if something changed
+    if (removedCount !== 0 || afterCount !== beforeCount) {
+      const updatedUnit: LearningUnit = {
+        ...unit,
+        absorbedExperienceIds: existingIds,
+        lastUpdatedAt: new Date(),
+        metadata: {
+          ...unit.metadata,
+          totalExperiences: afterCount,
+          puzzleBreakdown: newBreakdown,
+          version: unit.metadata.version + 1,
+        },
+      };
+
+      await this.saveUnitMetadata(updatedUnit);
+    }
+
+    return {
+      before: beforeCount,
+      after: afterCount,
+      removed: removedCount,
+      puzzleBreakdown: newBreakdown,
+    };
+  }
+
+  /**
+   * Sync metadata for all learning units in this profile
+   *
+   * @returns Summary of sync results
+   */
+  async syncAllMetadata(): Promise<{
+    unitsChecked: number;
+    unitsUpdated: number;
+    totalExperiencesRemoved: number;
+  }> {
+    // Query all units directly to avoid get() key mapping issues
+    const allUnits = await this.agentMemory.reasoningBank.queryMetadata(
+      LLM_STORAGE_KEYS.LEARNING_UNIT_TYPE,
+      {}
+    ) as any[];
+
+    const profileUnits = allUnits.filter(
+      (unit) => unit.profileName === this.profileName
+    );
+
+    let unitsUpdated = 0;
+    let totalRemoved = 0;
+
+    for (const unit of profileUnits) {
+      const result = await this.syncMetadataFromRaw(unit);
+      if (result && result.removed > 0) {
+        unitsUpdated++;
+        totalRemoved += result.removed;
+      }
+    }
+
+    return {
+      unitsChecked: profileUnits.length,
+      unitsUpdated,
+      totalExperiencesRemoved: totalRemoved,
+    };
+  }
+
+  /**
+   * Sync metadata from raw unit data (bypasses get() which can have key issues)
+   * Supports both sticky model (unit-bound) and legacy model (global experiences)
+   */
+  private async syncMetadataFromRaw(rawUnit: any): Promise<{
+    before: number;
+    after: number;
+    removed: number;
+  } | null> {
+    if (!rawUnit || !rawUnit.absorbedExperienceIds) {
+      return null;
+    }
+
+    const beforeCount = rawUnit.absorbedExperienceIds.length;
+    const unitId = rawUnit.id;
+
+    // First, check if unit uses new sticky model (has unit-bound experiences)
+    const unitBoundExperiences = await this.agentMemory.reasoningBank.queryMetadata(
+      LLM_STORAGE_KEYS.UNIT_EXPERIENCE_TYPE,
+      { boundToUnit: unitId }
+    ) as any[];
+
+    let existingIds: string[] = [];
+    const newBreakdown: Record<string, number> = {};
+
+    if (unitBoundExperiences.length > 0) {
+      // New sticky model: count from unit-bound experiences
+      for (const exp of unitBoundExperiences) {
+        existingIds.push(exp.id);
+        const puzzleKey = exp.puzzleId || 'unknown';
+        const puzzleName = puzzleKey.replace(/_[^_]+$/, '');
+        newBreakdown[puzzleName] = (newBreakdown[puzzleName] || 0) + 1;
+      }
+    } else {
+      // Legacy model: check global experiences via absorbedExperienceIds
+      for (const expId of rawUnit.absorbedExperienceIds) {
+        try {
+          const exp = await this.agentMemory.reasoningBank.getMetadata(
+            expId,
+            LLM_STORAGE_KEYS.EXPERIENCE_TYPE
+          ) as any;
+
+          if (exp) {
+            existingIds.push(expId);
+            const puzzleKey = exp.puzzleId || 'unknown';
+            const puzzleName = puzzleKey.replace(/_[^_]+$/, '');
+            newBreakdown[puzzleName] = (newBreakdown[puzzleName] || 0) + 1;
+          }
+        } catch {
+          // Experience no longer exists
+        }
+      }
+    }
+
+    const afterCount = existingIds.length;
+    const removedCount = beforeCount - afterCount;
+
+    // Only update if something changed
+    if (removedCount > 0) {
+      const key = LLM_STORAGE_KEYS.getLearningUnitKey(this.profileName, rawUnit.id);
+
+      await this.agentMemory.reasoningBank.storeMetadata(
+        key,
+        LLM_STORAGE_KEYS.LEARNING_UNIT_TYPE,
+        {
+          ...rawUnit,
+          absorbedExperienceIds: existingIds,
+          lastUpdatedAt: new Date().toISOString(),
+          metadata: {
+            ...rawUnit.metadata,
+            totalExperiences: afterCount,
+            puzzleBreakdown: newBreakdown,
+            version: (rawUnit.metadata?.version || 0) + 1,
+          },
+        }
+      );
+    }
+
+    return {
+      before: beforeCount,
+      after: afterCount,
+      removed: removedCount,
+    };
   }
 
   /**

@@ -136,19 +136,28 @@ export class DreamingConsolidator {
   /**
    * Calculate cluster target for the clustering algorithm
    *
-   * For doubled mode (higher strategy counts), we request MORE clusters
-   * than strategies to ensure diversity during selection.
+   * Scales cluster target with experience count to handle 10x runs:
+   * - Base target from fewShotMax
+   * - Scale with ~1 cluster per 25 experiences for large datasets
+   * - Apply 1.5x multiplier in doubled mode for diversity headroom
    *
-   * Standard mode: clusterTarget = fewShotMax
-   * Doubled mode (fewShotMax >= 10): clusterTarget = fewShotMax * 1.5
+   * @param experienceCount - Number of experiences to cluster
    */
-  private getClusterTarget(): number {
+  private getClusterTarget(experienceCount: number): number {
+    const baseTarget = this.consolidationOptions.fewShotMax;
+
+    // Scale with experience count: ~1 cluster per 25 experiences for large datasets
+    const experienceBasedTarget = Math.ceil(experienceCount / 25);
+
+    // Use whichever is larger to ensure good coverage at scale
+    const scaledTarget = Math.max(baseTarget, experienceBasedTarget);
+
+    // Apply 1.5x multiplier for diversity headroom in doubled mode
     const isDoubledMode = this.consolidationOptions.fewShotMax >= 10;
     if (isDoubledMode) {
-      // Request 50% more clusters than strategies for diversity
-      return Math.ceil(this.consolidationOptions.fewShotMax * 1.5);
+      return Math.ceil(scaledTarget * 1.5);
     }
-    return this.consolidationOptions.fewShotMax;
+    return scaledTarget;
   }
 
   /**
@@ -192,7 +201,7 @@ export class DreamingConsolidator {
     console.log(`   Successful: ${successful.length}, Invalid: ${invalid.length}, Wrong: ${wrong.length}`);
 
     // Phase 3: COMPRESSION - Cluster similar experiences
-    const clusterTarget = this.getClusterTarget();
+    const clusterTarget = this.getClusterTarget(successful.length);
     console.log(`🔍 Clustering ${successful.length} experiences with ${this.clusteringAlgorithm.getIdentifier()}...`);
     console.log(`   Cluster target: ${clusterTarget} (strategy selection: ${this.consolidationOptions.fewShotMin}-${this.consolidationOptions.fewShotMax})`);
     const clusterResult = await this.clusteringAlgorithm.cluster(
@@ -335,7 +344,7 @@ export class DreamingConsolidator {
     clusterName: string
   ): Promise<SynthesizedPattern | null> {
     // Build prompt with FULL reasoning for each experience
-    const experienceDescriptions = cluster.slice(0, 5).map((exp, i) => `
+    const experienceDescriptions = cluster.slice(0, this.consolidationOptions.fewShotMax).map((exp, i) => `
 ${i + 1}. Grid context: ${this.describeGridContext(exp.gridState, exp.move)}
    Your move: (${exp.move.row},${exp.move.col}) = ${exp.move.value}
 
@@ -1148,8 +1157,8 @@ Be concise. Each item should be a short phrase or sentence.`;
 
     } catch (error) {
       console.warn(`   ⚠️ LLM diversity selection failed:`, error);
-      // Fallback to first 3 patterns
-      return patterns.slice(0, 3).map((pattern) => this.patternToFewShot(pattern));
+      // Fallback to minimum patterns
+      return patterns.slice(0, this.consolidationOptions.fewShotMin).map((pattern) => this.patternToFewShot(pattern));
     }
   }
 
@@ -1277,7 +1286,11 @@ WHY_DIVERSE: Elimination approach rather than completion`;
       }
     }
 
-    return indices.slice(0, 5); // Max 5 strategies
+    const selected = indices.slice(0, this.consolidationOptions.fewShotMax);
+    if (selected.length < this.consolidationOptions.fewShotMin) {
+      console.warn(`   ⚠️ LLM selected only ${selected.length} strategies (min: ${this.consolidationOptions.fewShotMin})`);
+    }
+    return selected;
   }
 
   /**
@@ -1297,7 +1310,11 @@ WHY_DIVERSE: Elimination approach rather than completion`;
       }
     }
 
-    return indices.slice(0, 5); // Max 5 strategies
+    const selected = indices.slice(0, this.consolidationOptions.fewShotMax);
+    if (selected.length < this.consolidationOptions.fewShotMin) {
+      console.warn(`   ⚠️ LLM selected only ${selected.length} strategies (min: ${this.consolidationOptions.fewShotMin})`);
+    }
+    return selected;
   }
 
   /**
@@ -1437,7 +1454,7 @@ Identify at most 3 anti-patterns.`;
     experiences: LLMExperience[]
   ): Promise<SynthesizedAntiPattern | null> {
     // Format mistakes for prompt
-    const mistakes = experiences.slice(0, 5).map(exp => ({
+    const mistakes = experiences.slice(0, this.consolidationOptions.fewShotMax).map(exp => ({
       row: exp.move.row,
       col: exp.move.col,
       value: exp.move.value,
@@ -1459,7 +1476,7 @@ Identify at most 3 anti-patterns.`;
       userPrompt = this.aispBuilder.buildAISPLiteAntiPatternPrompt(errorType, mistakes);
     } else {
       // Standard mode - use natural language prompts
-      const examples = experiences.slice(0, 5).map((exp, i) => `
+      const examples = experiences.slice(0, this.consolidationOptions.fewShotMax).map((exp, i) => `
 ${i + 1}. Move (${exp.move.row},${exp.move.col})=${exp.move.value}
    Error: ${exp.validation.error}
    Your reasoning: ${exp.move.reasoning.substring(0, 300)}...`).join('\n');
@@ -1894,10 +1911,12 @@ CONFIDENCE: [0.0-1.0 how confident you are in this analysis]`;
     if (importantExperiences.length < 3) {
       console.log(`⚠️  Only ${importantExperiences.length} important experiences - need at least 3`);
       // Still mark them as absorbed even if not enough to synthesize
+      // Pass full experiences to enable sticky experience model (copies + deletes originals)
       await learningUnitManager.markExperiencesAbsorbed(
         learningUnitId,
         newExperiences.map((e) => e.id),
-        this.computePuzzleBreakdown(newExperiences)
+        this.computePuzzleBreakdown(newExperiences),
+        newExperiences  // Full experiences for unit-bound copies
       );
       return this.createEmptyReport();
     }
@@ -1909,7 +1928,7 @@ CONFIDENCE: [0.0-1.0 how confident you are in this analysis]`;
 
     console.log(`   ↳ Correct: ${successful.length}, Invalid: ${invalid.length}, Valid-but-wrong: ${validButWrong.length}`);
 
-    const clusterTarget = this.getClusterTarget();
+    const clusterTarget = this.getClusterTarget(successful.length);
     console.log(`🔍 Clustering ${successful.length} experiences with ${this.clusteringAlgorithm.getIdentifier()}...`);
     console.log(`   Cluster target: ${clusterTarget} (strategy selection: ${this.consolidationOptions.fewShotMin}-${this.consolidationOptions.fewShotMax})`);
 
@@ -2006,16 +2025,18 @@ CONFIDENCE: [0.0-1.0 how confident you are in this analysis]`;
       }
     }
 
-    // 6. Mark experiences as absorbed
+    // 6. Mark experiences as absorbed (copies to unit storage, deletes originals)
     const experienceIds = newExperiences.map((e) => e.id);
+    // Pass full experiences to enable sticky experience model (copies + deletes originals)
     await learningUnitManager.markExperiencesAbsorbed(
       learningUnitId,
       experienceIds,
-      this.computePuzzleBreakdown(newExperiences)
+      this.computePuzzleBreakdown(newExperiences),
+      newExperiences  // Full experiences for unit-bound copies
     );
 
-    // Also mark as consolidated in experience store
-    await this.experienceStore.markConsolidated(experienceIds);
+    // Note: markConsolidated is no longer needed since sticky experience model
+    // deletes global experiences after copying to unit storage (1b: consumed)
 
     console.log(`✅ Re-consolidation complete: absorbed ${experienceIds.length} experiences`);
 

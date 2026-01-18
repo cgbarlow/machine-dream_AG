@@ -86,6 +86,7 @@ TEST_NAME=$(jq -r '.testName // "A/B/X Test"' "$CONFIG")
 RUNS_PER_CONFIG=$(jq -r '.runsPerConfig // 5' "$CONFIG")
 PUZZLES=$(jq -r '.puzzles[]' "$CONFIG")
 NUM_CONFIGS=$(jq -r '.configurations | map(select(.name)) | length' "$CONFIG")
+NUM_PUZZLES=$(jq -r '.puzzles | length' "$CONFIG")
 
 # Set results directory
 if [[ -n "$RESUME_DIR" ]]; then
@@ -167,10 +168,10 @@ clear_current_run() {
 get_progress_stats() {
   if [[ -f "$PROGRESS_FILE" ]]; then
     local completed=$(jq '.completed | length' "$PROGRESS_FILE")
-    local total=$((NUM_CONFIGS * RUNS_PER_CONFIG))
+    local total=$((NUM_CONFIGS * NUM_PUZZLES * RUNS_PER_CONFIG))
     echo "$completed/$total"
   else
-    echo "0/$((NUM_CONFIGS * RUNS_PER_CONFIG))"
+    echo "0/$((NUM_CONFIGS * NUM_PUZZLES * RUNS_PER_CONFIG))"
   fi
 }
 

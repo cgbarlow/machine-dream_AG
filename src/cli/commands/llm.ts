@@ -1945,6 +1945,23 @@ export function registerLLMCommand(program: Command): void {
 
           logger.info(`✓ Deleted ${toDelete.length} unconsolidated experiences`);
           logger.info('   Consolidated experiences and few-shots preserved');
+
+          // Sync learning unit metadata to reflect deleted experiences
+          const affectedProfiles = new Set(toDelete.map(exp => exp.profileName || 'default'));
+          let totalUnitsUpdated = 0;
+          let totalExpRemoved = 0;
+
+          for (const profileName of affectedProfiles) {
+            const unitManager = new LearningUnitManager(agentMemory, profileName);
+            const syncResult = await unitManager.syncAllMetadata();
+            totalUnitsUpdated += syncResult.unitsUpdated;
+            totalExpRemoved += syncResult.totalExperiencesRemoved;
+          }
+
+          if (totalUnitsUpdated > 0) {
+            logger.info(`   Synced ${totalUnitsUpdated} learning unit(s) metadata (removed ${totalExpRemoved} stale references)`);
+          }
+
           return;
         }
 
@@ -2305,29 +2322,27 @@ export function registerLLMCommand(program: Command): void {
         const manager = new LLMProfileManager();
         const agentMemory = new AgentMemory(createDefaultMemoryConfig());
 
-        // If --rerun is specified, infer profile from the learning unit
+        // If --rerun is specified without --profile, try to infer profile from the learning unit
         let inferredProfile: string | null = null;
-        if (options.rerun) {
+        if (options.rerun && !options.profile) {
           // Extract profile name from unit ID (e.g., "gpt-oss-120b_standard_llmclusterv1_20260113_1" → "gpt-oss-120b")
           // Pattern: {profile}_{mode}_{algo}v{version}_{date}_{N}[_2x]
           const parts = options.rerun.split('_');
-          if (parts.length < 5) {
-            throw new CLIError(`Invalid learning unit ID format: ${options.rerun}`, 1);
-          }
-
-          // Profile is everything before the first mode keyword (standard, aisp, aisp-full)
-          const modeKeywords = ['standard', 'aisp', 'aisp-full'];
-          let profileParts: string[] = [];
-          for (const part of parts) {
-            if (modeKeywords.includes(part) || modeKeywords.some(k => part.startsWith(k))) {
-              break;
+          if (parts.length >= 5) {
+            // Profile is everything before the first mode keyword (standard, aisp, aisp-full)
+            const modeKeywords = ['standard', 'aisp', 'aisp-full'];
+            let profileParts: string[] = [];
+            for (const part of parts) {
+              if (modeKeywords.includes(part) || modeKeywords.some(k => part.startsWith(k))) {
+                break;
+              }
+              profileParts.push(part);
             }
-            profileParts.push(part);
+            inferredProfile = profileParts.join('_');
           }
-          inferredProfile = profileParts.join('_');
 
           if (!inferredProfile) {
-            throw new CLIError(`Cannot infer profile from learning unit ID: ${options.rerun}`, 1);
+            throw new CLIError(`Cannot infer profile from learning unit ID: ${options.rerun}. Use --profile to specify explicitly.`, 1);
           }
 
           logger.info(`📦 Inferred profile from learning unit: ${inferredProfile}\n`);
@@ -3588,6 +3603,57 @@ export function registerLLMCommand(program: Command): void {
         }
       } catch (error) {
         throw new CLIError('Failed to delete learning unit', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm learning sync
+  learning
+    .command('sync')
+    .description('Sync learning unit metadata with actual database state')
+    .argument('[id]', 'Learning unit ID (or "all" for all units)')
+    .option('--profile <name>', 'LLM profile (default: active profile)')
+    .action(async (id, options) => {
+      try {
+        const profileManager = new LLMProfileManager();
+        const agentMemory = new AgentMemory(createDefaultMemoryConfig());
+
+        const profileName = options.profile || profileManager.getActive()?.name;
+        if (!profileName) {
+          throw new CLIError('No active profile. Use --profile or set an active profile.', 1);
+        }
+
+        const unitManager = new LearningUnitManager(agentMemory, profileName);
+
+        if (!id || id === 'all') {
+          // Sync all learning units
+          logger.info(`🔄 Syncing all learning units for profile: ${profileName}`);
+          const result = await unitManager.syncAllMetadata();
+          logger.info(`   Checked ${result.unitsChecked} unit(s)`);
+          if (result.unitsUpdated > 0) {
+            logger.info(`   Updated ${result.unitsUpdated} unit(s)`);
+            logger.info(`   Removed ${result.totalExperiencesRemoved} stale experience references`);
+          } else {
+            logger.info(`   All metadata is up to date`);
+          }
+        } else {
+          // Sync specific unit
+          logger.info(`🔄 Syncing learning unit: ${id}`);
+          const result = await unitManager.syncMetadata(id);
+          if (!result) {
+            throw new CLIError(`Learning unit not found: ${id}`, 1);
+          }
+          if (result.removed > 0) {
+            logger.info(`   Before: ${result.before} experiences`);
+            logger.info(`   After: ${result.after} experiences`);
+            logger.info(`   Removed ${result.removed} stale references`);
+            logger.info(`   Puzzle breakdown updated`);
+          } else {
+            logger.info(`   Metadata is up to date (${result.after} experiences)`);
+          }
+        }
+        logger.info(`\n✅ Sync complete`);
+      } catch (error) {
+        throw new CLIError('Failed to sync learning unit', 1, error instanceof Error ? error.message : String(error));
       }
     });
 

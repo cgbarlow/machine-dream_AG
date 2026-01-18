@@ -18,6 +18,7 @@ export * from './DeepClusterV1.js';
 export * from './DeepClusterV2.js';
 export * from './LLMClusterV1.js';
 export * from './LLMClusterV2.js';
+export * from './LLMClusterV3.js';
 
 import { AlgorithmRegistry } from './AlgorithmRegistry.js';
 import { FastClusterV2 } from './FastClusterV2.js';
@@ -26,6 +27,7 @@ import { DeepClusterV1 } from './DeepClusterV1.js';
 import { DeepClusterV2 } from './DeepClusterV2.js';
 import { LLMClusterV1, type LLMClusterConfig } from './LLMClusterV1.js';
 import { LLMClusterV2, type LLMClusterV2Config } from './LLMClusterV2.js';
+import { LLMClusterV3 } from './LLMClusterV3.js';
 import type { LMStudioClient } from '../LMStudioClient.js';
 import type { ValidatedLLMClient } from '../ValidatedLLMClient.js';
 
@@ -56,6 +58,7 @@ export interface AlgorithmRegistryOptions {
  * - DeepCluster v2 - Two-phase with AISP semantic prompts (ADR-013)
  * - LLMCluster v1 - Fully LLM-driven pattern identification
  * - LLMCluster v2 - Enhanced LLM-driven with mutual exclusivity, self-critique, and AISP support
+ * - LLMCluster v3 - Scale-aware pattern diversity with 1-indexed prompts and breadth checking
  *
  * @param llmClient - Optional LLM client for LLM-based algorithms
  * @param silent - Suppress console output (default: false)
@@ -100,8 +103,11 @@ export function initializeAlgorithmRegistry(
     if (validatedClient) {
       const deepClusterV2 = new DeepClusterV2(validatedClient);
       const llmClusterV2 = new LLMClusterV2(validatedClient);
+      const llmClusterV3 = new LLMClusterV3(validatedClient);
       registry.register(deepClusterV2);
       registry.register(llmClusterV2);
+      registry.register(llmClusterV3);
+      if (!silent) console.log(`✅ Registered llmclusterv3`);
     }
   }
 

@@ -1640,6 +1640,63 @@ The `friendlyName` is generated from the strategy name or cluster name:
       Reasoning: ...
 ```
 
+### 8.6 Sticky Experience Model (ADR-016, Added 2026-01-18)
+
+Experiences follow a "sticky" lifecycle when absorbed into learning units:
+
+#### Experience Lifecycle
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│ 1. Play Session → Experience stored as llm_experience          │
+│    (unconsolidated, global pool)                                │
+├────────────────────────────────────────────────────────────────┤
+│ 2. Dreaming/Consolidation → Experience COPIED to unit storage  │
+│    - Creates: unit_exp:{unitId}:{expId}                         │
+│    - DELETES original from global pool (consumed)               │
+├────────────────────────────────────────────────────────────────┤
+│ 3. Unit-bound experience is now OWNED by the learning unit     │
+│    - Survives session deletion                                  │
+│    - Deleted only when unit is deleted                          │
+└────────────────────────────────────────────────────────────────┘
+```
+
+#### Key Behaviors
+
+| Decision | Behavior |
+|----------|----------|
+| **1b** | Original experience is **deleted** after absorption (consumed) |
+| **2a** | Session deletion removes unconsolidated experiences |
+| **2b** | Session deletion **retains** unit-bound copies |
+| **3a** | `--rerun` re-analyzes existing unit experiences only |
+
+#### Storage Types
+
+```typescript
+// Global pool (pre-absorption)
+type: 'llm_experience'
+key: experienceId
+
+// Unit-bound (post-absorption)
+type: 'unit_experience'
+key: `unit_exp:${unitId}:${experienceId}`
+data: { ...experience, boundToUnit, boundAt, unitVersion }
+```
+
+#### Benefits
+
+- **Clear ownership**: Each unit owns its experience copies
+- **Clean deletion**: Deleting a unit deletes only its copies
+- **No interference**: Units cannot affect each other's experiences
+- **Consistent metadata**: Unit experience count = actual stored copies
+
+#### Backwards Compatibility
+
+Legacy units (pre-ADR-016) continue to work:
+- `getUnitExperiences()` checks unit-bound storage first
+- Falls back to `absorbedExperienceIds` + global lookup
+- `migrateToNewExperienceModel()` migrates legacy units on demand
+
 ---
 
 ## 9. Algorithm Versioning System
