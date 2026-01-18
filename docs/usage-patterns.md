@@ -87,22 +87,22 @@ machine-dream llm dream run --profile gpt-oss-120b --exclude-algorithms deepclus
 | Mode | Flag | Validation | Use Case |
 |------|------|------------|----------|
 | **Standard** | (none) | None | Default, natural language |
-| **AISP-Lite** | `--aisp` | Prompts only | Structured prompts, natural responses |
+| **AISP-Lite** | `--aisp-lite` | Prompts only | Structured prompts, natural responses |
 | **AISP-Full** | `--aisp-full` | Prompts + responses | Full protocol compliance |
 
-### AISP-Lite Mode (`--aisp`)
+### AISP-Lite Mode (`--aisp-lite`)
 
 Validates prompts use AISP syntax; responses can be natural language:
 
 ```bash
 # Play with AISP-validated prompts
-machine-dream llm play puzzles/9x9-easy.json --aisp
+machine-dream llm play puzzles/9x9-easy.json --aisp-lite
 
 # Dream with AISP prompts
-machine-dream llm dream run --profile gpt-oss-120b --aisp
+machine-dream llm dream run --profile gpt-oss-120b --aisp-lite
 
 # Learning unit naming includes mode
-# Creates: gpt-oss-120b_aisp_fastclusterv3_20260119_1
+# Creates: gpt-oss-120b_aisp-lite_fastclusterv3_20260119_1
 ```
 
 ### AISP-Full Mode (`--aisp-full`)
