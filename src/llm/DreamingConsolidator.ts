@@ -776,15 +776,26 @@ IMPORTANT: Do NOT give this pattern a name. Focus on situation and action.`;
       );
 
       // Parse based on mode with fallback
+      let hierarchy: AbstractionHierarchy;
       if (this.aispMode === 'aisp-full') {
-        const hierarchy = this.parseAISPHierarchyResponse(result.content, patterns.length, profileName);
-        if (hierarchy.levels.length > 0) return hierarchy;
-        // Fallback to English parsing
-        return this.parseHierarchyResponse(result.content, patterns.length, profileName);
+        hierarchy = this.parseAISPHierarchyResponse(result.content, patterns.length, profileName);
+        if (hierarchy.levels.length === 0) {
+          // Fallback to English parsing
+          hierarchy = this.parseHierarchyResponse(result.content, patterns.length, profileName);
+        }
+      } else {
+        hierarchy = this.parseHierarchyResponse(result.content, patterns.length, profileName);
       }
-      return this.parseHierarchyResponse(result.content, patterns.length, profileName);
+
+      // If parsing still failed, create basic hierarchy from patterns
+      if (hierarchy.levels.length === 0) {
+        console.log(`   ⚠️  Hierarchy parsing failed, creating basic hierarchy`);
+        return this.createBasicHierarchy(patterns, profileName);
+      }
+      return hierarchy;
     } catch (error) {
       // Return a basic hierarchy if LLM fails
+      console.log(`   ⚠️  Hierarchy LLM call failed, creating basic hierarchy`);
       return this.createBasicHierarchy(patterns, profileName);
     }
   }
