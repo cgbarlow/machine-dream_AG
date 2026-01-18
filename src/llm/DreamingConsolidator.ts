@@ -2195,6 +2195,44 @@ CONFIDENCE: [0.0-1.0 how confident you are in this analysis]`;
 
     console.log(`✅ Synthesized ${sharedPatterns.length} SHARED patterns for both units`);
 
+    // Secondary refinement: If not enough patterns for 2x mode, split largest clusters
+    const minPatternsFor2x = DOUBLED_CONSOLIDATION_COUNTS.fewShotMin;
+    if (sharedPatterns.length < minPatternsFor2x && sharedPatterns.length > 0) {
+      console.log(`\n⚠️  Only ${sharedPatterns.length} patterns, need ${minPatternsFor2x} for 2x mode`);
+      console.log(`🔄 Secondary refinement: splitting largest clusters...`);
+
+      // Find clusters that could be split (sorted by size, descending)
+      const sortedClusters = Array.from(clusters.entries())
+        .filter(([_, exps]) => exps.length >= 4) // Need at least 4 to split into 2 clusters of 2
+        .sort((a, b) => b[1].length - a[1].length);
+
+      const patternsNeeded = minPatternsFor2x - sharedPatterns.length;
+      let additionalPatterns = 0;
+
+      for (const [clusterName, clusterExps] of sortedClusters) {
+        if (additionalPatterns >= patternsNeeded) break;
+
+        console.log(`   🔍 Splitting "${clusterName}" (${clusterExps.length} experiences)...`);
+        try {
+          const subPatterns = await this.splitClusterIntoSubPatterns(clusterExps, clusterName);
+          if (subPatterns.length > 1) {
+            // Replace original pattern with sub-patterns
+            const originalIndex = sharedPatterns.findIndex(p => p.strategyName?.includes(clusterName.substring(0, 20)));
+            if (originalIndex >= 0) {
+              sharedPatterns.splice(originalIndex, 1);
+            }
+            sharedPatterns.push(...subPatterns);
+            additionalPatterns += subPatterns.length - 1; // Net gain
+            console.log(`   ✅ Split into ${subPatterns.length} sub-patterns`);
+          }
+        } catch (error) {
+          console.warn(`   ⚠️  Failed to split cluster:`, error);
+        }
+      }
+
+      console.log(`✅ After secondary refinement: ${sharedPatterns.length} SHARED patterns`);
+    }
+
     if (sharedPatterns.length === 0) {
       console.log(`⚠️  No valid patterns synthesized - cannot create learning units`);
       // Mark experiences as absorbed anyway
@@ -2484,6 +2522,202 @@ MERGED_STRATEGIES:
     }
 
     return breakdown;
+  }
+
+  /**
+   * Split a large cluster into sub-patterns for secondary refinement
+   *
+   * Used when initial clustering produces fewer patterns than needed for 2x mode.
+   * Asks LLM to identify 2-3 distinct sub-patterns within the cluster, then
+   * categorizes experiences and synthesizes a pattern for each sub-cluster.
+   *
+   * @param experiences - The cluster experiences to split
+   * @param clusterName - Original cluster name
+   * @returns Array of synthesized patterns (2-3 patterns if successful)
+   */
+  private async splitClusterIntoSubPatterns(
+    experiences: LLMExperience[],
+    clusterName: string
+  ): Promise<SynthesizedPattern[]> {
+    // Need at least 4 experiences to split into 2 meaningful clusters
+    if (experiences.length < 4) {
+      return [];
+    }
+
+    // Sample experiences for LLM analysis (max 10 for efficiency)
+    const sampleSize = Math.min(experiences.length, 10);
+    const sampledExps = experiences.slice(0, sampleSize);
+
+    // Build experience descriptions for analysis
+    const experienceDescriptions = sampledExps.map((exp, i) => `
+${i + 1}. Move: (${exp.move.row},${exp.move.col}) = ${exp.move.value}
+   Reasoning: ${exp.move.reasoning.substring(0, 200)}${exp.move.reasoning.length > 200 ? '...' : ''}
+`).join('\n');
+
+    // Ask LLM to identify sub-patterns
+    const systemPrompt = `You are analyzing Sudoku solving experiences to identify distinct sub-patterns within a cluster.
+Your task is to identify 2-3 DISTINCT reasoning approaches within the given experiences.
+Each sub-pattern should represent a meaningfully different way of approaching the same general strategy.`;
+
+    const userPrompt = `The following ${sampledExps.length} experiences are from a cluster called "${clusterName}".
+Identify 2-3 DISTINCT sub-patterns based on the reasoning differences.
+
+Experiences:
+${experienceDescriptions}
+
+For each sub-pattern, provide:
+1. A short name (2-4 words)
+2. A brief description of what makes it distinct
+3. Which experience numbers (1-${sampledExps.length}) belong to this sub-pattern
+
+Format your response as:
+SUB-PATTERN 1: [Name]
+Description: [What makes it distinct]
+Experiences: [comma-separated numbers]
+
+SUB-PATTERN 2: [Name]
+Description: [What makes it distinct]
+Experiences: [comma-separated numbers]
+
+SUB-PATTERN 3: [Name] (optional)
+Description: [What makes it distinct]
+Experiences: [comma-separated numbers]`;
+
+    try {
+      const result = await this.llmClient.chat(
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        {
+          validatePrompt: false,
+          validateResponse: false,
+          context: 'secondary-refinement',
+        }
+      );
+
+      // Parse sub-pattern assignments
+      const subPatternAssignments = this.parseSubPatternResponse(
+        result.content,
+        clusterName,
+        sampledExps.length
+      );
+
+      if (subPatternAssignments.length < 2) {
+        console.log(`   ⚠️  LLM found fewer than 2 sub-patterns`);
+        return [];
+      }
+
+      // Create sub-clusters based on LLM assignments
+      // For experiences not in sample, assign to sub-pattern based on similarity
+      const subClusters: Map<string, LLMExperience[]> = new Map();
+
+      // Initialize sub-clusters
+      for (const sp of subPatternAssignments) {
+        subClusters.set(sp.name, []);
+      }
+
+      // Assign sampled experiences based on LLM categorization
+      for (const sp of subPatternAssignments) {
+        for (const expIdx of sp.experienceIndices) {
+          if (expIdx >= 0 && expIdx < sampledExps.length) {
+            subClusters.get(sp.name)!.push(sampledExps[expIdx]);
+          }
+        }
+      }
+
+      // Assign remaining experiences (not in sample) to sub-patterns
+      // Use simple keyword matching based on sub-pattern descriptions
+      const remainingExps = experiences.slice(sampleSize);
+      for (const exp of remainingExps) {
+        const reasoning = exp.move.reasoning.toLowerCase();
+        let bestMatch = subPatternAssignments[0].name;
+        let bestScore = 0;
+
+        for (const sp of subPatternAssignments) {
+          // Simple keyword scoring based on description
+          const keywords = sp.description.toLowerCase().split(/\s+/);
+          const score = keywords.filter(kw => reasoning.includes(kw)).length;
+          if (score > bestScore) {
+            bestScore = score;
+            bestMatch = sp.name;
+          }
+        }
+
+        subClusters.get(bestMatch)!.push(exp);
+      }
+
+      // Filter out sub-clusters that are too small (< 2 experiences)
+      const validSubClusters = Array.from(subClusters.entries())
+        .filter(([_, exps]) => exps.length >= 2);
+
+      if (validSubClusters.length < 2) {
+        console.log(`   ⚠️  Only ${validSubClusters.length} valid sub-clusters after filtering`);
+        return [];
+      }
+
+      // Synthesize pattern for each sub-cluster
+      const subPatterns: SynthesizedPattern[] = [];
+      for (const [subName, subExps] of validSubClusters) {
+        console.log(`      📝 Synthesizing sub-pattern "${subName}" (${subExps.length} experiences)...`);
+        const pattern = await this.synthesizePattern(subExps, `${clusterName}/${subName}`);
+        if (pattern) {
+          subPatterns.push(pattern);
+        }
+      }
+
+      return subPatterns;
+    } catch (error) {
+      console.warn(`   ⚠️  Failed to identify sub-patterns:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Parse LLM response for sub-pattern identification
+   */
+  private parseSubPatternResponse(
+    response: string,
+    _clusterName: string,
+    sampleSize: number
+  ): Array<{ name: string; description: string; experienceIndices: number[] }> {
+    const subPatterns: Array<{ name: string; description: string; experienceIndices: number[] }> = [];
+
+    // Match SUB-PATTERN blocks
+    const patternMatches = response.matchAll(/SUB-PATTERN\s*\d+:\s*(.+?)(?=\n)/gi);
+
+    for (const match of patternMatches) {
+      const name = match[1].trim();
+
+      // Find the description line after this pattern
+      const descMatch = response
+        .substring(match.index || 0)
+        .match(/Description:\s*(.+?)(?=\n)/i);
+      const description = descMatch ? descMatch[1].trim() : name;
+
+      // Find the experiences line
+      const expMatch = response
+        .substring(match.index || 0)
+        .match(/Experiences:\s*(.+?)(?=\n|SUB-PATTERN|$)/i);
+
+      let experienceIndices: number[] = [];
+      if (expMatch) {
+        // Parse comma-separated numbers or ranges
+        const expStr = expMatch[1].trim();
+        const numbers = expStr.match(/\d+/g);
+        if (numbers) {
+          experienceIndices = numbers
+            .map(n => parseInt(n, 10) - 1) // Convert to 0-indexed
+            .filter(n => n >= 0 && n < sampleSize);
+        }
+      }
+
+      if (name && experienceIndices.length > 0) {
+        subPatterns.push({ name, description, experienceIndices });
+      }
+    }
+
+    return subPatterns;
   }
 
   /**

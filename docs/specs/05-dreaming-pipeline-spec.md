@@ -1783,6 +1783,115 @@ npx machine-dream llm dream run --algorithm llmclusterv3 --learning-unit final-u
 
 Alternatively, use `llm learning unconsolidate` to restore experiences from a unit back to the global pool.
 
+### 8.6.2 Secondary Refinement for 2x Mode (Added 2026-01-19)
+
+When creating dual learning units (standard + 2x), the system uses **shared clustering** where clustering runs once with doubled targets, and both units select from the same pattern pool. However, if the initial clustering produces fewer patterns than needed for 2x mode (minimum 6), secondary refinement automatically splits large clusters.
+
+#### Problem Statement
+
+In some cases, experiences are highly homogeneous and cluster into very few patterns:
+
+```
+1. 360 experiences cluster into only 5 patterns
+2. Standard unit (3-5 strategies): Works fine
+3. 2x unit (6-10 strategies): FAILS - only 5 patterns available
+```
+
+#### Solution: Secondary Refinement
+
+When `sharedPatterns.length < 6` (minimum for 2x mode), the system:
+
+1. **Identifies splittable clusters**: Finds clusters with ≥4 experiences (enough to split into 2 sub-clusters of 2)
+2. **Asks LLM to find sub-patterns**: Samples up to 10 experiences, asks LLM to identify 2-3 distinct reasoning approaches
+3. **Categorizes experiences**: Assigns remaining experiences to sub-patterns via keyword matching
+4. **Synthesizes sub-patterns**: Creates new patterns for each valid sub-cluster (≥2 experiences)
+
+#### Configuration
+
+The system uses two thresholds:
+
+| Threshold | Default | Purpose |
+|-----------|---------|---------|
+| `dominanceThreshold` | 0.4 (40%) | Triggers initial refinement if any cluster exceeds this % |
+| `minPatternsFor2x` | 6 | Minimum patterns needed for 2x mode; triggers secondary refinement if not met |
+
+#### Workflow
+
+```
+Shared Clustering (target: 23 clusters)
+         │
+         ▼
+LLM Categorization: 360 experiences → 5 patterns
+         │
+         ├── If patterns ≥ 6: Proceed to dual unit creation
+         │
+         └── If patterns < 6: Secondary Refinement
+                   │
+                   ▼
+              Split largest clusters:
+              1. "only_candidate" (174 exp) → 2-3 sub-patterns
+              2. "constraint_reasoning" (95 exp) → 2-3 sub-patterns
+                   │
+                   ▼
+              New pattern pool: 7-9 patterns
+                   │
+                   ▼
+              Dual Unit Creation:
+              - Standard: Select 3-5 strategies
+              - 2x: Select 6-10 strategies
+```
+
+#### Implementation
+
+```typescript
+// In DreamingConsolidator.consolidateDual():
+const minPatternsFor2x = DOUBLED_CONSOLIDATION_COUNTS.fewShotMin; // 6
+
+if (sharedPatterns.length < minPatternsFor2x && sharedPatterns.length > 0) {
+  console.log(`⚠️  Only ${sharedPatterns.length} patterns, need ${minPatternsFor2x} for 2x mode`);
+  console.log(`🔄 Secondary refinement: splitting largest clusters...`);
+
+  const sortedClusters = Array.from(clusters.entries())
+    .filter(([_, exps]) => exps.length >= 4)
+    .sort((a, b) => b[1].length - a[1].length);
+
+  for (const [clusterName, clusterExps] of sortedClusters) {
+    if (sharedPatterns.length >= minPatternsFor2x) break;
+
+    const subPatterns = await this.splitClusterIntoSubPatterns(clusterExps, clusterName);
+    if (subPatterns.length > 1) {
+      // Replace original pattern with sub-patterns
+      const originalIndex = sharedPatterns.findIndex(p =>
+        p.strategyName.includes(clusterName.substring(0, 20)));
+      if (originalIndex >= 0) {
+        sharedPatterns.splice(originalIndex, 1);
+      }
+      sharedPatterns.push(...subPatterns);
+    }
+  }
+}
+```
+
+#### Sub-Pattern Identification
+
+The `splitClusterIntoSubPatterns()` method:
+
+1. **Samples experiences**: Takes up to 10 experiences for LLM analysis
+2. **LLM analysis prompt**: Asks LLM to identify 2-3 distinct reasoning approaches with:
+   - Short name (2-4 words)
+   - Description of what makes it distinct
+   - Which sampled experiences belong to each sub-pattern
+3. **Categorizes remaining**: Uses keyword matching from descriptions to assign non-sampled experiences
+4. **Synthesizes**: Calls `synthesizePattern()` for each valid sub-cluster
+
+#### Expected Outcomes
+
+| Scenario | Initial Patterns | After Secondary Refinement | Result |
+|----------|------------------|---------------------------|--------|
+| Highly homogeneous | 3-5 | 6-8 | 2x mode now possible |
+| Moderately diverse | 6-10 | (unchanged) | No refinement needed |
+| Highly diverse | 10+ | (unchanged) | No refinement needed |
+
 ---
 
 ## 9. Algorithm Versioning System
