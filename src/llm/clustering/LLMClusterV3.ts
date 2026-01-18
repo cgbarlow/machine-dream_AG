@@ -74,7 +74,7 @@ export interface LLMClusterV3Config {
   parallelBatches: number;     // Default: 3 - Number of concurrent batch requests
   enableSelfCritique: boolean; // Default: true - LLM reviews patterns before categorization
   enableRefinement: boolean;   // Default: true - Two-pass refinement for dominant clusters
-  dominanceThreshold: number;  // Default: 0.5 - Threshold for dominant cluster refinement
+  dominanceThreshold: number;  // Default: 0.4 - Threshold for dominant cluster refinement (40%)
 }
 
 const DEFAULT_CONFIG: LLMClusterV3Config = {
@@ -82,7 +82,7 @@ const DEFAULT_CONFIG: LLMClusterV3Config = {
   parallelBatches: 3,
   enableSelfCritique: true,
   enableRefinement: true,
-  dominanceThreshold: 0.5,
+  dominanceThreshold: 0.4,  // Lowered from 0.5 to trigger refinement earlier (supports 2x mode)
 };
 
 /**
