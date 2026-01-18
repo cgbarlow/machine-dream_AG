@@ -84,33 +84,45 @@ machine-dream llm dream run --profile gpt-oss-120b --exclude-algorithms deepclus
 
 ### Mode Overview
 
-| Mode | Flag | Validation | Use Case |
-|------|------|------------|----------|
-| **Standard** | (none) | None | Default, natural language |
-| **AISP-Lite** | `--aisp-lite` | Prompts only | Structured prompts, natural responses |
-| **AISP-Full** | `--aisp-full` | Prompts + responses | Full protocol compliance |
+| Mode | Flag | Prompts | Output | Best For |
+|------|------|---------|--------|----------|
+| **Standard** | (none) | Natural language | Natural language | Default |
+| **AISP** | `--aisp` | Pure AISP | Normal text | General use |
+| **AISP-Lite** | `--aisp-lite` | Minimal AISP (5 blocks) | Normal text | Smaller models |
+| **AISP-Full** | `--aisp-full` | Pure AISP + Gen Spec | Pure AISP | Capable models |
+
+### AISP Mode (`--aisp`)
+
+Sends pure AISP-formatted prompts; model responds in normal text format (ROW/COL/VALUE):
+
+```bash
+# Play with AISP prompts
+machine-dream llm play puzzles/9x9-easy.json --aisp
+
+# Dream with AISP prompts
+machine-dream llm dream run --profile gpt-oss-120b --aisp
+
+# Learning unit naming includes mode
+# Creates: gpt-oss-120b_aisp_fastclusterv3_20260119_1
+```
 
 ### AISP-Lite Mode (`--aisp-lite`)
 
-Validates prompts use AISP syntax; responses can be natural language:
+Simplified AISP format using only 5 required blocks (`⟦Ω⟧`, `⟦Σ⟧`, `⟦Λ⟧`, `⟦Ε⟧`). Better for smaller/weaker models that struggle with full AISP syntax:
 
 ```bash
-# Play with AISP-validated prompts
+# Play with minimal AISP prompts
 machine-dream llm play puzzles/9x9-easy.json --aisp-lite
 
-# Dream with AISP prompts
-machine-dream llm dream run --profile gpt-oss-120b --aisp-lite
-
-# Learning unit naming includes mode
-# Creates: gpt-oss-120b_aisp-lite_fastclusterv3_20260119_1
+# Target tier: Bronze (δ≥0.20) vs Silver (δ≥0.40) for --aisp
 ```
 
 ### AISP-Full Mode (`--aisp-full`)
 
-Validates both prompts AND responses; triggers critique workflow on low scores:
+Full AISP mode with Generation Spec included. Model outputs entirely in AISP syntax. Validates both prompts AND responses; triggers critique workflow on low scores:
 
 ```bash
-# Play with full AISP validation
+# Play with full AISP (prompts + responses)
 machine-dream llm play puzzles/9x9-easy.json --aisp-full
 
 # Dream with full validation
@@ -118,18 +130,20 @@ machine-dream llm dream run --profile gpt-oss-120b --aisp-full
 
 # Learning unit naming includes mode
 # Creates: gpt-oss-120b_aisp-full_fastclusterv3_20260119_1
+
+# Strategies stored in AISP-encoded format
 ```
 
 ### Validation Tiers
 
-AISP responses are scored and tiered:
+AISP responses are scored by density (δ) and tiered:
 
 | Tier | Score (δ) | Behavior |
 |------|-----------|----------|
 | Platinum | δ ≥ 0.75 | Accepted |
 | Gold | δ ≥ 0.60 | Accepted |
-| Silver | δ ≥ 0.40 | Accepted with warning |
-| Bronze | δ ≥ 0.20 | Accepted with warning |
+| Silver | δ ≥ 0.40 | Accepted (target for `--aisp`) |
+| Bronze | δ ≥ 0.20 | Accepted with warning (target for `--aisp-lite`) |
 | Reject | δ < 0.20 | Triggers critique workflow |
 
 ### Session Mode Tracking
@@ -166,13 +180,17 @@ Compare performance between modes:
 machine-dream llm play puzzles/9x9-easy.json --profile gpt-oss-120b
 # ... repeat for N runs
 
+# Generate AISP experiences
+machine-dream llm play puzzles/9x9-easy.json --profile gpt-oss-120b --aisp
+# ... repeat for N runs
+
 # Generate AISP-full experiences
 machine-dream llm play puzzles/9x9-easy.json --profile gpt-oss-120b --aisp-full
 # ... repeat for N runs
 
 # Dream creates separate units by mode
 machine-dream llm dream run --profile gpt-oss-120b
-# Creates: gpt-oss-120b_standard_... and gpt-oss-120b_aisp-full_...
+# Creates: gpt-oss-120b_standard_..., gpt-oss-120b_aisp_..., gpt-oss-120b_aisp-full_...
 
 # Compare in ABX tests
 ./scripts/abx-test.sh scripts/abx-configs/standard-vs-aisp.json
