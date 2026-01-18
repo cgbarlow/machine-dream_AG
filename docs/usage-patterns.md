@@ -288,7 +288,9 @@ machine-dream llm dream run \
 
 ## A/B Testing Workflows
 
-### Create 4 Units from Same Experiences
+### Create 4 Units from Same Experiences (Fixed Unit Names)
+
+When you need **specific learning unit names** (e.g., for reproducible experiments or to overwrite existing units), use explicit `--learning-unit` flags with `--preserve-experiences`:
 
 Create standard and 2x units for two algorithms from the same 372 experiences:
 
