@@ -44,13 +44,14 @@ machine-dream llm play --profile gpt-oss-120b --dream puzzles/9x9-easy.json
 
 ## Multi-Algorithm Dreaming
 
-### Default: All Algorithms
+### Default: Latest Version of Each Algorithm
 
-By default, `dream run` uses all registered algorithms (fastclusterv2, fastclusterv3, llmclusterv3):
+By default, `dream run` uses the latest version of each algorithm family (fastclusterv3, llmclusterv3):
 
 ```bash
 machine-dream llm dream run --profile gpt-oss-120b
-# Creates 6 learning units (3 algorithms × 2 modes each)
+# Creates 4 learning units (2 algorithms × 2 modes each)
+# Note: deepcluster is excluded by default; use --exclude-algorithms none to include
 ```
 
 ### Specific Algorithm
