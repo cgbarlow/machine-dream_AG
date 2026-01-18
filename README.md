@@ -219,6 +219,7 @@ See [scripts/SCRIPTS.md](scripts/SCRIPTS.md) for complete documentation.
 | Document | Description |
 |----------|-------------|
 | [User Guide](docs/USER_GUIDE.md) | Complete usage and configuration |
+| [Usage Patterns](docs/usage-patterns.md) | Common workflows and advanced patterns |
 | [CLI Reference](docs/cli-reference.md) | All commands and options |
 | [Specifications](docs/specs/) | 19 formal specifications |
 | [ADRs](docs/adr/) | 13 architecture decision records |
