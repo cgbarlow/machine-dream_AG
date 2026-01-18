@@ -1,0 +1,244 @@
+{
+  "testName": "Baseline Comparison - GPT-OSS-120B Learning Units (Multi-Model)",
+  "runsPerConfig": 3,
+  "puzzles": [
+    "puzzles/batch/9x9-easy/9x9-easy-011.json",
+    "puzzles/batch/9x9-easy/9x9-easy-012.json",
+    "puzzles/batch/9x9-easy/9x9-easy-013.json"
+  ],
+  "_comment_learning_units": {
+    "aisp-full_baseline": "gpt-oss-120b-aisp-full-10run-baseline_20260118_1",
+    "aisp-full_baseline_2x": "gpt-oss-120b-aisp-full-10run-baseline_20260118_1-2x",
+    "standard_baseline": "gpt-oss-120b-standard-10run-baseline_20260118_1",
+    "standard_baseline_2x": "gpt-oss-120b-standard-10run-baseline_20260118_1-2x",
+    "_note": "All learning units generated from 10 puzzle runs with gpt-oss-120b"
+  },
+  "_comment_profiles": [
+    "gpt-oss-120b = GPT-OSS 120B (source of learning units)",
+    "qwen3-coder = qwen3-coder-30b-a3b-instruct",
+    "deepseek-r1 = deepseek-r1-distill-qwen-32b"
+  ],
+  "_comment_test_matrix": {
+    "models": 3,
+    "configs_per_model": 9,
+    "breakdown": {
+      "aisp-full_with_learning": 2,
+      "aisp-lite_with_aisp-full_units": 2,
+      "standard_with_learning": 2,
+      "no_learning_baselines": 3
+    },
+    "total_configs": 27,
+    "puzzles": 3,
+    "runs_per_config": 3,
+    "total_runs": 243
+  },
+  "configurations": [
+    {
+      "_section": "========== GPT-OSS-120B (9 configs) =========="
+    },
+    {
+      "_subsection": "--- no-learning baselines (3 configs) ---"
+    },
+    {
+      "name": "gpt-oss-120b_standard_no-learning",
+      "profile": "gpt-oss-120b",
+      "learningUnit": null,
+      "options": []
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_no-learning",
+      "profile": "gpt-oss-120b",
+      "learningUnit": null,
+      "options": ["--aisp-lite"]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_no-learning",
+      "profile": "gpt-oss-120b",
+      "learningUnit": null,
+      "options": ["--aisp-full"]
+    },
+    {
+      "_subsection": "--- aisp-full mode with learning (2 configs) ---"
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_10run-baseline",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b-aisp-full-10run-baseline_20260118_1",
+      "options": ["--aisp-full"]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_10run-baseline-2x",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b-aisp-full-10run-baseline_20260118_1-2x",
+      "options": ["--aisp-full"]
+    },
+    {
+      "_subsection": "--- aisp-lite mode with aisp-full units (2 configs) ---"
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_10run-baseline",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b-aisp-full-10run-baseline_20260118_1",
+      "options": ["--aisp-lite"]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_10run-baseline-2x",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b-aisp-full-10run-baseline_20260118_1-2x",
+      "options": ["--aisp-lite"]
+    },
+    {
+      "_subsection": "--- standard mode with learning (2 configs) ---"
+    },
+    {
+      "name": "gpt-oss-120b_standard_10run-baseline",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b-standard-10run-baseline_20260118_1",
+      "options": []
+    },
+    {
+      "name": "gpt-oss-120b_standard_10run-baseline-2x",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b-standard-10run-baseline_20260118_1-2x",
+      "options": []
+    },
+    {
+      "_section": "========== QWEN3-CODER (9 configs) =========="
+    },
+    {
+      "_subsection": "--- no-learning baselines (3 configs) ---"
+    },
+    {
+      "name": "qwen3-coder_standard_no-learning",
+      "profile": "qwen3-coder",
+      "learningUnit": null,
+      "options": []
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_no-learning",
+      "profile": "qwen3-coder",
+      "learningUnit": null,
+      "options": ["--aisp-lite"]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_no-learning",
+      "profile": "qwen3-coder",
+      "learningUnit": null,
+      "options": ["--aisp-full"]
+    },
+    {
+      "_subsection": "--- aisp-full mode with learning (2 configs) ---"
+    },
+    {
+      "name": "qwen3-coder_aisp-full_10run-baseline",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b-aisp-full-10run-baseline_20260118_1",
+      "options": ["--aisp-full"]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_10run-baseline-2x",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b-aisp-full-10run-baseline_20260118_1-2x",
+      "options": ["--aisp-full"]
+    },
+    {
+      "_subsection": "--- aisp-lite mode with aisp-full units (2 configs) ---"
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_10run-baseline",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b-aisp-full-10run-baseline_20260118_1",
+      "options": ["--aisp-lite"]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_10run-baseline-2x",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b-aisp-full-10run-baseline_20260118_1-2x",
+      "options": ["--aisp-lite"]
+    },
+    {
+      "_subsection": "--- standard mode with learning (2 configs) ---"
+    },
+    {
+      "name": "qwen3-coder_standard_10run-baseline",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b-standard-10run-baseline_20260118_1",
+      "options": []
+    },
+    {
+      "name": "qwen3-coder_standard_10run-baseline-2x",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b-standard-10run-baseline_20260118_1-2x",
+      "options": []
+    },
+    {
+      "_section": "========== DEEPSEEK-R1 (9 configs) =========="
+    },
+    {
+      "_subsection": "--- no-learning baselines (3 configs) ---"
+    },
+    {
+      "name": "deepseek-r1_standard_no-learning",
+      "profile": "deepseek-r1",
+      "learningUnit": null,
+      "options": []
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_no-learning",
+      "profile": "deepseek-r1",
+      "learningUnit": null,
+      "options": ["--aisp-lite"]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_no-learning",
+      "profile": "deepseek-r1",
+      "learningUnit": null,
+      "options": ["--aisp-full"]
+    },
+    {
+      "_subsection": "--- aisp-full mode with learning (2 configs) ---"
+    },
+    {
+      "name": "deepseek-r1_aisp-full_10run-baseline",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b-aisp-full-10run-baseline_20260118_1",
+      "options": ["--aisp-full"]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_10run-baseline-2x",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b-aisp-full-10run-baseline_20260118_1-2x",
+      "options": ["--aisp-full"]
+    },
+    {
+      "_subsection": "--- aisp-lite mode with aisp-full units (2 configs) ---"
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_10run-baseline",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b-aisp-full-10run-baseline_20260118_1",
+      "options": ["--aisp-lite"]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_10run-baseline-2x",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b-aisp-full-10run-baseline_20260118_1-2x",
+      "options": ["--aisp-lite"]
+    },
+    {
+      "_subsection": "--- standard mode with learning (2 configs) ---"
+    },
+    {
+      "name": "deepseek-r1_standard_10run-baseline",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b-standard-10run-baseline_20260118_1",
+      "options": []
+    },
+    {
+      "name": "deepseek-r1_standard_10run-baseline-2x",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b-standard-10run-baseline_20260118_1-2x",
+      "options": []
+    }
+  ]
+}

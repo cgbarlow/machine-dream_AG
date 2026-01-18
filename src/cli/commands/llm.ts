@@ -2291,6 +2291,7 @@ export function registerLLMCommand(program: Command): void {
     .option('--no-dual-unit', 'Create only single learning unit (default: creates BOTH standard AND -2x)')
     .option('--algorithm <name>', 'Clustering algorithm: fastcluster, deepcluster, llmcluster')
     .option('--algorithms <list>', 'Comma-separated list (default: all latest versions)')
+    .option('--exclude-algorithms <list>', 'Comma-separated algorithms to exclude (default: deepcluster; use "none" to include all)')
     .option('--debug', 'Show detailed debug output including LLM responses and pattern parsing')
     .option('--output <file>', 'Save consolidation report')
     // Spec 18 Section 3.3.4: LLMCluster performance options
@@ -2429,6 +2430,26 @@ export function registerLLMCommand(program: Command): void {
             logger.info(`🔧 Using all algorithms (${algorithmsToUse.length}): ${algorithmsToUse.map(a => a.getIdentifier()).join(', ')}`);
           }
 
+          // Filter out excluded algorithms (--exclude-algorithms option)
+          // Default: exclude deepcluster algorithms (slow, often redundant with llmcluster)
+          const excludeAlgorithmsValue = options.excludeAlgorithms ?? 'deepcluster';
+          if (excludeAlgorithmsValue && excludeAlgorithmsValue.toLowerCase() !== 'none') {
+            const excludeList = excludeAlgorithmsValue.split(',').map((s: string) => s.trim().toLowerCase());
+            const beforeCount = algorithmsToUse.length;
+            algorithmsToUse = algorithmsToUse.filter((algo: any) => {
+              const identifier = algo.getIdentifier().toLowerCase();
+              const name = algo.getName().toLowerCase();
+              const excluded = excludeList.some((ex: string) =>
+                identifier.includes(ex) || name.includes(ex)
+              );
+              return !excluded;
+            });
+            if (algorithmsToUse.length < beforeCount) {
+              logger.info(`🚫 Excluded ${beforeCount - algorithmsToUse.length} algorithm(s): ${excludeList.join(', ')}`);
+              logger.info(`📋 Remaining algorithms: ${algorithmsToUse.map((a: any) => a.getIdentifier()).join(', ')}`);
+            }
+          }
+
           if (algorithmsToUse.length === 0) {
             throw new CLIError('No algorithms available', 1);
           }
@@ -2454,6 +2475,9 @@ export function registerLLMCommand(program: Command): void {
             }
             logger.info(`   Reset ${resetCount} experiences to unconsolidated`);
           }
+
+          // Track experience IDs for --rerun isolation (BUGFIX)
+          let rerunExperienceIds: string[] | null = null;
 
           // Handle --rerun: re-run consolidation with experiences from existing unit
           if (options.rerun) {
@@ -2521,6 +2545,9 @@ export function registerLLMCommand(program: Command): void {
               resetCount++;
             }
             logger.info(`   ✓ Marked ${resetCount} experiences as unconsolidated\n`);
+
+            // Store the IDs that were reset for filtering later (--rerun isolation)
+            rerunExperienceIds = existingUnit.absorbedExperienceIds;
           }
 
           // Get learning unit manager and existing units (shared)
@@ -2529,8 +2556,21 @@ export function registerLLMCommand(program: Command): void {
           const existingUnits = existingUnitsList.map(u => u.id);
 
           // Get unconsolidated experiences (same for all algorithms)
-          const before = await experienceStore.getUnconsolidated(profileName);
-          logger.info(`📦 Found ${before.length} unconsolidated experiences`);
+          let before = await experienceStore.getUnconsolidated(profileName);
+
+          // BUGFIX: When --rerun is specified, only use the specified unit's experiences
+          // This prevents other unconsolidated experiences from being included
+          if (rerunExperienceIds && rerunExperienceIds.length > 0) {
+            const beforeCount = before.length;
+            before = before.filter((exp: LLMExperience) => rerunExperienceIds!.includes(exp.id));
+            if (before.length < beforeCount) {
+              logger.info(`📦 Found ${before.length} experiences from specified unit (filtered from ${beforeCount} total unconsolidated)`);
+            } else {
+              logger.info(`📦 Found ${before.length} unconsolidated experiences`);
+            }
+          } else {
+            logger.info(`📦 Found ${before.length} unconsolidated experiences`);
+          }
 
           if (before.length === 0) {
             logger.info('💤 No experiences to consolidate');
@@ -2607,7 +2647,7 @@ export function registerLLMCommand(program: Command): void {
           if (options.dualUnit !== false) {
             // DUAL MODE (DEFAULT): Create both standard and -2x learning units
             logger.info(`🔄 Dual unit mode: creating "${learningUnitId}" AND "${learningUnitId}${DOUBLE_STRATEGY_SUFFIX}"`);
-            const dualResult = await consolidator.consolidateDual(unitManager, learningUnitId, profileName);
+            const dualResult = await consolidator.consolidateDual(unitManager, learningUnitId, profileName, rerunExperienceIds ?? undefined);
 
             // Show dual results
             logger.info(`\n✅ Dual Dream Cycle Complete`);
@@ -2629,7 +2669,7 @@ export function registerLLMCommand(program: Command): void {
             report = dualResult as any;
           } else if (options.learningUnit) {
             // Use reConsolidate for iterative learning on a specific unit
-            report = await consolidator.reConsolidate(unitManager, learningUnitId, profileName);
+            report = await consolidator.reConsolidate(unitManager, learningUnitId, profileName, rerunExperienceIds ?? undefined);
 
             // Show results
             logger.info(`\n✅ Dream Cycle Complete`);

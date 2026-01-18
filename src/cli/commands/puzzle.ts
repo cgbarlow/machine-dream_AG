@@ -121,7 +121,8 @@ export function registerPuzzleCommand(program: Command): void {
     .option('--symmetry <type>', 'Symmetry: none|rotational|reflectional|diagonal (default: none)', 'none')
     .option('--no-validate', 'Skip uniqueness validation (faster)')
     .option('--output-dir <dir>', 'Output directory for puzzles (default: puzzles/batch/)', 'puzzles/batch/')
-    .option('--format <format>', 'Filename format: {seed}|{index}|{difficulty} (default: {index})', '{index}')
+    .option('--format <format>', 'Filename format: {size}|{difficulty}|{seed}|{index} (default: {size}-{difficulty}-{index})', '{size}-{difficulty}-{index}')
+    .option('--no-solution', 'Exclude solution from output files')
     .action(async (options) => {
       const { outputFormat: outputFormat2 } = getCommandConfig(puzzleCommand);
 
@@ -146,14 +147,17 @@ export function registerPuzzleCommand(program: Command): void {
         // Create output directory
         await fs.mkdir(options.outputDir, { recursive: true });
 
+        // Find the highest existing file index to avoid overwriting
+        const startIndex = await findNextFileIndex(options.outputDir, options.format, puzzles[0]);
+
         // Save each puzzle
         const savedFiles: string[] = [];
         for (let i = 0; i < puzzles.length; i++) {
           const puzzle = puzzles[i];
-          const filename = generateFilename(i + 1, puzzle, options.format);
+          const filename = generateFilename(startIndex + i, puzzle, options.format);
           const filepath = path.join(options.outputDir, filename);
 
-          await savePuzzleToFile(puzzle, filepath, false);
+          await savePuzzleToFile(puzzle, filepath, options.solution !== false);
           savedFiles.push(filepath);
 
           // Progress indicator
@@ -380,6 +384,45 @@ function generateFilename(index: number, puzzle: GeneratedPuzzle, template: stri
   }
 
   return filename;
+}
+
+/**
+ * Find the next available file index in a directory
+ * Scans existing files to find the highest index and returns the next one
+ */
+async function findNextFileIndex(
+  outputDir: string,
+  template: string,
+  samplePuzzle: GeneratedPuzzle
+): Promise<number> {
+  try {
+    const files = await fs.readdir(outputDir);
+
+    // Build a pattern to match the template (replace {index} with a capture group)
+    const basePattern = template
+      .replace('{index}', '(\\d+)')
+      .replace('{seed}', '\\d+')
+      .replace('{difficulty}', samplePuzzle.targetDifficulty)
+      .replace('{size}', `${samplePuzzle.size}x${samplePuzzle.size}`);
+
+    const regex = new RegExp(`^${basePattern}\\.json$`);
+
+    let maxIndex = 0;
+    for (const file of files) {
+      const match = file.match(regex);
+      if (match && match[1]) {
+        const index = parseInt(match[1], 10);
+        if (index > maxIndex) {
+          maxIndex = index;
+        }
+      }
+    }
+
+    return maxIndex + 1;
+  } catch {
+    // Directory doesn't exist or can't be read - start from 1
+    return 1;
+  }
 }
 
 /**

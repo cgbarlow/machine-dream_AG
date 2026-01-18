@@ -1,0 +1,24 @@
+{
+  "testName": "GPT-OSS-120B Standard Mode Baseline (No Learning)",
+  "runsPerConfig": 1,
+  "puzzles": [
+    "puzzles/batch/9x9-easy/9x9-easy-001.json",
+    "puzzles/batch/9x9-easy/9x9-easy-002.json",
+    "puzzles/batch/9x9-easy/9x9-easy-003.json",
+    "puzzles/batch/9x9-easy/9x9-easy-004.json",
+    "puzzles/batch/9x9-easy/9x9-easy-005.json",
+    "puzzles/batch/9x9-easy/9x9-easy-006.json",
+    "puzzles/batch/9x9-easy/9x9-easy-007.json",
+    "puzzles/batch/9x9-easy/9x9-easy-008.json",
+    "puzzles/batch/9x9-easy/9x9-easy-009.json",
+    "puzzles/batch/9x9-easy/9x9-easy-010.json"
+  ],
+  "configurations": [
+    {
+      "name": "gpt-oss-120b_standard_no-learning",
+      "profile": "gpt-oss-120b",
+      "learningUnit": null,
+      "options": []
+    }
+  ]
+}

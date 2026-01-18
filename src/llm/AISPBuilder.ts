@@ -724,4 +724,146 @@ ${this.getAISPGenerationSpec()}
     // Default: quote a snippet
     return `"${analysis.substring(0, 60)}..."`;
   }
+
+  // ============================================================================
+  // AISP Anti-Pattern Synthesis (Spec 19 + Spec 16)
+  // ============================================================================
+
+  /**
+   * Build AISP-compliant system prompt for anti-pattern synthesis
+   *
+   * Used during dreaming when --aisp or --aisp-full mode is enabled.
+   * Instructs the model to analyze mistakes and output in AISP format.
+   */
+  buildAISPAntiPatternSystemPrompt(): string {
+    const date = new Date().toISOString().split('T')[0];
+
+    return `𝔸1.0.sudoku.antipattern@${date}
+γ≔sudoku.failure.analysis
+ρ≔⟨analysis,synthesis,prevention⟩
+
+⟦Ω:Task⟧{
+  goal≜analyze(mistakes)→synthesize(anti_patterns)
+  ∀output:syntax∈AISP
+  ∀anti_pattern:format∈⟦Λ:AntiPattern⟧
+}
+
+⟦Σ:AntiPatternFormat⟧{
+  ;; Anti-pattern encoding structure
+  AntiPattern≜⟦Λ:AntiPattern.Name⟧{
+    avoid≜mistake_pattern
+    why≜failure_cause
+    prevent≜⟨step1;step2;step3⟩
+    freq≔occurrence_count
+  }
+}
+
+⟦Ε:Output⟧{
+  ;; Output anti-patterns in AISP format
+  ∀anti_pattern:encode(AISP)
+  format≔ANTI_PATTERN_NAME|AVOID|WHY|PREVENT
+  ¬prose; ¬verbose_explanation
+}`;
+  }
+
+  /**
+   * Build AISP-compliant prompt for anti-pattern synthesis
+   *
+   * Formats the invalid moves and instructs the model to synthesize
+   * anti-patterns in AISP-compliant format.
+   *
+   * @param errorType - The category of error being analyzed
+   * @param mistakes - Array of mistake descriptions
+   */
+  buildAISPAntiPatternPrompt(
+    errorType: string,
+    mistakes: Array<{ row: number; col: number; value: number; error: string; reasoning: string }>
+  ): string {
+    const date = new Date().toISOString().split('T')[0];
+    const errorTypeFormatted = errorType.replace(/_/g, '.');
+
+    const lines: string[] = [];
+
+    // Header
+    lines.push(`𝔸1.0.antipattern.${errorTypeFormatted}@${date}`);
+    lines.push(`γ≔sudoku.failure.${errorTypeFormatted}`);
+    lines.push('');
+
+    // Input: Mistakes
+    lines.push('⟦Σ:Mistakes⟧{');
+    lines.push(`  error_type≔"${errorType.replace(/_/g, ' ')}"`);
+    lines.push(`  count≔${mistakes.length}`);
+    lines.push('  instances≔⟨');
+    for (let i = 0; i < Math.min(mistakes.length, 5); i++) {
+      const m = mistakes[i];
+      lines.push(`    m${i + 1}≔{cell:(${m.row},${m.col});val:${m.value};err:"${this.truncate(m.error, 50)}";why:"${this.truncate(m.reasoning, 100)}"}`);
+    }
+    lines.push('  ⟩');
+    lines.push('}');
+    lines.push('');
+
+    // Task
+    lines.push('⟦Ω:Task⟧{');
+    lines.push('  analyze(mistakes)→synthesize(anti_pattern)');
+    lines.push('  identify≜common_mistake_pattern');
+    lines.push('  explain≜root_cause');
+    lines.push('  prevent≜actionable_steps');
+    lines.push('}');
+    lines.push('');
+
+    // Required output format
+    lines.push('⟦Ε:Output⟧{');
+    lines.push('  ;; REQUIRED: Respond with anti-pattern in this exact format');
+    lines.push('  ANTI_PATTERN_NAME: ⟨short_name_2_4_words⟩');
+    lines.push('  AVOID: ⟨mistake_pattern_description⟩');
+    lines.push('  WHY: ⟨root_cause_explanation⟩');
+    lines.push('  PREVENT_1: ⟨first_prevention_step⟩');
+    lines.push('  PREVENT_2: ⟨second_prevention_step⟩');
+    lines.push('  PREVENT_3: ⟨optional_third_step⟩');
+    lines.push('}');
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Build AISP-lite anti-pattern prompt (simplified format)
+   *
+   * Uses minimal AISP syntax suitable for smaller models.
+   */
+  buildAISPLiteAntiPatternPrompt(
+    errorType: string,
+    mistakes: Array<{ row: number; col: number; value: number; error: string; reasoning: string }>
+  ): string {
+    const lines: string[] = [];
+
+    // Simplified header
+    lines.push(`𝔸1.0.antipattern-lite`);
+    lines.push(`γ≔${errorType}`);
+    lines.push('');
+
+    // Mistakes in simple format
+    lines.push('⟦Σ:Mistakes⟧{');
+    for (let i = 0; i < Math.min(mistakes.length, 5); i++) {
+      const m = mistakes[i];
+      lines.push(`  m${i + 1}≔(${m.row},${m.col},${m.value}):"${this.truncate(m.error, 40)}"`);
+    }
+    lines.push('}');
+    lines.push('');
+
+    // Task and output combined
+    lines.push('⟦Ε:Task⟧{');
+    lines.push('  analyze→synthesize anti_pattern');
+    lines.push('  output≔ANTI_PATTERN_NAME|AVOID|WHY|PREVENT_1|PREVENT_2');
+    lines.push('}');
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Truncate string to max length
+   */
+  private truncate(str: string, maxLen: number): string {
+    if (str.length <= maxLen) return str.replace(/"/g, "'");
+    return str.substring(0, maxLen - 3).replace(/"/g, "'") + '...';
+  }
 }

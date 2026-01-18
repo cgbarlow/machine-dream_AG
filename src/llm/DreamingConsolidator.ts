@@ -1304,6 +1304,8 @@ WHY_DIVERSE: Elimination approach rather than completion`;
    * LLM-driven anti-pattern synthesis from invalid moves
    *
    * Spec 11: Negative Example Learning (2026-01-09)
+   * Spec 16: AISP-compliant prompts when aisp modes enabled
+   *
    * The LLM analyzes its mistakes and synthesizes anti-patterns.
    * Returns free-text summary that can be included in insights.
    */
@@ -1314,12 +1316,32 @@ WHY_DIVERSE: Elimination approach rather than completion`;
 
     console.log(`🔍 Asking LLM to analyze ${invalid.length} mistakes and identify anti-patterns...`);
 
-    const mistakesList = invalid.slice(0, 20).map((exp, i) => `
+    let systemPrompt: string;
+    let userPrompt: string;
+
+    if (this.aispMode !== 'off') {
+      // Use AISP-compliant prompts when any aisp mode is enabled
+      const mistakes = invalid.slice(0, 20).map(exp => ({
+        row: exp.move.row,
+        col: exp.move.col,
+        value: exp.move.value,
+        error: exp.validation.error || '',
+        reasoning: exp.move.reasoning,
+      }));
+
+      systemPrompt = this.aispBuilder.buildAISPAntiPatternSystemPrompt();
+      userPrompt = this.aispMode === 'aisp-full'
+        ? this.aispBuilder.buildAISPAntiPatternPrompt('general_analysis', mistakes)
+        : this.aispBuilder.buildAISPLiteAntiPatternPrompt('general_analysis', mistakes);
+    } else {
+      // Standard mode - use natural language prompts
+      const mistakesList = invalid.slice(0, 20).map((exp, i) => `
 ${i + 1}. Move (${exp.move.row},${exp.move.col})=${exp.move.value}
    Error: ${exp.validation.error}
    Your reasoning: ${exp.move.reasoning.substring(0, 200)}...`).join('\n');
 
-    const prompt = `You made ${invalid.length} invalid moves during Sudoku solving.
+      systemPrompt = 'You are analyzing your Sudoku solving mistakes to identify patterns of errors.';
+      userPrompt = `You made ${invalid.length} invalid moves during Sudoku solving.
 
 Your mistakes:
 ${mistakesList}
@@ -1333,18 +1355,16 @@ For each anti-pattern you identify, explain:
 
 Focus on the most common/impactful mistakes. Synthesize patterns, don't just list individual errors.
 Identify at most 3 anti-patterns.`;
+    }
 
     try {
       const result = await this.llmClient.chat(
         [
-          {
-            role: 'system',
-            content: 'You are analyzing your Sudoku solving mistakes to identify patterns of errors.',
-          },
-          { role: 'user', content: prompt },
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
         ],
         {
-          validatePrompt: this.aispMode !== 'off', // NL stripped before validation
+          validatePrompt: this.aispMode !== 'off',
           validateResponse: this.aispMode === 'aisp-full',
           context: 'anti-pattern-analysis',
         }
@@ -1408,17 +1428,44 @@ Identify at most 3 anti-patterns.`;
 
   /**
    * Synthesize a single anti-pattern from a cluster of similar errors
+   *
+   * When AISP modes are enabled (--aisp, --aisp-lite, --aisp-full), uses
+   * AISP-compliant prompts per Spec 16 + Spec 19.
    */
   private async synthesizeSingleAntiPattern(
     errorType: string,
     experiences: LLMExperience[]
   ): Promise<SynthesizedAntiPattern | null> {
-    const examples = experiences.slice(0, 5).map((exp, i) => `
+    // Format mistakes for prompt
+    const mistakes = experiences.slice(0, 5).map(exp => ({
+      row: exp.move.row,
+      col: exp.move.col,
+      value: exp.move.value,
+      error: exp.validation.error || '',
+      reasoning: exp.move.reasoning,
+    }));
+
+    let systemPrompt: string;
+    let userPrompt: string;
+
+    // Use AISP-compliant prompts when aisp modes are enabled
+    if (this.aispMode === 'aisp-full') {
+      // Full AISP mode - use full AISP prompt format
+      systemPrompt = this.aispBuilder.buildAISPAntiPatternSystemPrompt();
+      userPrompt = this.aispBuilder.buildAISPAntiPatternPrompt(errorType, mistakes);
+    } else if (this.aispMode === 'aisp') {
+      // AISP-lite mode - use simplified AISP prompt format
+      systemPrompt = this.aispBuilder.buildAISPAntiPatternSystemPrompt();
+      userPrompt = this.aispBuilder.buildAISPLiteAntiPatternPrompt(errorType, mistakes);
+    } else {
+      // Standard mode - use natural language prompts
+      const examples = experiences.slice(0, 5).map((exp, i) => `
 ${i + 1}. Move (${exp.move.row},${exp.move.col})=${exp.move.value}
    Error: ${exp.validation.error}
    Your reasoning: ${exp.move.reasoning.substring(0, 300)}...`).join('\n');
 
-    const prompt = `You made ${experiences.length} invalid moves that violated the ${errorType.replace(/_/g, ' ')} rule.
+      systemPrompt = 'You are analyzing your Sudoku solving mistakes to identify and prevent error patterns.';
+      userPrompt = `You made ${experiences.length} invalid moves that violated the ${errorType.replace(/_/g, ' ')} rule.
 
 Examples:
 ${examples}
@@ -1432,17 +1479,15 @@ WHY_IT_FAILS: [explain the root cause in 1-2 sentences]
 PREVENTION_STEP_1: [specific action to avoid this]
 PREVENTION_STEP_2: [another preventive action]
 PREVENTION_STEP_3: [optional third step]`;
+    }
 
     const result = await this.llmClient.chat(
       [
-        {
-          role: 'system',
-          content: 'You are analyzing your Sudoku solving mistakes to identify and prevent error patterns.',
-        },
-        { role: 'user', content: prompt },
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
       ],
       {
-        validatePrompt: this.aispMode !== 'off', // NL stripped before validation
+        validatePrompt: this.aispMode !== 'off',
         validateResponse: this.aispMode === 'aisp-full',
         context: 'anti-pattern-synthesis',
       }
@@ -1460,6 +1505,10 @@ PREVENTION_STEP_3: [optional third step]`;
 
   /**
    * Parse LLM response into a SynthesizedAntiPattern
+   *
+   * Supports both NL format and AISP format:
+   * - NL: WHAT_GOES_WRONG, WHY_IT_FAILS, PREVENTION_STEP_1/2/3
+   * - AISP: AVOID, WHY, PREVENT_1/2/3
    */
   private parseAntiPatternResponse(
     response: string,
@@ -1469,14 +1518,37 @@ PREVENTION_STEP_3: [optional third step]`;
     const cleanResponse = response.replace(/\*\*/g, '');
 
     const nameMatch = cleanResponse.match(/ANTI_PATTERN_NAME:\s*(.+?)(?=\n|$)/i);
-    const whatMatch = cleanResponse.match(/WHAT_GOES_WRONG:\s*(.+?)(?=\n\s*[A-Z_]+:|$)/is);
-    const whyMatch = cleanResponse.match(/WHY_IT_FAILS:\s*(.+?)(?=\n\s*[A-Z_]+:|$)/is);
+
+    // Try NL format first, then AISP format
+    let whatMatch = cleanResponse.match(/WHAT_GOES_WRONG:\s*(.+?)(?=\n\s*[A-Z_]+:|$)/is);
+    if (!whatMatch) {
+      // AISP format: AVOID field
+      whatMatch = cleanResponse.match(/AVOID:\s*(.+?)(?=\n\s*[A-Z_]+:|$)/is);
+    }
+
+    let whyMatch = cleanResponse.match(/WHY_IT_FAILS:\s*(.+?)(?=\n\s*[A-Z_]+:|$)/is);
+    if (!whyMatch) {
+      // AISP format: WHY field
+      whyMatch = cleanResponse.match(/WHY:\s*(.+?)(?=\n\s*[A-Z_]+:|$)/is);
+    }
 
     const preventionSteps: string[] = [];
+
+    // Try NL format: PREVENTION_STEP_1/2/3
     for (let i = 1; i <= 3; i++) {
       const stepMatch = cleanResponse.match(new RegExp(`PREVENTION_STEP_${i}:\\s*(.+?)(?=\\n|$)`, 'i'));
       if (stepMatch) {
         preventionSteps.push(stepMatch[1].trim());
+      }
+    }
+
+    // If no NL prevention steps found, try AISP format: PREVENT_1/2/3
+    if (preventionSteps.length === 0) {
+      for (let i = 1; i <= 3; i++) {
+        const stepMatch = cleanResponse.match(new RegExp(`PREVENT_${i}:\\s*(.+?)(?=\\n|$)`, 'i'));
+        if (stepMatch) {
+          preventionSteps.push(stepMatch[1].trim());
+        }
       }
     }
 
@@ -1775,7 +1847,8 @@ CONFIDENCE: [0.0-1.0 how confident you are in this analysis]`;
   async reConsolidate(
     learningUnitManager: LearningUnitManager,
     learningUnitId: string,
-    profileName: string
+    profileName: string,
+    restrictToExperienceIds?: string[]
   ): Promise<ConsolidationReport> {
     // 1. Load existing few-shots from learning unit
     const existingFewShots = await learningUnitManager.getFewShots(learningUnitId);
@@ -1786,7 +1859,17 @@ CONFIDENCE: [0.0-1.0 how confident you are in this analysis]`;
     console.log(`📦 Already absorbed: ${absorbedIds.length} experiences`);
 
     // 2. Get new unconsolidated experiences not yet absorbed
-    const allUnconsolidated = await this.experienceStore.getUnconsolidated(profileName);
+    let allUnconsolidated = await this.experienceStore.getUnconsolidated(profileName);
+
+    // BUGFIX: When --rerun is used, restrict to only the specified unit's experiences
+    if (restrictToExperienceIds && restrictToExperienceIds.length > 0) {
+      const beforeCount = allUnconsolidated.length;
+      allUnconsolidated = allUnconsolidated.filter(exp => restrictToExperienceIds.includes(exp.id));
+      if (allUnconsolidated.length < beforeCount) {
+        console.log(`📦 Restricted to ${allUnconsolidated.length} experiences (from ${beforeCount} total unconsolidated)`);
+      }
+    }
+
     const newExperiences = allUnconsolidated.filter(
       (exp) => !absorbedIds.includes(exp.id)
     );
@@ -1970,13 +2053,24 @@ CONFIDENCE: [0.0-1.0 how confident you are in this analysis]`;
   async consolidateDual(
     learningUnitManager: LearningUnitManager,
     learningUnitId: string,
-    profileName: string
+    profileName: string,
+    restrictToExperienceIds?: string[]
   ): Promise<DualConsolidationResult> {
     console.log(`\n🔄 Starting DUAL consolidation for "${learningUnitId}"`);
     console.log(`   Will create: "${learningUnitId}" (standard) + "${learningUnitId}${DOUBLE_STRATEGY_SUFFIX}" (doubled)`);
 
     // Get all unconsolidated experiences before we start
-    const experiences = await this.experienceStore.getUnconsolidated(profileName);
+    let experiences = await this.experienceStore.getUnconsolidated(profileName);
+
+    // BUGFIX: When --rerun is used, restrict to only the specified unit's experiences
+    if (restrictToExperienceIds && restrictToExperienceIds.length > 0) {
+      const beforeCount = experiences.length;
+      experiences = experiences.filter(exp => restrictToExperienceIds.includes(exp.id));
+      if (experiences.length < beforeCount) {
+        console.log(`📦 Restricted to ${experiences.length} experiences (from ${beforeCount} total unconsolidated)`);
+      }
+    }
+
     const experienceIds = experiences.map(e => e.id);
 
     if (experiences.length === 0) {
@@ -1995,7 +2089,8 @@ CONFIDENCE: [0.0-1.0 how confident you are in this analysis]`;
     const standardReport = await this.reConsolidate(
       learningUnitManager,
       learningUnitId,
-      profileName
+      profileName,
+      restrictToExperienceIds
     );
     console.log(`   ✅ Standard: ${standardReport.fewShotsUpdated} strategies created`);
 
@@ -2011,7 +2106,8 @@ CONFIDENCE: [0.0-1.0 how confident you are in this analysis]`;
     const doubledReport = await this.reConsolidate(
       learningUnitManager,
       doubledUnitId,
-      profileName
+      profileName,
+      restrictToExperienceIds
     );
     console.log(`   ✅ Doubled: ${doubledReport.fewShotsUpdated} strategies created`);
 

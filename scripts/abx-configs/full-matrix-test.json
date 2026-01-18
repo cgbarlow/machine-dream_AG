@@ -5,13 +5,15 @@
     "puzzles/9x9-easy.json"
   ],
   "_comment_learning_units": {
-    "NL_PLACEHOLDER": "Natural language learning unit for default mode - TO BE CREATED",
-    "aisp_llmclusterv2": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
-    "aisp_llmclusterv2_2x": "PLACEHOLDER - 2x iteration of llmclusterv2",
-    "aisp_fastclusterv3": "PLACEHOLDER - FastClusterV3 generated unit",
-    "aisp_fastclusterv3_2x": "PLACEHOLDER - 2x iteration of fastclusterv3",
-    "aisp_deepclusterv2": "PLACEHOLDER - DeepClusterV2 generated unit",
-    "aisp_deepclusterv2_2x": "PLACEHOLDER - 2x iteration of deepclusterv2"
+    "standard_llmclusterv2": "gpt-oss-120b_standard_llmclusterv2_20260117_1",
+    "standard_llmclusterv2_2x": "gpt-oss-120b_standard_llmclusterv2_20260117_1-2x",
+    "standard_fastclusterv3": "gpt-oss-120b_standard_fastclusterv3_20260117_1",
+    "standard_fastclusterv3_2x": "gpt-oss-120b_standard_fastclusterv3_20260117_1-2x",
+    "aisp_llmclusterv2": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1",
+    "aisp_llmclusterv2_2x": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1-2x",
+    "aisp_fastclusterv3": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1",
+    "aisp_fastclusterv3_2x": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1-2x",
+    "_note_deepcluster": "DeepCluster configs disabled - no learning units available"
   },
   "_comment_profiles": [
     "deepseek-r1 = deepseek-r1-distill-qwen-32b",
@@ -22,16 +24,378 @@
   ],
   "configurations": [
     {
-      "_section": "========== DEEPSEEK-R1 (42 configs) =========="
+      "_section": "========== DEEPSEEK-R1 (15 configs) =========="
     },
     {
-      "_subsection": "--- default mode (14 configs) ---"
+      "_subsection": "--- default mode (5 configs) ---"
     },
     {
       "name": "deepseek-r1_default_no-learning",
       "profile": "deepseek-r1",
       "learningUnit": null,
       "options": []
+    },
+    {
+      "name": "deepseek-r1_default_llmclusterv2",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_standard_llmclusterv2_20260117_1",
+      "options": []
+    },
+    {
+      "name": "deepseek-r1_default_llmclusterv2-2x",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_standard_llmclusterv2_20260117_1-2x",
+      "options": []
+    },
+    {
+      "name": "deepseek-r1_default_fastclusterv3",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_standard_fastclusterv3_20260117_1",
+      "options": []
+    },
+    {
+      "name": "deepseek-r1_default_fastclusterv3-2x",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_standard_fastclusterv3_20260117_1-2x",
+      "options": []
+    },
+    {
+      "_subsection": "--- aisp-lite mode (5 configs) ---"
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_no-learning",
+      "profile": "deepseek-r1",
+      "learningUnit": null,
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_llmclusterv2",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_llmclusterv2-2x",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1-2x",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_fastclusterv3",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_fastclusterv3-2x",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1-2x",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "_subsection": "--- aisp-full mode (5 configs) ---"
+    },
+    {
+      "name": "deepseek-r1_aisp-full_no-learning",
+      "profile": "deepseek-r1",
+      "learningUnit": null,
+      "options": [
+        "--aisp-full"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_llmclusterv2",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1",
+      "options": [
+        "--aisp-full"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_llmclusterv2-2x",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1-2x",
+      "options": [
+        "--aisp-full"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_fastclusterv3",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1",
+      "options": [
+        "--aisp-full"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_fastclusterv3-2x",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1-2x",
+      "options": [
+        "--aisp-full"
+      ]
+    },
+    {
+      "_section": "========== GPT-OSS-120B (15 configs) =========="
+    },
+    {
+      "_subsection": "--- default mode (5 configs) ---"
+    },
+    {
+      "name": "gpt-oss-120b_default_no-learning",
+      "profile": "gpt-oss-120b",
+      "learningUnit": null,
+      "options": []
+    },
+    {
+      "name": "gpt-oss-120b_default_llmclusterv2",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_standard_llmclusterv2_20260117_1",
+      "options": []
+    },
+    {
+      "name": "gpt-oss-120b_default_llmclusterv2-2x",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_standard_llmclusterv2_20260117_1-2x",
+      "options": []
+    },
+    {
+      "name": "gpt-oss-120b_default_fastclusterv3",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_standard_fastclusterv3_20260117_1",
+      "options": []
+    },
+    {
+      "name": "gpt-oss-120b_default_fastclusterv3-2x",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_standard_fastclusterv3_20260117_1-2x",
+      "options": []
+    },
+    {
+      "_subsection": "--- aisp-lite mode (5 configs) ---"
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_no-learning",
+      "profile": "gpt-oss-120b",
+      "learningUnit": null,
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_llmclusterv2",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_llmclusterv2-2x",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1-2x",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_fastclusterv3",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_fastclusterv3-2x",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1-2x",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "_subsection": "--- aisp-full mode (5 configs) ---"
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_no-learning",
+      "profile": "gpt-oss-120b",
+      "learningUnit": null,
+      "options": [
+        "--aisp-full"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_llmclusterv2",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1",
+      "options": [
+        "--aisp-full"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_llmclusterv2-2x",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1-2x",
+      "options": [
+        "--aisp-full"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_fastclusterv3",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1",
+      "options": [
+        "--aisp-full"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_fastclusterv3-2x",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1-2x",
+      "options": [
+        "--aisp-full"
+      ]
+    },
+    {
+      "_section": "========== QWEN3-CODER (15 configs) =========="
+    },
+    {
+      "_subsection": "--- default mode (5 configs) ---"
+    },
+    {
+      "name": "qwen3-coder_default_no-learning",
+      "profile": "qwen3-coder",
+      "learningUnit": null,
+      "options": []
+    },
+    {
+      "name": "qwen3-coder_default_llmclusterv2",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_standard_llmclusterv2_20260117_1",
+      "options": []
+    },
+    {
+      "name": "qwen3-coder_default_llmclusterv2-2x",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_standard_llmclusterv2_20260117_1-2x",
+      "options": []
+    },
+    {
+      "name": "qwen3-coder_default_fastclusterv3",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_standard_fastclusterv3_20260117_1",
+      "options": []
+    },
+    {
+      "name": "qwen3-coder_default_fastclusterv3-2x",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_standard_fastclusterv3_20260117_1-2x",
+      "options": []
+    },
+    {
+      "_subsection": "--- aisp-lite mode (5 configs) ---"
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_no-learning",
+      "profile": "qwen3-coder",
+      "learningUnit": null,
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_llmclusterv2",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_llmclusterv2-2x",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1-2x",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_fastclusterv3",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_fastclusterv3-2x",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1-2x",
+      "options": [
+        "--aisp-lite"
+      ]
+    },
+    {
+      "_subsection": "--- aisp-full mode (5 configs) ---"
+    },
+    {
+      "name": "qwen3-coder_aisp-full_no-learning",
+      "profile": "qwen3-coder",
+      "learningUnit": null,
+      "options": [
+        "--aisp-full"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_llmclusterv2",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1",
+      "options": [
+        "--aisp-full"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_llmclusterv2-2x",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1-2x",
+      "options": [
+        "--aisp-full"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_fastclusterv3",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1",
+      "options": [
+        "--aisp-full"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_fastclusterv3-2x",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1-2x",
+      "options": [
+        "--aisp-full"
+      ]
+    }
+  ],
+  "_disabled_configurations": [
+    {
+      "_section": "========== DEEPCLUSTER CONFIGS (disabled - no learning units) =========="
+    },
+    {
+      "_section": "========== SUCCINCT CONFIGS (disabled) =========="
     },
     {
       "name": "deepseek-r1_default_no-learning_succinct",
@@ -42,58 +406,384 @@
       ]
     },
     {
-      "name": "deepseek-r1_default_llmclusterv2",
-      "profile": "deepseek-r1",
-      "learningUnit": "PLACEHOLDER_NL_llmclusterv2",
-      "options": []
-    },
-    {
       "name": "deepseek-r1_default_llmclusterv2_succinct",
       "profile": "deepseek-r1",
-      "learningUnit": "PLACEHOLDER_NL_llmclusterv2",
+      "learningUnit": "gpt-oss-120b_standard_llmclusterv2_20260117_1",
       "options": [
         "--succinct-reasoning"
       ]
-    },
-    {
-      "name": "deepseek-r1_default_llmclusterv2-2x",
-      "profile": "deepseek-r1",
-      "learningUnit": "PLACEHOLDER_NL_llmclusterv2_2x",
-      "options": []
     },
     {
       "name": "deepseek-r1_default_llmclusterv2-2x_succinct",
       "profile": "deepseek-r1",
-      "learningUnit": "PLACEHOLDER_NL_llmclusterv2_2x",
+      "learningUnit": "gpt-oss-120b_standard_llmclusterv2_20260117_1-2x",
       "options": [
         "--succinct-reasoning"
       ]
-    },
-    {
-      "name": "deepseek-r1_default_fastclusterv3",
-      "profile": "deepseek-r1",
-      "learningUnit": "PLACEHOLDER_NL_fastclusterv3",
-      "options": []
     },
     {
       "name": "deepseek-r1_default_fastclusterv3_succinct",
       "profile": "deepseek-r1",
-      "learningUnit": "PLACEHOLDER_NL_fastclusterv3",
+      "learningUnit": "gpt-oss-120b_standard_fastclusterv3_20260117_1",
       "options": [
         "--succinct-reasoning"
       ]
     },
     {
-      "name": "deepseek-r1_default_fastclusterv3-2x",
-      "profile": "deepseek-r1",
-      "learningUnit": "PLACEHOLDER_NL_fastclusterv3_2x",
-      "options": []
-    },
-    {
       "name": "deepseek-r1_default_fastclusterv3-2x_succinct",
       "profile": "deepseek-r1",
-      "learningUnit": "PLACEHOLDER_NL_fastclusterv3_2x",
+      "learningUnit": "gpt-oss-120b_standard_fastclusterv3_20260117_1-2x",
       "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_no-learning_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": null,
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_llmclusterv2_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_llmclusterv2-2x_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1-2x",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_fastclusterv3_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-lite_fastclusterv3-2x_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1-2x",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_no-learning_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": null,
+      "options": [
+        "--aisp-full",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_llmclusterv2_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1",
+      "options": [
+        "--aisp-full",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_llmclusterv2-2x_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1-2x",
+      "options": [
+        "--aisp-full",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_fastclusterv3_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1",
+      "options": [
+        "--aisp-full",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "deepseek-r1_aisp-full_fastclusterv3-2x_succinct",
+      "profile": "deepseek-r1",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1-2x",
+      "options": [
+        "--aisp-full",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_default_no-learning_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": null,
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_default_llmclusterv2_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_standard_llmclusterv2_20260117_1",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_default_llmclusterv2-2x_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_standard_llmclusterv2_20260117_1-2x",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_default_fastclusterv3_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_standard_fastclusterv3_20260117_1",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_default_fastclusterv3-2x_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_standard_fastclusterv3_20260117_1-2x",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_no-learning_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": null,
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_llmclusterv2_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_llmclusterv2-2x_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1-2x",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_fastclusterv3_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-lite_fastclusterv3-2x_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1-2x",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_no-learning_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": null,
+      "options": [
+        "--aisp-full",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_llmclusterv2_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1",
+      "options": [
+        "--aisp-full",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_llmclusterv2-2x_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1-2x",
+      "options": [
+        "--aisp-full",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_fastclusterv3_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1",
+      "options": [
+        "--aisp-full",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "gpt-oss-120b_aisp-full_fastclusterv3-2x_succinct",
+      "profile": "gpt-oss-120b",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1-2x",
+      "options": [
+        "--aisp-full",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_default_no-learning_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": null,
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_default_llmclusterv2_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_standard_llmclusterv2_20260117_1",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_default_llmclusterv2-2x_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_standard_llmclusterv2_20260117_1-2x",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_default_fastclusterv3_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_standard_fastclusterv3_20260117_1",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_default_fastclusterv3-2x_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_standard_fastclusterv3_20260117_1-2x",
+      "options": [
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_no-learning_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": null,
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_llmclusterv2_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_llmclusterv2-2x_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1-2x",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_fastclusterv3_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-lite_fastclusterv3-2x_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1-2x",
+      "options": [
+        "--aisp-lite",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_no-learning_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": null,
+      "options": [
+        "--aisp-full",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_llmclusterv2_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1",
+      "options": [
+        "--aisp-full",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_llmclusterv2-2x_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1-2x",
+      "options": [
+        "--aisp-full",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_fastclusterv3_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1",
+      "options": [
+        "--aisp-full",
+        "--succinct-reasoning"
+      ]
+    },
+    {
+      "name": "qwen3-coder_aisp-full_fastclusterv3-2x_succinct",
+      "profile": "qwen3-coder",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1-2x",
+      "options": [
+        "--aisp-full",
         "--succinct-reasoning"
       ]
     },
@@ -122,94 +812,6 @@
       "profile": "deepseek-r1",
       "learningUnit": "PLACEHOLDER_NL_deepclusterv2_2x",
       "options": [
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "_subsection": "--- aisp-lite mode (14 configs) ---"
-    },
-    {
-      "name": "deepseek-r1_aisp-lite_no-learning",
-      "profile": "deepseek-r1",
-      "learningUnit": null,
-      "options": [
-        "--aisp-lite"
-      ]
-    },
-    {
-      "name": "deepseek-r1_aisp-lite_no-learning_succinct",
-      "profile": "deepseek-r1",
-      "learningUnit": null,
-      "options": [
-        "--aisp-lite",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "deepseek-r1_aisp-lite_llmclusterv2",
-      "profile": "deepseek-r1",
-      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
-      "options": [
-        "--aisp-lite"
-      ]
-    },
-    {
-      "name": "deepseek-r1_aisp-lite_llmclusterv2_succinct",
-      "profile": "deepseek-r1",
-      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
-      "options": [
-        "--aisp-lite",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "deepseek-r1_aisp-lite_llmclusterv2-2x",
-      "profile": "deepseek-r1",
-      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
-      "options": [
-        "--aisp-lite"
-      ]
-    },
-    {
-      "name": "deepseek-r1_aisp-lite_llmclusterv2-2x_succinct",
-      "profile": "deepseek-r1",
-      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
-      "options": [
-        "--aisp-lite",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "deepseek-r1_aisp-lite_fastclusterv3",
-      "profile": "deepseek-r1",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
-      "options": [
-        "--aisp-lite"
-      ]
-    },
-    {
-      "name": "deepseek-r1_aisp-lite_fastclusterv3_succinct",
-      "profile": "deepseek-r1",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
-      "options": [
-        "--aisp-lite",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "deepseek-r1_aisp-lite_fastclusterv3-2x",
-      "profile": "deepseek-r1",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
-      "options": [
-        "--aisp-lite"
-      ]
-    },
-    {
-      "name": "deepseek-r1_aisp-lite_fastclusterv3-2x_succinct",
-      "profile": "deepseek-r1",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
-      "options": [
-        "--aisp-lite",
         "--succinct-reasoning"
       ]
     },
@@ -248,99 +850,11 @@
       ]
     },
     {
-      "_subsection": "--- aisp-full mode (14 configs) ---"
-    },
-    {
-      "name": "deepseek-r1_aisp-full_no-learning",
-      "profile": "deepseek-r1",
-      "learningUnit": null,
-      "options": [
-        "--aisp"
-      ]
-    },
-    {
-      "name": "deepseek-r1_aisp-full_no-learning_succinct",
-      "profile": "deepseek-r1",
-      "learningUnit": null,
-      "options": [
-        "--aisp",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "deepseek-r1_aisp-full_llmclusterv2",
-      "profile": "deepseek-r1",
-      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
-      "options": [
-        "--aisp"
-      ]
-    },
-    {
-      "name": "deepseek-r1_aisp-full_llmclusterv2_succinct",
-      "profile": "deepseek-r1",
-      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
-      "options": [
-        "--aisp",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "deepseek-r1_aisp-full_llmclusterv2-2x",
-      "profile": "deepseek-r1",
-      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
-      "options": [
-        "--aisp"
-      ]
-    },
-    {
-      "name": "deepseek-r1_aisp-full_llmclusterv2-2x_succinct",
-      "profile": "deepseek-r1",
-      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
-      "options": [
-        "--aisp",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "deepseek-r1_aisp-full_fastclusterv3",
-      "profile": "deepseek-r1",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
-      "options": [
-        "--aisp"
-      ]
-    },
-    {
-      "name": "deepseek-r1_aisp-full_fastclusterv3_succinct",
-      "profile": "deepseek-r1",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
-      "options": [
-        "--aisp",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "deepseek-r1_aisp-full_fastclusterv3-2x",
-      "profile": "deepseek-r1",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
-      "options": [
-        "--aisp"
-      ]
-    },
-    {
-      "name": "deepseek-r1_aisp-full_fastclusterv3-2x_succinct",
-      "profile": "deepseek-r1",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
-      "options": [
-        "--aisp",
-        "--succinct-reasoning"
-      ]
-    },
-    {
       "name": "deepseek-r1_aisp-full_deepclusterv2",
       "profile": "deepseek-r1",
       "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
       "options": [
-        "--aisp"
+        "--aisp-full"
       ]
     },
     {
@@ -348,7 +862,7 @@
       "profile": "deepseek-r1",
       "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
       "options": [
-        "--aisp",
+        "--aisp-full",
         "--succinct-reasoning"
       ]
     },
@@ -357,7 +871,7 @@
       "profile": "deepseek-r1",
       "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
       "options": [
-        "--aisp"
+        "--aisp-full"
       ]
     },
     {
@@ -365,83 +879,7 @@
       "profile": "deepseek-r1",
       "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
       "options": [
-        "--aisp",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "_section": "========== GPT-OSS-120B (42 configs) =========="
-    },
-    {
-      "_subsection": "--- default mode (14 configs) ---"
-    },
-    {
-      "name": "gpt-oss-120b_default_no-learning",
-      "profile": "gpt-oss-120b",
-      "learningUnit": null,
-      "options": []
-    },
-    {
-      "name": "gpt-oss-120b_default_no-learning_succinct",
-      "profile": "gpt-oss-120b",
-      "learningUnit": null,
-      "options": [
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "gpt-oss-120b_default_llmclusterv2",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "PLACEHOLDER_NL_llmclusterv2",
-      "options": []
-    },
-    {
-      "name": "gpt-oss-120b_default_llmclusterv2_succinct",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "PLACEHOLDER_NL_llmclusterv2",
-      "options": [
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "gpt-oss-120b_default_llmclusterv2-2x",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "PLACEHOLDER_NL_llmclusterv2_2x",
-      "options": []
-    },
-    {
-      "name": "gpt-oss-120b_default_llmclusterv2-2x_succinct",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "PLACEHOLDER_NL_llmclusterv2_2x",
-      "options": [
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "gpt-oss-120b_default_fastclusterv3",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "PLACEHOLDER_NL_fastclusterv3",
-      "options": []
-    },
-    {
-      "name": "gpt-oss-120b_default_fastclusterv3_succinct",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "PLACEHOLDER_NL_fastclusterv3",
-      "options": [
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "gpt-oss-120b_default_fastclusterv3-2x",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "PLACEHOLDER_NL_fastclusterv3_2x",
-      "options": []
-    },
-    {
-      "name": "gpt-oss-120b_default_fastclusterv3-2x_succinct",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "PLACEHOLDER_NL_fastclusterv3_2x",
-      "options": [
+        "--aisp-full",
         "--succinct-reasoning"
       ]
     },
@@ -470,94 +908,6 @@
       "profile": "gpt-oss-120b",
       "learningUnit": "PLACEHOLDER_NL_deepclusterv2_2x",
       "options": [
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "_subsection": "--- aisp-lite mode (14 configs) ---"
-    },
-    {
-      "name": "gpt-oss-120b_aisp-lite_no-learning",
-      "profile": "gpt-oss-120b",
-      "learningUnit": null,
-      "options": [
-        "--aisp-lite"
-      ]
-    },
-    {
-      "name": "gpt-oss-120b_aisp-lite_no-learning_succinct",
-      "profile": "gpt-oss-120b",
-      "learningUnit": null,
-      "options": [
-        "--aisp-lite",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "gpt-oss-120b_aisp-lite_llmclusterv2",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
-      "options": [
-        "--aisp-lite"
-      ]
-    },
-    {
-      "name": "gpt-oss-120b_aisp-lite_llmclusterv2_succinct",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
-      "options": [
-        "--aisp-lite",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "gpt-oss-120b_aisp-lite_llmclusterv2-2x",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
-      "options": [
-        "--aisp-lite"
-      ]
-    },
-    {
-      "name": "gpt-oss-120b_aisp-lite_llmclusterv2-2x_succinct",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
-      "options": [
-        "--aisp-lite",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "gpt-oss-120b_aisp-lite_fastclusterv3",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
-      "options": [
-        "--aisp-lite"
-      ]
-    },
-    {
-      "name": "gpt-oss-120b_aisp-lite_fastclusterv3_succinct",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
-      "options": [
-        "--aisp-lite",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "gpt-oss-120b_aisp-lite_fastclusterv3-2x",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
-      "options": [
-        "--aisp-lite"
-      ]
-    },
-    {
-      "name": "gpt-oss-120b_aisp-lite_fastclusterv3-2x_succinct",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
-      "options": [
-        "--aisp-lite",
         "--succinct-reasoning"
       ]
     },
@@ -596,99 +946,11 @@
       ]
     },
     {
-      "_subsection": "--- aisp-full mode (14 configs) ---"
-    },
-    {
-      "name": "gpt-oss-120b_aisp-full_no-learning",
-      "profile": "gpt-oss-120b",
-      "learningUnit": null,
-      "options": [
-        "--aisp"
-      ]
-    },
-    {
-      "name": "gpt-oss-120b_aisp-full_no-learning_succinct",
-      "profile": "gpt-oss-120b",
-      "learningUnit": null,
-      "options": [
-        "--aisp",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "gpt-oss-120b_aisp-full_llmclusterv2",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
-      "options": [
-        "--aisp"
-      ]
-    },
-    {
-      "name": "gpt-oss-120b_aisp-full_llmclusterv2_succinct",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
-      "options": [
-        "--aisp",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "gpt-oss-120b_aisp-full_llmclusterv2-2x",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
-      "options": [
-        "--aisp"
-      ]
-    },
-    {
-      "name": "gpt-oss-120b_aisp-full_llmclusterv2-2x_succinct",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
-      "options": [
-        "--aisp",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "gpt-oss-120b_aisp-full_fastclusterv3",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
-      "options": [
-        "--aisp"
-      ]
-    },
-    {
-      "name": "gpt-oss-120b_aisp-full_fastclusterv3_succinct",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
-      "options": [
-        "--aisp",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "gpt-oss-120b_aisp-full_fastclusterv3-2x",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
-      "options": [
-        "--aisp"
-      ]
-    },
-    {
-      "name": "gpt-oss-120b_aisp-full_fastclusterv3-2x_succinct",
-      "profile": "gpt-oss-120b",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
-      "options": [
-        "--aisp",
-        "--succinct-reasoning"
-      ]
-    },
-    {
       "name": "gpt-oss-120b_aisp-full_deepclusterv2",
       "profile": "gpt-oss-120b",
       "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
       "options": [
-        "--aisp"
+        "--aisp-full"
       ]
     },
     {
@@ -696,7 +958,7 @@
       "profile": "gpt-oss-120b",
       "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
       "options": [
-        "--aisp",
+        "--aisp-full",
         "--succinct-reasoning"
       ]
     },
@@ -705,7 +967,7 @@
       "profile": "gpt-oss-120b",
       "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
       "options": [
-        "--aisp"
+        "--aisp-full"
       ]
     },
     {
@@ -713,92 +975,7 @@
       "profile": "gpt-oss-120b",
       "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
       "options": [
-        "--aisp",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "_subsection": "--- default mode (14 configs) ---"
-    },
-    {
-      "_subsection": "--- aisp-lite mode (14 configs) ---"
-    },
-    {
-      "_subsection": "--- aisp-full mode (14 configs) ---"
-    },
-    {
-      "_section": "========== QWEN3-CODER (42 configs) =========="
-    },
-    {
-      "_subsection": "--- default mode (14 configs) ---"
-    },
-    {
-      "name": "qwen3-coder_default_no-learning",
-      "profile": "qwen3-coder",
-      "learningUnit": null,
-      "options": []
-    },
-    {
-      "name": "qwen3-coder_default_no-learning_succinct",
-      "profile": "qwen3-coder",
-      "learningUnit": null,
-      "options": [
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "qwen3-coder_default_llmclusterv2",
-      "profile": "qwen3-coder",
-      "learningUnit": "PLACEHOLDER_NL_llmclusterv2",
-      "options": []
-    },
-    {
-      "name": "qwen3-coder_default_llmclusterv2_succinct",
-      "profile": "qwen3-coder",
-      "learningUnit": "PLACEHOLDER_NL_llmclusterv2",
-      "options": [
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "qwen3-coder_default_llmclusterv2-2x",
-      "profile": "qwen3-coder",
-      "learningUnit": "PLACEHOLDER_NL_llmclusterv2_2x",
-      "options": []
-    },
-    {
-      "name": "qwen3-coder_default_llmclusterv2-2x_succinct",
-      "profile": "qwen3-coder",
-      "learningUnit": "PLACEHOLDER_NL_llmclusterv2_2x",
-      "options": [
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "qwen3-coder_default_fastclusterv3",
-      "profile": "qwen3-coder",
-      "learningUnit": "PLACEHOLDER_NL_fastclusterv3",
-      "options": []
-    },
-    {
-      "name": "qwen3-coder_default_fastclusterv3_succinct",
-      "profile": "qwen3-coder",
-      "learningUnit": "PLACEHOLDER_NL_fastclusterv3",
-      "options": [
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "qwen3-coder_default_fastclusterv3-2x",
-      "profile": "qwen3-coder",
-      "learningUnit": "PLACEHOLDER_NL_fastclusterv3_2x",
-      "options": []
-    },
-    {
-      "name": "qwen3-coder_default_fastclusterv3-2x_succinct",
-      "profile": "qwen3-coder",
-      "learningUnit": "PLACEHOLDER_NL_fastclusterv3_2x",
-      "options": [
+        "--aisp-full",
         "--succinct-reasoning"
       ]
     },
@@ -827,94 +1004,6 @@
       "profile": "qwen3-coder",
       "learningUnit": "PLACEHOLDER_NL_deepclusterv2_2x",
       "options": [
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "_subsection": "--- aisp-lite mode (14 configs) ---"
-    },
-    {
-      "name": "qwen3-coder_aisp-lite_no-learning",
-      "profile": "qwen3-coder",
-      "learningUnit": null,
-      "options": [
-        "--aisp-lite"
-      ]
-    },
-    {
-      "name": "qwen3-coder_aisp-lite_no-learning_succinct",
-      "profile": "qwen3-coder",
-      "learningUnit": null,
-      "options": [
-        "--aisp-lite",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "qwen3-coder_aisp-lite_llmclusterv2",
-      "profile": "qwen3-coder",
-      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
-      "options": [
-        "--aisp-lite"
-      ]
-    },
-    {
-      "name": "qwen3-coder_aisp-lite_llmclusterv2_succinct",
-      "profile": "qwen3-coder",
-      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
-      "options": [
-        "--aisp-lite",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "qwen3-coder_aisp-lite_llmclusterv2-2x",
-      "profile": "qwen3-coder",
-      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
-      "options": [
-        "--aisp-lite"
-      ]
-    },
-    {
-      "name": "qwen3-coder_aisp-lite_llmclusterv2-2x_succinct",
-      "profile": "qwen3-coder",
-      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
-      "options": [
-        "--aisp-lite",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "qwen3-coder_aisp-lite_fastclusterv3",
-      "profile": "qwen3-coder",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
-      "options": [
-        "--aisp-lite"
-      ]
-    },
-    {
-      "name": "qwen3-coder_aisp-lite_fastclusterv3_succinct",
-      "profile": "qwen3-coder",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
-      "options": [
-        "--aisp-lite",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "qwen3-coder_aisp-lite_fastclusterv3-2x",
-      "profile": "qwen3-coder",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
-      "options": [
-        "--aisp-lite"
-      ]
-    },
-    {
-      "name": "qwen3-coder_aisp-lite_fastclusterv3-2x_succinct",
-      "profile": "qwen3-coder",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
-      "options": [
-        "--aisp-lite",
         "--succinct-reasoning"
       ]
     },
@@ -953,99 +1042,11 @@
       ]
     },
     {
-      "_subsection": "--- aisp-full mode (14 configs) ---"
-    },
-    {
-      "name": "qwen3-coder_aisp-full_no-learning",
-      "profile": "qwen3-coder",
-      "learningUnit": null,
-      "options": [
-        "--aisp"
-      ]
-    },
-    {
-      "name": "qwen3-coder_aisp-full_no-learning_succinct",
-      "profile": "qwen3-coder",
-      "learningUnit": null,
-      "options": [
-        "--aisp",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "qwen3-coder_aisp-full_llmclusterv2",
-      "profile": "qwen3-coder",
-      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
-      "options": [
-        "--aisp"
-      ]
-    },
-    {
-      "name": "qwen3-coder_aisp-full_llmclusterv2_succinct",
-      "profile": "qwen3-coder",
-      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
-      "options": [
-        "--aisp",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "qwen3-coder_aisp-full_llmclusterv2-2x",
-      "profile": "qwen3-coder",
-      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
-      "options": [
-        "--aisp"
-      ]
-    },
-    {
-      "name": "qwen3-coder_aisp-full_llmclusterv2-2x_succinct",
-      "profile": "qwen3-coder",
-      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
-      "options": [
-        "--aisp",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "qwen3-coder_aisp-full_fastclusterv3",
-      "profile": "qwen3-coder",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
-      "options": [
-        "--aisp"
-      ]
-    },
-    {
-      "name": "qwen3-coder_aisp-full_fastclusterv3_succinct",
-      "profile": "qwen3-coder",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
-      "options": [
-        "--aisp",
-        "--succinct-reasoning"
-      ]
-    },
-    {
-      "name": "qwen3-coder_aisp-full_fastclusterv3-2x",
-      "profile": "qwen3-coder",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
-      "options": [
-        "--aisp"
-      ]
-    },
-    {
-      "name": "qwen3-coder_aisp-full_fastclusterv3-2x_succinct",
-      "profile": "qwen3-coder",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
-      "options": [
-        "--aisp",
-        "--succinct-reasoning"
-      ]
-    },
-    {
       "name": "qwen3-coder_aisp-full_deepclusterv2",
       "profile": "qwen3-coder",
       "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
       "options": [
-        "--aisp"
+        "--aisp-full"
       ]
     },
     {
@@ -1053,7 +1054,7 @@
       "profile": "qwen3-coder",
       "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
       "options": [
-        "--aisp",
+        "--aisp-full",
         "--succinct-reasoning"
       ]
     },
@@ -1062,7 +1063,7 @@
       "profile": "qwen3-coder",
       "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
       "options": [
-        "--aisp"
+        "--aisp-full"
       ]
     },
     {
@@ -1070,23 +1071,12 @@
       "profile": "qwen3-coder",
       "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
       "options": [
-        "--aisp",
+        "--aisp-full",
         "--succinct-reasoning"
       ]
     },
     {
-      "_subsection": "--- default mode (14 configs) ---"
-    },
-    {
-      "_subsection": "--- aisp-lite mode (14 configs) ---"
-    },
-    {
-      "_subsection": "--- aisp-full mode (14 configs) ---"
-    }
-  ],
-  "_disabled_configurations": [
-    {
-      "_section": "========== NEMOTRON-NANO (42 configs) =========="
+      "_section": "========== NEMOTRON-NANO (15 configs) =========="
     },
     {
       "name": "nemotron-nano_default_no-learning",
@@ -1105,13 +1095,13 @@
     {
       "name": "nemotron-nano_default_llmclusterv2",
       "profile": "nemotron-nano",
-      "learningUnit": "PLACEHOLDER_NL_llmclusterv2",
+      "learningUnit": "gpt-oss-120b_standard_llmclusterv2_20260117_1",
       "options": []
     },
     {
       "name": "nemotron-nano_default_llmclusterv2_succinct",
       "profile": "nemotron-nano",
-      "learningUnit": "PLACEHOLDER_NL_llmclusterv2",
+      "learningUnit": "gpt-oss-120b_standard_llmclusterv2_20260117_1",
       "options": [
         "--succinct-reasoning"
       ]
@@ -1119,13 +1109,13 @@
     {
       "name": "nemotron-nano_default_llmclusterv2-2x",
       "profile": "nemotron-nano",
-      "learningUnit": "PLACEHOLDER_NL_llmclusterv2_2x",
+      "learningUnit": "gpt-oss-120b_standard_llmclusterv2_20260117_1-2x",
       "options": []
     },
     {
       "name": "nemotron-nano_default_llmclusterv2-2x_succinct",
       "profile": "nemotron-nano",
-      "learningUnit": "PLACEHOLDER_NL_llmclusterv2_2x",
+      "learningUnit": "gpt-oss-120b_standard_llmclusterv2_20260117_1-2x",
       "options": [
         "--succinct-reasoning"
       ]
@@ -1133,13 +1123,13 @@
     {
       "name": "nemotron-nano_default_fastclusterv3",
       "profile": "nemotron-nano",
-      "learningUnit": "PLACEHOLDER_NL_fastclusterv3",
+      "learningUnit": "gpt-oss-120b_standard_fastclusterv3_20260117_1",
       "options": []
     },
     {
       "name": "nemotron-nano_default_fastclusterv3_succinct",
       "profile": "nemotron-nano",
-      "learningUnit": "PLACEHOLDER_NL_fastclusterv3",
+      "learningUnit": "gpt-oss-120b_standard_fastclusterv3_20260117_1",
       "options": [
         "--succinct-reasoning"
       ]
@@ -1147,13 +1137,13 @@
     {
       "name": "nemotron-nano_default_fastclusterv3-2x",
       "profile": "nemotron-nano",
-      "learningUnit": "PLACEHOLDER_NL_fastclusterv3_2x",
+      "learningUnit": "gpt-oss-120b_standard_fastclusterv3_20260117_1-2x",
       "options": []
     },
     {
       "name": "nemotron-nano_default_fastclusterv3-2x_succinct",
       "profile": "nemotron-nano",
-      "learningUnit": "PLACEHOLDER_NL_fastclusterv3_2x",
+      "learningUnit": "gpt-oss-120b_standard_fastclusterv3_20260117_1-2x",
       "options": [
         "--succinct-reasoning"
       ]
@@ -1206,7 +1196,7 @@
     {
       "name": "nemotron-nano_aisp-lite_llmclusterv2",
       "profile": "nemotron-nano",
-      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1",
       "options": [
         "--aisp-lite"
       ]
@@ -1214,7 +1204,7 @@
     {
       "name": "nemotron-nano_aisp-lite_llmclusterv2_succinct",
       "profile": "nemotron-nano",
-      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1",
       "options": [
         "--aisp-lite",
         "--succinct-reasoning"
@@ -1223,7 +1213,7 @@
     {
       "name": "nemotron-nano_aisp-lite_llmclusterv2-2x",
       "profile": "nemotron-nano",
-      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1-2x",
       "options": [
         "--aisp-lite"
       ]
@@ -1231,7 +1221,7 @@
     {
       "name": "nemotron-nano_aisp-lite_llmclusterv2-2x_succinct",
       "profile": "nemotron-nano",
-      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1-2x",
       "options": [
         "--aisp-lite",
         "--succinct-reasoning"
@@ -1240,7 +1230,7 @@
     {
       "name": "nemotron-nano_aisp-lite_fastclusterv3",
       "profile": "nemotron-nano",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1",
       "options": [
         "--aisp-lite"
       ]
@@ -1248,7 +1238,7 @@
     {
       "name": "nemotron-nano_aisp-lite_fastclusterv3_succinct",
       "profile": "nemotron-nano",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1",
       "options": [
         "--aisp-lite",
         "--succinct-reasoning"
@@ -1257,7 +1247,7 @@
     {
       "name": "nemotron-nano_aisp-lite_fastclusterv3-2x",
       "profile": "nemotron-nano",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1-2x",
       "options": [
         "--aisp-lite"
       ]
@@ -1265,7 +1255,7 @@
     {
       "name": "nemotron-nano_aisp-lite_fastclusterv3-2x_succinct",
       "profile": "nemotron-nano",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1-2x",
       "options": [
         "--aisp-lite",
         "--succinct-reasoning"
@@ -1310,7 +1300,7 @@
       "profile": "nemotron-nano",
       "learningUnit": null,
       "options": [
-        "--aisp"
+        "--aisp-full"
       ]
     },
     {
@@ -1318,75 +1308,75 @@
       "profile": "nemotron-nano",
       "learningUnit": null,
       "options": [
-        "--aisp",
+        "--aisp-full",
         "--succinct-reasoning"
       ]
     },
     {
       "name": "nemotron-nano_aisp-full_llmclusterv2",
       "profile": "nemotron-nano",
-      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1",
       "options": [
-        "--aisp"
+        "--aisp-full"
       ]
     },
     {
       "name": "nemotron-nano_aisp-full_llmclusterv2_succinct",
       "profile": "nemotron-nano",
-      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1",
       "options": [
-        "--aisp",
+        "--aisp-full",
         "--succinct-reasoning"
       ]
     },
     {
       "name": "nemotron-nano_aisp-full_llmclusterv2-2x",
       "profile": "nemotron-nano",
-      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1-2x",
       "options": [
-        "--aisp"
+        "--aisp-full"
       ]
     },
     {
       "name": "nemotron-nano_aisp-full_llmclusterv2-2x_succinct",
       "profile": "nemotron-nano",
-      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1-2x",
       "options": [
-        "--aisp",
+        "--aisp-full",
         "--succinct-reasoning"
       ]
     },
     {
       "name": "nemotron-nano_aisp-full_fastclusterv3",
       "profile": "nemotron-nano",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1",
       "options": [
-        "--aisp"
+        "--aisp-full"
       ]
     },
     {
       "name": "nemotron-nano_aisp-full_fastclusterv3_succinct",
       "profile": "nemotron-nano",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1",
       "options": [
-        "--aisp",
+        "--aisp-full",
         "--succinct-reasoning"
       ]
     },
     {
       "name": "nemotron-nano_aisp-full_fastclusterv3-2x",
       "profile": "nemotron-nano",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1-2x",
       "options": [
-        "--aisp"
+        "--aisp-full"
       ]
     },
     {
       "name": "nemotron-nano_aisp-full_fastclusterv3-2x_succinct",
       "profile": "nemotron-nano",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1-2x",
       "options": [
-        "--aisp",
+        "--aisp-full",
         "--succinct-reasoning"
       ]
     },
@@ -1395,7 +1385,7 @@
       "profile": "nemotron-nano",
       "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
       "options": [
-        "--aisp"
+        "--aisp-full"
       ]
     },
     {
@@ -1403,7 +1393,7 @@
       "profile": "nemotron-nano",
       "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
       "options": [
-        "--aisp",
+        "--aisp-full",
         "--succinct-reasoning"
       ]
     },
@@ -1412,7 +1402,7 @@
       "profile": "nemotron-nano",
       "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
       "options": [
-        "--aisp"
+        "--aisp-full"
       ]
     },
     {
@@ -1420,12 +1410,12 @@
       "profile": "nemotron-nano",
       "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
       "options": [
-        "--aisp",
+        "--aisp-full",
         "--succinct-reasoning"
       ]
     },
     {
-      "_section": "========== QWQ-32B (42 configs) =========="
+      "_section": "========== QWQ-32B (15 configs) =========="
     },
     {
       "name": "qwq-32b_default_no-learning",
@@ -1444,13 +1434,13 @@
     {
       "name": "qwq-32b_default_llmclusterv2",
       "profile": "qwq-32b",
-      "learningUnit": "PLACEHOLDER_NL_llmclusterv2",
+      "learningUnit": "gpt-oss-120b_standard_llmclusterv2_20260117_1",
       "options": []
     },
     {
       "name": "qwq-32b_default_llmclusterv2_succinct",
       "profile": "qwq-32b",
-      "learningUnit": "PLACEHOLDER_NL_llmclusterv2",
+      "learningUnit": "gpt-oss-120b_standard_llmclusterv2_20260117_1",
       "options": [
         "--succinct-reasoning"
       ]
@@ -1458,13 +1448,13 @@
     {
       "name": "qwq-32b_default_llmclusterv2-2x",
       "profile": "qwq-32b",
-      "learningUnit": "PLACEHOLDER_NL_llmclusterv2_2x",
+      "learningUnit": "gpt-oss-120b_standard_llmclusterv2_20260117_1-2x",
       "options": []
     },
     {
       "name": "qwq-32b_default_llmclusterv2-2x_succinct",
       "profile": "qwq-32b",
-      "learningUnit": "PLACEHOLDER_NL_llmclusterv2_2x",
+      "learningUnit": "gpt-oss-120b_standard_llmclusterv2_20260117_1-2x",
       "options": [
         "--succinct-reasoning"
       ]
@@ -1472,13 +1462,13 @@
     {
       "name": "qwq-32b_default_fastclusterv3",
       "profile": "qwq-32b",
-      "learningUnit": "PLACEHOLDER_NL_fastclusterv3",
+      "learningUnit": "gpt-oss-120b_standard_fastclusterv3_20260117_1",
       "options": []
     },
     {
       "name": "qwq-32b_default_fastclusterv3_succinct",
       "profile": "qwq-32b",
-      "learningUnit": "PLACEHOLDER_NL_fastclusterv3",
+      "learningUnit": "gpt-oss-120b_standard_fastclusterv3_20260117_1",
       "options": [
         "--succinct-reasoning"
       ]
@@ -1486,13 +1476,13 @@
     {
       "name": "qwq-32b_default_fastclusterv3-2x",
       "profile": "qwq-32b",
-      "learningUnit": "PLACEHOLDER_NL_fastclusterv3_2x",
+      "learningUnit": "gpt-oss-120b_standard_fastclusterv3_20260117_1-2x",
       "options": []
     },
     {
       "name": "qwq-32b_default_fastclusterv3-2x_succinct",
       "profile": "qwq-32b",
-      "learningUnit": "PLACEHOLDER_NL_fastclusterv3_2x",
+      "learningUnit": "gpt-oss-120b_standard_fastclusterv3_20260117_1-2x",
       "options": [
         "--succinct-reasoning"
       ]
@@ -1545,7 +1535,7 @@
     {
       "name": "qwq-32b_aisp-lite_llmclusterv2",
       "profile": "qwq-32b",
-      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1",
       "options": [
         "--aisp-lite"
       ]
@@ -1553,7 +1543,7 @@
     {
       "name": "qwq-32b_aisp-lite_llmclusterv2_succinct",
       "profile": "qwq-32b",
-      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1",
       "options": [
         "--aisp-lite",
         "--succinct-reasoning"
@@ -1562,7 +1552,7 @@
     {
       "name": "qwq-32b_aisp-lite_llmclusterv2-2x",
       "profile": "qwq-32b",
-      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1-2x",
       "options": [
         "--aisp-lite"
       ]
@@ -1570,7 +1560,7 @@
     {
       "name": "qwq-32b_aisp-lite_llmclusterv2-2x_succinct",
       "profile": "qwq-32b",
-      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1-2x",
       "options": [
         "--aisp-lite",
         "--succinct-reasoning"
@@ -1579,7 +1569,7 @@
     {
       "name": "qwq-32b_aisp-lite_fastclusterv3",
       "profile": "qwq-32b",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1",
       "options": [
         "--aisp-lite"
       ]
@@ -1587,7 +1577,7 @@
     {
       "name": "qwq-32b_aisp-lite_fastclusterv3_succinct",
       "profile": "qwq-32b",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1",
       "options": [
         "--aisp-lite",
         "--succinct-reasoning"
@@ -1596,7 +1586,7 @@
     {
       "name": "qwq-32b_aisp-lite_fastclusterv3-2x",
       "profile": "qwq-32b",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1-2x",
       "options": [
         "--aisp-lite"
       ]
@@ -1604,7 +1594,7 @@
     {
       "name": "qwq-32b_aisp-lite_fastclusterv3-2x_succinct",
       "profile": "qwq-32b",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1-2x",
       "options": [
         "--aisp-lite",
         "--succinct-reasoning"
@@ -1649,7 +1639,7 @@
       "profile": "qwq-32b",
       "learningUnit": null,
       "options": [
-        "--aisp"
+        "--aisp-full"
       ]
     },
     {
@@ -1657,75 +1647,75 @@
       "profile": "qwq-32b",
       "learningUnit": null,
       "options": [
-        "--aisp",
+        "--aisp-full",
         "--succinct-reasoning"
       ]
     },
     {
       "name": "qwq-32b_aisp-full_llmclusterv2",
       "profile": "qwq-32b",
-      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1",
       "options": [
-        "--aisp"
+        "--aisp-full"
       ]
     },
     {
       "name": "qwq-32b_aisp-full_llmclusterv2_succinct",
       "profile": "qwq-32b",
-      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260116_7",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1",
       "options": [
-        "--aisp",
+        "--aisp-full",
         "--succinct-reasoning"
       ]
     },
     {
       "name": "qwq-32b_aisp-full_llmclusterv2-2x",
       "profile": "qwq-32b",
-      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1-2x",
       "options": [
-        "--aisp"
+        "--aisp-full"
       ]
     },
     {
       "name": "qwq-32b_aisp-full_llmclusterv2-2x_succinct",
       "profile": "qwq-32b",
-      "learningUnit": "PLACEHOLDER_AISP_llmclusterv2_2x",
+      "learningUnit": "gpt-oss-120b_aisp-full_llmclusterv2_20260117_1-2x",
       "options": [
-        "--aisp",
+        "--aisp-full",
         "--succinct-reasoning"
       ]
     },
     {
       "name": "qwq-32b_aisp-full_fastclusterv3",
       "profile": "qwq-32b",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1",
       "options": [
-        "--aisp"
+        "--aisp-full"
       ]
     },
     {
       "name": "qwq-32b_aisp-full_fastclusterv3_succinct",
       "profile": "qwq-32b",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1",
       "options": [
-        "--aisp",
+        "--aisp-full",
         "--succinct-reasoning"
       ]
     },
     {
       "name": "qwq-32b_aisp-full_fastclusterv3-2x",
       "profile": "qwq-32b",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1-2x",
       "options": [
-        "--aisp"
+        "--aisp-full"
       ]
     },
     {
       "name": "qwq-32b_aisp-full_fastclusterv3-2x_succinct",
       "profile": "qwq-32b",
-      "learningUnit": "PLACEHOLDER_AISP_fastclusterv3_2x",
+      "learningUnit": "gpt-oss-120b_aisp-full_fastclusterv3_20260117_1-2x",
       "options": [
-        "--aisp",
+        "--aisp-full",
         "--succinct-reasoning"
       ]
     },
@@ -1734,7 +1724,7 @@
       "profile": "qwq-32b",
       "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
       "options": [
-        "--aisp"
+        "--aisp-full"
       ]
     },
     {
@@ -1742,7 +1732,7 @@
       "profile": "qwq-32b",
       "learningUnit": "PLACEHOLDER_AISP_deepclusterv2",
       "options": [
-        "--aisp",
+        "--aisp-full",
         "--succinct-reasoning"
       ]
     },
@@ -1751,7 +1741,7 @@
       "profile": "qwq-32b",
       "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
       "options": [
-        "--aisp"
+        "--aisp-full"
       ]
     },
     {
@@ -1759,7 +1749,7 @@
       "profile": "qwq-32b",
       "learningUnit": "PLACEHOLDER_AISP_deepclusterv2_2x",
       "options": [
-        "--aisp",
+        "--aisp-full",
         "--succinct-reasoning"
       ]
     }

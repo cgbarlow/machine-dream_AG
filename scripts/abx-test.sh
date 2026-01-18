@@ -309,27 +309,36 @@ for i in $CONFIG_INDICES; do
       echo "      Progress: $(get_progress_stats)"
       echo "      ─────────────────────────────────────────────"
 
-      # Run with output streaming - filter to show key events
-      eval $CMD 2>&1 | tee "$LOG_FILE" | while IFS= read -r line; do
-        # Show move attempts and results
-        if [[ "$line" =~ ^Move[[:space:]] ]] || \
-           [[ "$line" =~ CORRECT ]] || \
-           [[ "$line" =~ INVALID ]] || \
-           [[ "$line" =~ VALID_BUT_WRONG ]] || \
-           [[ "$line" =~ SOLVED ]] || \
-           [[ "$line" =~ "Session Results" ]] || \
-           [[ "$line" =~ "Total moves:" ]] || \
-           [[ "$line" =~ "Correct moves:" ]] || \
-           [[ "$line" =~ "Accuracy:" ]] || \
-           [[ "$line" =~ "Session ended:" ]] || \
-           [[ "$line" =~ "Reason:" ]] || \
-           [[ "$line" =~ "timeout" ]] || \
-           [[ "$line" =~ "Error" ]] || \
-           [[ "$line" =~ "strategies" ]] || \
-           [[ "$line" =~ "Learning unit:" ]]; then
-          echo "      | $line"
+      # Run command and capture to log file
+      eval $CMD > "$LOG_FILE" 2>&1 &
+      CMD_PID=$!
+
+      # Monitor and show new moves in real-time by polling log file
+      LAST_MOVE=0
+      SHOWN_RESULTS=false
+      while kill -0 $CMD_PID 2>/dev/null; do
+        if [[ -f "$LOG_FILE" ]]; then
+          # Check for new moves
+          while IFS= read -r line; do
+            if [[ "$line" =~ ^Move\ ([0-9]+): ]]; then
+              MOVE_NUM="${BASH_REMATCH[1]}"
+              if (( MOVE_NUM > LAST_MOVE )); then
+                LAST_MOVE=$MOVE_NUM
+                echo "      | $line"
+              fi
+            fi
+          done < <(grep "^Move [0-9]" "$LOG_FILE" 2>/dev/null)
         fi
+        sleep 1
       done
+      wait $CMD_PID 2>/dev/null
+
+      # Show final session results
+      if [[ -f "$LOG_FILE" ]]; then
+        grep -E "Session Results|Total moves:|Correct moves:|Accuracy:|Session ended:|Reason:" "$LOG_FILE" | while read -r line; do
+          echo "      | $line"
+        done
+      fi
 
       # Parse results from log file
       OUTPUT=$(cat "$LOG_FILE")

@@ -219,16 +219,36 @@ export class ValidatedLLMClient {
     const prefix = `AISP [${context}:${type}]`;
     const delta = result.delta ?? 0;
 
+    // Check for known false-positive contexts before logging as error
+    const knownFalsePositiveContext = this.isKnownFalsePositiveContext(context);
+
     if (result.tierValue >= 2) {
       // Silver or above - info level
       console.log(`✓ ${prefix} ${result.tierName} (δ=${delta.toFixed(3)})`);
     } else if (result.tierValue === 1) {
       // Bronze - warning level
       console.warn(`⚠️ ${prefix} ${result.tierName} (δ=${delta.toFixed(3)})`);
+    } else if (knownFalsePositiveContext) {
+      // Known false-positive context - warning level instead of error
+      console.warn(`⚠️ ${prefix} ${result.tierName} (δ=${delta.toFixed(3)}) [expected for ${context}]`);
     } else {
       // Reject - error level
       console.error(`❌ ${prefix} ${result.tierName} (δ=${delta.toFixed(3)})`);
     }
+  }
+
+  /**
+   * Check if context is a known false-positive context
+   *
+   * These contexts use valid AISP-like formats that the validator doesn't
+   * fully recognize, so Reject tier is expected and not an error.
+   */
+  private isKnownFalsePositiveContext(context: string): boolean {
+    const knownFalsePositiveContexts = [
+      'fewshot-selection',
+      'hierarchy-build',
+    ];
+    return knownFalsePositiveContexts.includes(context);
   }
 
   /**
