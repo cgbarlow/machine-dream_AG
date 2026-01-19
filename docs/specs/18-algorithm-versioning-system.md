@@ -702,6 +702,105 @@ When `aispMode === 'aisp-full'`, all four prompt types use AISP syntax:
 - ✅ No P0 pattern assignments in categorization output
 - ✅ Patterns span at least 2 different reasoning approaches
 
+### 3.8 FastCluster v4 (Dual-Mode AISP Keyword Extraction)
+
+#### 3.8.1 Overview
+
+**Name**: FastCluster
+**Version**: 4
+**Identifier**: `fastclusterv4`
+**Approach**: Keyword-based clustering with dual-mode extraction (English AND AISP patterns)
+
+**Problem Solved**: FastClusterV3 uses English keyword extraction (`'only candidate'`, `'missing from row'`, etc.) which NEVER matches AISP mathematical notation used in AISP mode. This causes all AISP experiences to fall into a single `'general_reasoning'` cluster, resulting in only 4 strategies for both 1x and 2x modes.
+
+**Performance Targets**:
+- Speed: <5 seconds for 500 experiences (same as v3)
+- Quality: 3-5 clusters for 1x mode, 6-10 clusters for 2x mode
+- Memory: <100MB peak usage
+
+#### 3.8.2 Algorithm Description
+
+Extends FastClusterV3 with dual-mode keyword extraction:
+
+**AISP Marker Detection**:
+```typescript
+private readonly AISP_MARKERS = ['⟦', '≔', '∧', '∃', '∀', '→', '∈', '≜', '⊢', '∵'];
+
+private isAISPReasoning(reasoning: string): boolean {
+  return this.AISP_MARKERS.some(marker => reasoning.includes(marker));
+}
+```
+
+**AISP Keyword Pattern Mapping**:
+
+| AISP Pattern | English Equivalent | Regex |
+|--------------|-------------------|-------|
+| `candidates≔{v}∧\|candidates\|=1` | only_candidate | `/candidates≔\{[^}]+\}∧\|candidates\|=1/` |
+| `∃!cell∈row` | missing_from_row | `/∃!cell∈row/` |
+| `∃!cell∈col` | missing_from_column | `/∃!cell∈col/` |
+| `∃!cell∈box` | missing_from_box | `/∃!cell∈box/` |
+| `last≔remaining` | last_remaining | `/last≔remaining/` |
+| `constraint∩` | intersection | `/constraint∩/` |
+| `∀candidate:eliminated` | elimination | `/∀candidate:eliminated/` |
+| `forced≔true` | forced | `/forced≔true/` |
+| `naked_single` | naked_single | `/naked_single/i` |
+| `hidden_single` | hidden_single | `/hidden_single/i` |
+| `⊢placement` | placement | `/⊢placement/` |
+| `process≔elimination` | process_elimination | `/process≔elimination/` |
+| `unique∈` | unique | `/unique∈/` |
+| `subset∩` | subset | `/subset∩/` |
+| `∵constraint` | constraint | `/∵constraint/` |
+
+**Dual-Mode Keyword Extraction**:
+```typescript
+private extractKeywords(reasoning: string, keywordDepth: number): string[] {
+  if (this.isAISPReasoning(reasoning)) {
+    return this.extractAISPKeywords(reasoning, keywordDepth);
+  }
+  return this.extractEnglishKeywords(reasoning, keywordDepth);
+}
+
+private extractAISPKeywords(reasoning: string, keywordDepth: number): string[] {
+  const found: string[] = [];
+
+  for (const {pattern, keyword} of this.AISP_KEYWORD_PATTERNS) {
+    if (pattern.test(reasoning)) {
+      found.push(keyword);
+      if (found.length >= keywordDepth) break;
+    }
+  }
+
+  return found.length > 0 ? found : ['general_reasoning'];
+}
+```
+
+**Key Differences from v3**:
+1. Detects AISP markers in reasoning text
+2. Uses regex patterns for AISP keyword extraction
+3. Maps AISP mathematical notation to English keywords
+4. Falls back to English extraction for standard mode
+5. Maintains full backward compatibility when not in AISP mode
+
+#### 3.8.3 When to Use
+
+**Use FastClusterV4 when**:
+- Running in AISP mode with mathematical notation in reasoning
+- Standard FastCluster produces only 1 cluster (general_reasoning)
+- 1x and 2x modes produce the same number of strategies
+
+**Default**: FastClusterV4 is recommended for all AISP mode consolidations.
+
+#### 3.8.4 Validation Criteria
+
+**Success Criteria**:
+- ✅ All FastClusterV3 tests pass when not in AISP mode (backward compatible)
+- ✅ AISP marker detection correctly identifies AISP reasoning
+- ✅ AISP pattern extraction produces meaningful keywords
+- ✅ 1x mode produces 3-5 strategies (not 1 or 4)
+- ✅ 2x mode produces 6-10 strategies (MORE than 1x)
+- ✅ Mixed AISP/English reasoning handled correctly
+- ✅ Processing time <5 seconds for 500 experiences
+
 ---
 
 ## 4. Learning Unit Naming Convention

@@ -14,6 +14,7 @@ export * from './ClusteringAlgorithm.js';
 export * from './AlgorithmRegistry.js';
 export * from './FastClusterV2.js';
 export * from './FastClusterV3.js';
+export * from './FastClusterV4.js';
 export * from './DeepClusterV1.js';
 export * from './DeepClusterV2.js';
 export * from './LLMClusterV1.js';
@@ -23,6 +24,7 @@ export * from './LLMClusterV3.js';
 import { AlgorithmRegistry } from './AlgorithmRegistry.js';
 import { FastClusterV2 } from './FastClusterV2.js';
 import { FastClusterV3 } from './FastClusterV3.js';
+import { FastClusterV4 } from './FastClusterV4.js';
 import { DeepClusterV1 } from './DeepClusterV1.js';
 import { DeepClusterV2 } from './DeepClusterV2.js';
 import { LLMClusterV1, type LLMClusterConfig } from './LLMClusterV1.js';
@@ -84,6 +86,10 @@ export function initializeAlgorithmRegistry(
     // Register FastCluster v3 with AISP support (ADR-013)
     const fastClusterV3 = new FastClusterV3();
     registry.register(fastClusterV3);
+
+    // Register FastCluster v4 with dual-mode AISP keyword extraction (Spec 18 Section 3.8)
+    const fastClusterV4 = new FastClusterV4();
+    registry.register(fastClusterV4);
 
     registryInitialized = true;
   }

@@ -125,13 +125,14 @@ machine-dream llm learning show <unit-id>
 
 ### Dreaming Algorithms
 
-Three clustering algorithms for experience consolidation:
+Clustering algorithms for experience consolidation:
 
 | Algorithm | Speed | Best For |
 |-----------|-------|----------|
 | **FastCluster v2** | <5s | Production, quick iteration |
+| **FastCluster v4** | <5s | AISP mode (dual-mode keyword extraction) |
 | **DeepCluster v1** | <60s | Better semantic quality |
-| **LLMCluster v1** | <180s | Research, maximum quality |
+| **LLMCluster v3** | <180s | Research, maximum quality with diversity |
 
 ```bash
 machine-dream llm dream run --algorithm llmcluster --profile qwen3
