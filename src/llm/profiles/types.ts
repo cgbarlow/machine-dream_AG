@@ -10,12 +10,13 @@
  * Supported LLM providers
  */
 export type LLMProvider =
-  | 'lmstudio'     // LM Studio local server
-  | 'openai'       // OpenAI API
-  | 'anthropic'    // Anthropic API
-  | 'ollama'       // Ollama local
-  | 'openrouter'   // OpenRouter
-  | 'custom';      // Custom OpenAI-compatible API
+  | 'lmstudio'      // LM Studio local server
+  | 'llama-server'  // llama.cpp llama-server (direct)
+  | 'openai'        // OpenAI API
+  | 'anthropic'     // Anthropic API
+  | 'ollama'        // Ollama local
+  | 'openrouter'    // OpenRouter
+  | 'custom';       // Custom OpenAI-compatible API
 
 /**
  * Model generation parameters
@@ -24,9 +25,18 @@ export interface ModelParameters {
   temperature: number;              // 0.0 - 2.0 (default: 0.7)
   maxTokens: number;                // Max response tokens (default: 2048)
   topP?: number;                    // Nucleus sampling (0.0-1.0)
+  topK?: number;                    // Top-K sampling (e.g., 50)
+  minP?: number;                    // Min-P sampling (0.0-1.0, e.g., 0.01)
   frequencyPenalty?: number;        // Repetition penalty (-2.0 to 2.0)
   presencePenalty?: number;         // Topic diversity (-2.0 to 2.0)
+  repeatPenalty?: number;           // Repeat penalty (1.0 = disabled)
   stop?: string[];                  // Stop sequences
+
+  // DRY (Don't Repeat Yourself) sampling parameters
+  dryMultiplier?: number;           // DRY penalty multiplier (e.g., 1.1)
+  dryBase?: number;                 // DRY base value (e.g., 1.75)
+  dryAllowedLength?: number;        // Min sequence length for DRY (e.g., 2)
+  dryPenaltyLastN?: number;         // Context for DRY penalty (-1 = full context)
 }
 
 /**
@@ -45,6 +55,7 @@ export interface LLMProfile {
   // Model Configuration
   model: string;                    // Model name/ID (friendly name for display)
   modelPath?: string;               // Full model path for LM Studio CLI (e.g., "Qwen/QwQ-32B-GGUF/qwq-32b-q8_0.gguf")
+  launchCommand?: string;           // Full command to start server (for llama-server provider)
   parameters: ModelParameters;      // Generation parameters
 
   // Metadata

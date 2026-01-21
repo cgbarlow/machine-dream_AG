@@ -52,7 +52,9 @@ interface LLMProfile {
   apiKey?: string;                   // API key (optional, stored securely)
 
   // Model Configuration
-  model: string;                     // Model name/ID
+  model: string;                     // Model name/ID (friendly name for display)
+  modelPath?: string;                // Full model path for LM Studio CLI (e.g., "Qwen/QwQ-32B-GGUF/qwq-32b-q8_0.gguf")
+  launchCommand?: string;            // Full command to start server (for llama-server provider)
   parameters: ModelParameters;       // Generation parameters
 
   // Metadata
@@ -74,20 +76,30 @@ interface LLMProfile {
 }
 
 type LLMProvider =
-  | 'lmstudio'     // LM Studio local server
-  | 'openai'       // OpenAI API
-  | 'anthropic'    // Anthropic API
-  | 'ollama'       // Ollama local
-  | 'openrouter'   // OpenRouter
-  | 'custom';      // Custom OpenAI-compatible API
+  | 'lmstudio'      // LM Studio local server
+  | 'llama-server'  // llama.cpp llama-server (direct)
+  | 'openai'        // OpenAI API
+  | 'anthropic'     // Anthropic API
+  | 'ollama'        // Ollama local
+  | 'openrouter'    // OpenRouter
+  | 'custom';       // Custom OpenAI-compatible API
 
 interface ModelParameters {
   temperature: number;               // 0.0 - 2.0 (default: 0.7)
   maxTokens: number;                 // Max response tokens
-  topP?: number;                     // Nucleus sampling
-  frequencyPenalty?: number;         // Repetition penalty
-  presencePenalty?: number;          // Topic diversity
+  topP?: number;                     // Nucleus sampling (0.0-1.0)
+  topK?: number;                     // Top-K sampling (e.g., 50)
+  minP?: number;                     // Min-P sampling (0.0-1.0, e.g., 0.01)
+  frequencyPenalty?: number;         // Repetition penalty (-2.0 to 2.0)
+  presencePenalty?: number;          // Topic diversity (-2.0 to 2.0)
+  repeatPenalty?: number;            // Repeat penalty (1.0 = disabled)
   stop?: string[];                   // Stop sequences
+
+  // DRY (Don't Repeat Yourself) sampling parameters
+  dryMultiplier?: number;            // DRY penalty multiplier (e.g., 1.1)
+  dryBase?: number;                  // DRY base value (e.g., 1.75)
+  dryAllowedLength?: number;         // Min sequence length for DRY (e.g., 2)
+  dryPenaltyLastN?: number;          // Context for DRY penalty (-1 = full context)
 }
 ```
 
@@ -142,6 +154,25 @@ interface ModelParameters {
       "timeout": 120000,
       "retries": 5,
       "tags": ["cloud", "expensive"]
+    },
+    "glm-4-llama": {
+      "name": "glm-4-llama",
+      "description": "GLM-4.7 Flash via llama-server (pre-configured sampling)",
+      "provider": "llama-server",
+      "baseUrl": "http://127.0.0.1:8080",
+      "model": "glm-4.7-flash",
+      "modelPath": "unsloth/GLM-4.7-Flash-GGUF/GLM-4.7-Flash-UD-Q8_K_XL.gguf",
+      "launchCommand": "llama-server.exe --model \"C:\\Users\\user\\.lmstudio\\models\\unsloth\\GLM-4.7-Flash-GGUF\\GLM-4.7-Flash-UD-Q8_K_XL.gguf\" --port 8080 --ctx-size 16384 --n-gpu-layers 999 --flash-attn on --temp 0.2 --top-k 50 --top-p 0.95 --min-p 0.01 --dry-multiplier 1.1",
+      "parameters": {
+        "temperature": 0.6,
+        "maxTokens": 8192
+      },
+      "createdAt": 1704556800000,
+      "usageCount": 0,
+      "isDefault": false,
+      "timeout": 600000,
+      "retries": 3,
+      "tags": ["local", "llama-server", "moe"]
     }
   },
   "activeProfile": "lm-studio-local"

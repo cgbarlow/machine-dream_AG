@@ -284,7 +284,7 @@ else
   # Verify learning units were created
   if [[ "$DRY_RUN" != "true" ]]; then
     log_info "Verifying created standard mode learning units:"
-    for unit in "$UNIT_STANDARD_LLM" "${UNIT_STANDARD_LLM}_2x" "$UNIT_STANDARD_FAST" "${UNIT_STANDARD_FAST}_2x"; do
+    for unit in "$UNIT_STANDARD_LLM" "${UNIT_STANDARD_LLM}-2x" "$UNIT_STANDARD_FAST" "${UNIT_STANDARD_FAST}-2x"; do
       if npx machine-dream llm learning list 2>&1 | grep -q "$unit"; then
         log_success "Created: $unit"
       else
@@ -303,8 +303,8 @@ else
   log_phase "PHASE 3: AISP-FULL MODE BASELINE"
   log_info "Running 10 puzzles with --aisp-full to generate experiences"
   log_info "Then dreaming to create 4 learning units:"
-  log_info "  - $UNIT_AISP_LLM + _2x"
-  log_info "  - $UNIT_AISP_FAST + _2x"
+  log_info "  - $UNIT_AISP_LLM + -2x"
+  log_info "  - $UNIT_AISP_FAST + -2x"
 
   PHASE3_START=$(date +%s)
 
@@ -330,7 +330,7 @@ else
   # Verify learning units were created
   if [[ "$DRY_RUN" != "true" ]]; then
     log_info "Verifying created aisp mode learning units:"
-    for unit in "$UNIT_AISP_LLM" "${UNIT_AISP_LLM}_2x" "$UNIT_AISP_FAST" "${UNIT_AISP_FAST}_2x"; do
+    for unit in "$UNIT_AISP_LLM" "${UNIT_AISP_LLM}-2x" "$UNIT_AISP_FAST" "${UNIT_AISP_FAST}-2x"; do
       if npx machine-dream llm learning list 2>&1 | grep -q "$unit"; then
         log_success "Created: $unit"
       else
@@ -359,8 +359,8 @@ else
     log_info "Verifying all 8 learning units exist..."
     MISSING_UNITS=0
 
-    for unit in "$UNIT_STANDARD_LLM" "${UNIT_STANDARD_LLM}_2x" "$UNIT_STANDARD_FAST" "${UNIT_STANDARD_FAST}_2x" \
-                "$UNIT_AISP_LLM" "${UNIT_AISP_LLM}_2x" "$UNIT_AISP_FAST" "${UNIT_AISP_FAST}_2x"; do
+    for unit in "$UNIT_STANDARD_LLM" "${UNIT_STANDARD_LLM}-2x" "$UNIT_STANDARD_FAST" "${UNIT_STANDARD_FAST}-2x" \
+                "$UNIT_AISP_LLM" "${UNIT_AISP_LLM}-2x" "$UNIT_AISP_FAST" "${UNIT_AISP_FAST}-2x"; do
       if npx machine-dream llm learning list 2>&1 | grep -q "$unit"; then
         log_success "Found: $unit"
       else

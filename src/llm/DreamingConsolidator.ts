@@ -545,7 +545,9 @@ ${experienceDescriptions}
    * Spec 16 Section 4.12: AISP Prompt Coverage
    */
   private extractAISPListField(content: string, fieldName: string): string[] {
-    const regex = new RegExp(`${fieldName}≔⟨([^⟩]+)⟩`);
+    // Fix: Use [\s\S]*? to match any character including newlines inside angle brackets
+    // Spec 16 Section 4.13.5: AISP List Field Extraction
+    const regex = new RegExp(`${fieldName}≔⟨([\\s\\S]*?)⟩`);
     const match = content.match(regex);
     if (!match) return [];
 
@@ -906,10 +908,13 @@ Be concise. Each item should be a short phrase or sentence.`;
     patternCount: number,
     profileName?: string
   ): AbstractionHierarchy {
-    // New simpler format: L0≔item1;item2;item3 (semicolon-separated on each line)
+    // New simpler format: L0≔item1;item2;item3 (semicolon-separated, may span multiple lines)
     const extractLevel = (level: string): string[] => {
       // Match L0≔... or L0=... pattern, handle both ≔ and =
-      const regex = new RegExp(`${level}[≔=](.+?)(?:\\n|$)`, 'i');
+      // Fix: Use [\s\S]+? to match any character including newlines (multiline content)
+      // Stop at next level marker (L0, L1, L2, L3) or end of string
+      // Spec 16 Section 4.13.5: Hierarchy Response Parsing
+      const regex = new RegExp(`${level}[≔=]([\\s\\S]+?)(?=L\\d|$)`, 'i');
       const match = response.match(regex);
       if (!match) return [];
       // Split by semicolon, clean up
@@ -1127,14 +1132,21 @@ Be concise. Each item should be a short phrase or sentence.`;
     // Use LLM to select diverse strategies
     console.log(`🎯 Asking LLM to select diverse strategies from ${patterns.length} patterns...`);
 
+    // Fix: Cap selection request at available patterns (can't select more than exist)
+    // Spec 05 Section 8.4: Selection Capping
+    const effectiveMax = Math.min(this.consolidationOptions.fewShotMax, patterns.length);
+    if (effectiveMax < this.consolidationOptions.fewShotMax) {
+      console.log(`   (Capping selection at ${effectiveMax} - only ${patterns.length} patterns available)`);
+    }
+
     // Build prompts based on mode
     const systemPrompt = this.aispMode === 'aisp-full'
       ? this.buildAISPFewShotSelectionSystemPrompt()
       : 'You are selecting diverse Sudoku strategies. Be strict about avoiding duplicates.';
 
     const prompt = this.aispMode === 'aisp-full'
-      ? this.buildAISPFewShotSelectionPrompt(patterns, this.consolidationOptions.fewShotMax)
-      : this.buildEnglishFewShotSelectionPrompt(patterns);
+      ? this.buildAISPFewShotSelectionPrompt(patterns, effectiveMax)
+      : this.buildEnglishFewShotSelectionPrompt(patterns, effectiveMax);
 
     try {
       const result = await this.llmClient.chat(
@@ -1252,19 +1264,23 @@ ${patternList}
 
   /**
    * Build English-formatted fewshot selection prompt (original format)
+   * @param patterns - Patterns to select from
+   * @param count - Number of strategies to select (capped at available patterns)
    */
-  private buildEnglishFewShotSelectionPrompt(patterns: SynthesizedPattern[]): string {
+  private buildEnglishFewShotSelectionPrompt(patterns: SynthesizedPattern[], count: number): string {
+    // Use min between requested count and minimum acceptable
+    const minAcceptable = Math.min(this.consolidationOptions.fewShotMin, count);
     return `You have synthesized ${patterns.length} Sudoku strategies from your experiences.
 
 Your strategies:
 ${patterns.map((p, i) => `${i + 1}. ${p.strategyName}: ${p.whenToUse}`).join('\n')}
 
-Now select EXACTLY ${this.consolidationOptions.fewShotMax} DIVERSE strategies to remember as few-shot examples.
-(Target: ${this.consolidationOptions.fewShotMax} strategies, minimum acceptable: ${this.consolidationOptions.fewShotMin})
+Now select EXACTLY ${count} DIVERSE strategies to remember as few-shot examples.
+(Target: ${count} strategies, minimum acceptable: ${minAcceptable})
 
-CRITICAL: Select the FULL ${this.consolidationOptions.fewShotMax} strategies!
-- You MUST provide ${this.consolidationOptions.fewShotMax} selections to maximize learning diversity
-- Do NOT stop early - find ${this.consolidationOptions.fewShotMax} distinct approaches
+CRITICAL: Select the FULL ${count} strategies!
+- You MUST provide ${count} selections to maximize learning diversity
+- Do NOT stop early - find ${count} distinct approaches
 - Do NOT select strategies that use the same underlying technique
 - If multiple strategies are variations of "last digit in row/column/box", pick only ONE
 - Aim for variety: completion strategies, elimination strategies, constraint checking, etc.
@@ -2207,7 +2223,9 @@ CONFIDENCE: [0.0-1.0 how confident you are in this analysis]`;
     console.log(`✅ Synthesized ${sharedPatterns.length} SHARED patterns for both units`);
 
     // Secondary refinement: If not enough patterns for 2x mode, split largest clusters
-    const minPatternsFor2x = DOUBLED_CONSOLIDATION_COUNTS.fewShotMin;
+    // Fix: Use fewShotMax + 2 (12) to ensure LLM has headroom for diversity selection
+    // Spec 05 Section 8.4: minPatternsFor2x = fewShotMax + 2
+    const minPatternsFor2x = DOUBLED_CONSOLIDATION_COUNTS.fewShotMax + 2;
     if (sharedPatterns.length < minPatternsFor2x && sharedPatterns.length > 0) {
       console.log(`\n⚠️  Only ${sharedPatterns.length} patterns, need ${minPatternsFor2x} for 2x mode`);
       console.log(`🔄 Secondary refinement: splitting largest clusters...`);

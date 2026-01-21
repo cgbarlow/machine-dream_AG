@@ -13,6 +13,7 @@ import type { LLMProfile, LLMProvider, ValidationResult } from './types.js';
  */
 const VALID_PROVIDERS: LLMProvider[] = [
   'lmstudio',
+  'llama-server',
   'openai',
   'anthropic',
   'ollama',

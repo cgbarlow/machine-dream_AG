@@ -1813,7 +1813,20 @@ The system uses two thresholds:
 | Threshold | Default | Purpose |
 |-----------|---------|---------|
 | `dominanceThreshold` | 0.4 (40%) | Triggers initial refinement if any cluster exceeds this % |
-| `minPatternsFor2x` | 6 | Minimum patterns needed for 2x mode; triggers secondary refinement if not met |
+| `minPatternsFor2x` | 12 | Minimum patterns needed for 2x mode; triggers secondary refinement if not met |
+
+**Rationale for minPatternsFor2x = 12:**
+The 2x mode requests `fewShotMax = 10` strategies from the LLM. Setting the threshold to 12 ensures sufficient patterns are available for diversity selection. If only 9 patterns exist, the LLM cannot select 10 diverse strategies.
+
+**Selection Capping:**
+When selecting diverse strategies via `generateFewShotsFromPatterns()`, the selection request is capped at the available pattern count:
+
+```typescript
+// Cap selection request to available patterns (can't select more than exist)
+const effectiveMax = Math.min(this.consolidationOptions.fewShotMax, patterns.length);
+```
+
+This prevents mathematically impossible selection requests (e.g., asking LLM to select 10 strategies from 9 patterns).
 
 #### Workflow
 
@@ -1823,9 +1836,9 @@ Shared Clustering (target: 23 clusters)
          ▼
 LLM Categorization: 360 experiences → 5 patterns
          │
-         ├── If patterns ≥ 6: Proceed to dual unit creation
+         ├── If patterns ≥ 12: Proceed to dual unit creation
          │
-         └── If patterns < 6: Secondary Refinement
+         └── If patterns < 12: Secondary Refinement
                    │
                    ▼
               Split largest clusters:
@@ -1845,7 +1858,8 @@ LLM Categorization: 360 experiences → 5 patterns
 
 ```typescript
 // In DreamingConsolidator.consolidateDual():
-const minPatternsFor2x = DOUBLED_CONSOLIDATION_COUNTS.fewShotMin; // 6
+// Use fewShotMax + 2 to ensure LLM has headroom for diversity selection
+const minPatternsFor2x = DOUBLED_CONSOLIDATION_COUNTS.fewShotMax + 2; // 12
 
 if (sharedPatterns.length < minPatternsFor2x && sharedPatterns.length > 0) {
   console.log(`⚠️  Only ${sharedPatterns.length} patterns, need ${minPatternsFor2x} for 2x mode`);
@@ -1888,9 +1902,9 @@ The `splitClusterIntoSubPatterns()` method:
 
 | Scenario | Initial Patterns | After Secondary Refinement | Result |
 |----------|------------------|---------------------------|--------|
-| Highly homogeneous | 3-5 | 6-8 | 2x mode now possible |
-| Moderately diverse | 6-10 | (unchanged) | No refinement needed |
-| Highly diverse | 10+ | (unchanged) | No refinement needed |
+| Highly homogeneous | 3-8 | 12-15 | 2x mode now possible |
+| Moderately diverse | 9-11 | 12-14 | Secondary refinement triggered |
+| Highly diverse | 12+ | (unchanged) | No refinement needed |
 
 ---
 

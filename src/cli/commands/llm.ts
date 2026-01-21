@@ -17,7 +17,7 @@ import { LLMProfileManager, ProfileValidator } from '../../llm/profiles/index.js
 import type { CreateProfileOptions, UpdateProfileOptions, LLMProvider } from '../../llm/profiles/index.js';
 import { LearningUnitManager } from '../../llm/LearningUnitManager.js';
 import type { LearningUnitExport } from '../../llm/LearningUnitManager.js';
-import { DEFAULT_LEARNING_UNIT_ID, DOUBLE_STRATEGY_SUFFIX, NO_LEARNING_UNIT_DISPLAY } from '../../llm/types.js';
+import { DEFAULT_LEARNING_UNIT_ID, DOUBLE_STRATEGY_SUFFIX, NO_LEARNING_UNIT_DISPLAY, DEFAULT_CONSOLIDATION_COUNTS, DOUBLED_CONSOLIDATION_COUNTS } from '../../llm/types.js';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { resolve, join, basename } from 'path';
 import * as readline from 'readline/promises';
@@ -216,6 +216,80 @@ async function runLmsCommand(args: string, timeout = 30000): Promise<{ stdout: s
 }
 
 /**
+ * Check if llama-server is running by checking if the endpoint responds
+ */
+async function isLlamaServerRunning(baseUrl: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${baseUrl}/health`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(3000),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Start llama-server using the launchCommand from profile
+ * Runs the command via PowerShell on Windows (from WSL)
+ */
+async function startLlamaServer(launchCommand: string, baseUrl: string): Promise<boolean> {
+  logger.info('🚀 Starting llama-server...');
+  logger.debug(`   Command: ${launchCommand}`);
+
+  try {
+    // Run the command via PowerShell (for Windows executables from WSL)
+    // Use Start-Process to run it detached so it continues after we return
+    const psCommand = `Start-Process -FilePath 'cmd.exe' -ArgumentList '/c ${launchCommand.replace(/"/g, '\\"')}' -WindowStyle Hidden`;
+
+    await execAsync(`powershell.exe -Command "${psCommand}"`, { timeout: 10000 });
+
+    // Wait for server to start (check health endpoint)
+    logger.info('   Waiting for server to start...');
+    for (let i = 0; i < 60; i++) { // Wait up to 2 minutes
+      await new Promise(r => setTimeout(r, 2000));
+      if (await isLlamaServerRunning(baseUrl)) {
+        logger.info('✓ llama-server started successfully');
+        return true;
+      }
+      if (i % 5 === 0) {
+        logger.info(`   Still waiting... (${(i + 1) * 2}s)`);
+      }
+    }
+
+    logger.error('❌ llama-server failed to start within 2 minutes');
+    return false;
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    logger.error(`❌ Failed to start llama-server: ${errMsg}`);
+    return false;
+  }
+}
+
+/**
+ * Stop llama-server by killing the process
+ */
+async function stopLlamaServer(): Promise<boolean> {
+  logger.info('🛑 Stopping llama-server...');
+
+  try {
+    // Kill llama-server.exe process via PowerShell
+    await execAsync(`powershell.exe -Command "Stop-Process -Name 'llama-server' -Force -ErrorAction SilentlyContinue"`, { timeout: 10000 });
+
+    // Wait a moment for process to terminate
+    await new Promise(r => setTimeout(r, 2000));
+
+    logger.info('✓ llama-server stopped');
+    return true;
+  } catch (error) {
+    // Process might not exist, which is fine
+    logger.debug(`   Stop result: ${error instanceof Error ? error.message : String(error)}`);
+    return true;
+  }
+}
+
+/**
  * Ensure the required model is loaded in LM Studio
  * Uses lms CLI to unload/load models as needed
  * @param requiredModel - Friendly model name (for display and API matching)
@@ -316,6 +390,60 @@ async function ensureModelLoaded(requiredModel: string, baseUrl: string, modelPa
     logger.info('   You can manually load the model in LM Studio GUI and retry');
     return false;
   }
+}
+
+/**
+ * Unified function to ensure model is ready for the given provider
+ * Handles both lmstudio (via lms CLI) and llama-server (via launchCommand)
+ */
+async function ensureModelReady(config: {
+  model: string;
+  baseUrl: string;
+  modelPath?: string;
+  provider?: string;
+  launchCommand?: string;
+}): Promise<boolean> {
+  const provider = config.provider || 'lmstudio';
+
+  if (provider === 'llama-server') {
+    // Check if llama-server is already running
+    if (await isLlamaServerRunning(config.baseUrl)) {
+      logger.info(`✓ llama-server is running at ${config.baseUrl}`);
+      return true;
+    }
+
+    // Need to start it
+    if (!config.launchCommand) {
+      logger.error('❌ llama-server not running and no launchCommand configured');
+      logger.info('   Start it manually or add launchCommand to your profile');
+      logger.info(`   Use: machine-dream llm server start <profile>`);
+      return false;
+    }
+
+    return await startLlamaServer(config.launchCommand, config.baseUrl);
+  }
+
+  // Default: lmstudio or other OpenAI-compatible providers
+  if (provider === 'lmstudio') {
+    return await ensureModelLoaded(config.model, config.baseUrl, config.modelPath);
+  }
+
+  // For other providers (openai, anthropic, etc.), just check if the endpoint is reachable
+  try {
+    const response = await fetch(`${config.baseUrl}/models`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(5000),
+    });
+    if (response.ok) {
+      logger.info(`✓ API endpoint reachable at ${config.baseUrl}`);
+      return true;
+    }
+  } catch {
+    // Fall through to error
+  }
+
+  logger.error(`❌ Cannot connect to ${provider} at ${config.baseUrl}`);
+  return false;
 }
 
 /**
@@ -505,14 +633,25 @@ export function registerLLMCommand(program: Command): void {
         logger.info(`Base URL:       ${p.baseUrl}`);
         logger.info(`Model:          ${p.model}`);
         if (p.modelPath) logger.info(`Model Path:     ${p.modelPath}`);
+        if (p.launchCommand) {
+          // Truncate long commands for display
+          const cmd = p.launchCommand.length > 80
+            ? p.launchCommand.substring(0, 77) + '...'
+            : p.launchCommand;
+          logger.info(`Launch Cmd:     ${cmd}`);
+        }
         logger.info(`API Key:        ${p.apiKey ? (ProfileValidator.isEnvVarReference(p.apiKey) ? p.apiKey : '***hidden***') : '(none)'}`);
         logger.info('');
         logger.info('Parameters:');
         logger.info(`  Temperature:      ${p.parameters.temperature}`);
         logger.info(`  Max Tokens:       ${p.parameters.maxTokens}`);
         if (p.parameters.topP) logger.info(`  Top P:            ${p.parameters.topP}`);
+        if (p.parameters.topK) logger.info(`  Top K:            ${p.parameters.topK}`);
+        if (p.parameters.minP) logger.info(`  Min P:            ${p.parameters.minP}`);
         if (p.parameters.frequencyPenalty) logger.info(`  Frequency Penalty: ${p.parameters.frequencyPenalty}`);
         if (p.parameters.presencePenalty) logger.info(`  Presence Penalty:  ${p.parameters.presencePenalty}`);
+        if (p.parameters.repeatPenalty !== undefined) logger.info(`  Repeat Penalty:   ${p.parameters.repeatPenalty}`);
+        if (p.parameters.dryMultiplier) logger.info(`  DRY Multiplier:   ${p.parameters.dryMultiplier}`);
         logger.info('');
         logger.info(`Timeout:        ${p.timeout}ms`);
         logger.info(`Retries:        ${p.retries}`);
@@ -838,7 +977,7 @@ export function registerLLMCommand(program: Command): void {
         validateConfig(config);
 
         // Ensure the required model is loaded in LM Studio
-        const modelReady = await ensureModelLoaded(config.model, config.baseUrl, config.modelPath);
+        const modelReady = await ensureModelReady(config);
         if (!modelReady) {
           throw new CLIError('Model not available', 1, `Could not load model "${config.model}". Please load it manually in LM Studio.`);
         }
@@ -2287,6 +2426,110 @@ export function registerLLMCommand(program: Command): void {
     });
 
   // ===================================================================
+  // llm server - llama-server management commands
+  // ===================================================================
+
+  const server = llm.command('server').description('Manage llama-server instances');
+
+  // llm server start
+  server
+    .command('start')
+    .description('Start llama-server for a profile')
+    .argument('<profile>', 'Profile name with llama-server provider')
+    .action(async (profileName) => {
+      try {
+        const profileManager = new LLMProfileManager();
+        const profile = profileManager.get(profileName);
+
+        if (!profile) {
+          throw new CLIError(`Profile not found: ${profileName}`, 1);
+        }
+
+        if (profile.provider !== 'llama-server') {
+          throw new CLIError(`Profile "${profileName}" is not a llama-server provider (is: ${profile.provider})`, 1);
+        }
+
+        if (!profile.launchCommand) {
+          throw new CLIError(`Profile "${profileName}" has no launchCommand configured`, 1, undefined, [
+            'Add a launchCommand to your profile with the full llama-server command line',
+            'Example: llama-server.exe --model "path/to/model.gguf" --port 8080 ...',
+          ]);
+        }
+
+        // Check if already running
+        if (await isLlamaServerRunning(profile.baseUrl)) {
+          logger.info(`✓ llama-server is already running at ${profile.baseUrl}`);
+          return;
+        }
+
+        // Start the server
+        const success = await startLlamaServer(profile.launchCommand, profile.baseUrl);
+        if (!success) {
+          throw new CLIError('Failed to start llama-server', 1);
+        }
+      } catch (error) {
+        if (error instanceof CLIError) throw error;
+        throw new CLIError('Failed to start server', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm server stop
+  server
+    .command('stop')
+    .description('Stop llama-server')
+    .action(async () => {
+      try {
+        await stopLlamaServer();
+      } catch (error) {
+        throw new CLIError('Failed to stop server', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm server status
+  server
+    .command('status')
+    .description('Check llama-server status')
+    .argument('[profile]', 'Profile name (or checks default port 8080)')
+    .action(async (profileName) => {
+      try {
+        let baseUrl = 'http://127.0.0.1:8080';
+
+        if (profileName) {
+          const profileManager = new LLMProfileManager();
+          const profile = profileManager.get(profileName);
+          if (profile) {
+            baseUrl = profile.baseUrl;
+          }
+        }
+
+        const running = await isLlamaServerRunning(baseUrl);
+        if (running) {
+          logger.info(`✓ llama-server is running at ${baseUrl}`);
+
+          // Try to get model info
+          try {
+            const response = await fetch(`${baseUrl}/v1/models`, {
+              signal: AbortSignal.timeout(3000),
+            });
+            if (response.ok) {
+              const data = await response.json() as { data?: Array<{ id: string }> };
+              const models = data.data?.map(m => m.id) || [];
+              if (models.length > 0) {
+                logger.info(`   Model: ${models.join(', ')}`);
+              }
+            }
+          } catch {
+            // Ignore errors fetching model info
+          }
+        } else {
+          logger.info(`✗ llama-server is not running at ${baseUrl}`);
+        }
+      } catch (error) {
+        throw new CLIError('Failed to check server status', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // ===================================================================
   // llm dream - LLM learning consolidation commands
   // ===================================================================
 
@@ -2381,7 +2624,7 @@ export function registerLLMCommand(program: Command): void {
           manager.recordUsage(profileName);
 
           // Ensure the required model is loaded in LM Studio (auto-loads if needed)
-          const modelReady = await ensureModelLoaded(config.model, config.baseUrl, config.modelPath);
+          const modelReady = await ensureModelReady(config);
           if (!modelReady) {
             logger.warn(`⚠️ Could not load model "${config.model}" for profile ${profileName}. Skipping...`);
             continue;
@@ -2682,9 +2925,10 @@ export function registerLLMCommand(program: Command): void {
             logger.info(`      Experiences processed: ${dualResult.doubled.experiencesConsolidated}`);
             logger.info(`      Few-shots created: ${dualResult.doubled.fewShotsUpdated}`);
 
-            // Verify both units
-            const standardFewShots = await experienceStore.getFewShots(profileName, learningUnitId);
-            const doubledFewShots = await experienceStore.getFewShots(profileName, `${learningUnitId}${DOUBLE_STRATEGY_SUFFIX}`);
+            // Verify both units - pass explicit limits to avoid default=5 truncation
+            // Spec 05 Section 8.4: Display should show correct strategy counts
+            const standardFewShots = await experienceStore.getFewShots(profileName, learningUnitId, DEFAULT_CONSOLIDATION_COUNTS.fewShotMax);
+            const doubledFewShots = await experienceStore.getFewShots(profileName, `${learningUnitId}${DOUBLE_STRATEGY_SUFFIX}`, DOUBLED_CONSOLIDATION_COUNTS.fewShotMax);
             logger.info(`\n📚 Learning units created:`);
             logger.info(`   "${learningUnitId}": ${standardFewShots.length} few-shot examples`);
             logger.info(`   "${learningUnitId}${DOUBLE_STRATEGY_SUFFIX}": ${doubledFewShots.length} few-shot examples\n`);

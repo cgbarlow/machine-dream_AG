@@ -593,12 +593,19 @@ Actions:
 
 Options (for 'add' action):
   --name <name>                # Profile name (required)
-  --provider <provider>        # lmstudio|openai|anthropic|ollama|openrouter|custom
+  --provider <provider>        # lmstudio|llama-server|openai|anthropic|ollama|openrouter|custom
   --base-url <url>             # API endpoint URL
   --api-key <key>              # API key or ${ENV_VAR} reference
-  --model <model>              # Model name
+  --model <model>              # Model name (friendly display name)
+  --model-path <path>          # Full model path for LM Studio CLI auto-load
+  --launch-command <cmd>       # Command to start server (llama-server provider)
   --temperature <n>            # Temperature (0.0-2.0, default: 0.7)
   --max-tokens <n>             # Max response tokens (default: 2048)
+  --top-k <n>                  # Top-K sampling (e.g., 50)
+  --top-p <n>                  # Top-P/nucleus sampling (0.0-1.0)
+  --min-p <n>                  # Min-P sampling (0.0-1.0)
+  --repeat-penalty <n>         # Repeat penalty (1.0 = disabled)
+  --dry-multiplier <n>         # DRY penalty multiplier (e.g., 1.1)
   --timeout <ms>               # Request timeout (default: 60000)
   --tags <tag1,tag2>           # Comma-separated tags
   --color <color>              # Display color for TUI
@@ -655,7 +662,52 @@ machine-dream llm profile export profiles-backup.json
 machine-dream llm profile import profiles-backup.json
 ```
 
-#### 3.8.1 `llm play` - Play Puzzle with AI Model
+#### 3.8.1 `llm server` - Manage llama-server Instances
+
+Commands for starting, stopping, and checking status of llama-server instances. Used with profiles that have `provider: "llama-server"`.
+
+```bash
+machine-dream llm server <action> [options]
+
+Actions:
+  start [profile]                 # Start llama-server for profile (default: active profile)
+  stop                            # Stop running llama-server instance
+  status                          # Check if llama-server is running
+
+Options:
+  --profile <name>                # Use specific profile (overrides active)
+```
+
+**Examples:**
+
+```bash
+# Check if llama-server is running
+machine-dream llm server status
+
+# Start llama-server for active profile (must have launchCommand)
+machine-dream llm server start
+
+# Start llama-server for specific profile
+machine-dream llm server start --profile glm-4-llama
+
+# Stop llama-server
+machine-dream llm server stop
+```
+
+**Requirements:**
+- Profile must have `provider: "llama-server"` and `launchCommand` field
+- The `launchCommand` is executed to start the server
+- Server health is checked via `/health` endpoint
+- On Windows/WSL, uses PowerShell to launch server in background
+
+**Integration with `llm play`:**
+- When using a `llama-server` profile with `llm play`, the server is automatically started if not running
+- When using an `lmstudio` profile, the model is automatically loaded via LM Studio CLI
+- Both providers support seamless model readiness checking before gameplay begins
+
+---
+
+#### 3.8.2 `llm play` - Play Puzzle with AI Model
 
 ```bash
 machine-dream llm play <puzzle-file> [options]
@@ -709,7 +761,7 @@ machine-dream llm play puzzles/medium-01.json \
   --max-tokens 4096
 ```
 
-#### 3.8.2 `llm stats` - View Learning Statistics
+#### 3.8.3 `llm stats` - View Learning Statistics
 
 ```bash
 machine-dream llm stats [options]
@@ -720,13 +772,13 @@ Options:
   --format <format>            # json|table|yaml (default: table)
 ```
 
-#### 3.8.3 `llm dream` - Consolidate LLM Learning
+#### 3.8.4 `llm dream` - Consolidate LLM Learning
 
 Commands for consolidating LLM learning from play experiences into reusable few-shot examples.
 
 **Subcommands:**
 
-##### 3.8.3.1 `llm dream run` - Run Consolidation
+##### 3.8.4.1 `llm dream run` - Run Consolidation
 
 Consolidate experiences into few-shot examples for a specific profile.
 
@@ -800,7 +852,7 @@ Patterns extracted: 8
 ✅ Profile now has 12 few-shot examples for learning
 ```
 
-##### 3.8.3.2 `llm dream status` - Check Learning Status
+##### 3.8.4.2 `llm dream status` - Check Learning Status
 
 Show current learning state for a profile.
 
@@ -843,7 +895,7 @@ Model: qwen3-30b
 💡 Run 'llm dream run --profile qwen3-coder' to consolidate
 ```
 
-#### 3.8.4 `llm benchmark` - Compare Memory ON vs OFF
+#### 3.8.5 `llm benchmark` - Compare Memory ON vs OFF
 
 ```bash
 machine-dream llm benchmark [options]
@@ -854,7 +906,7 @@ Options:
   --output <dir>               # Benchmark report directory
 ```
 
-#### 3.8.5 `llm memory show` - View Experience Details
+#### 3.8.6 `llm memory show` - View Experience Details
 
 View complete details of a stored LLM experience including full reasoning text and board state.
 
@@ -891,7 +943,7 @@ machine-dream llm memory show exp-abc123 --format json
 machine-dream llm memory show exp-abc123 --no-grid
 ```
 
-#### 3.8.6 `llm memory list` - Enhanced Experience List
+#### 3.8.7 `llm memory list` - Enhanced Experience List
 
 Enhanced version of `llm memory list` with additional filtering and display options.
 
@@ -926,7 +978,7 @@ machine-dream llm memory list --profile openai-gpt4 --format json > gpt4.json
 machine-dream llm memory list --profile lm-studio-qwen3 --format json > qwen3.json
 ```
 
-#### 3.8.6.1 `llm memory clear` - Clear All Memory
+#### 3.8.7.1 `llm memory clear` - Clear All Memory
 
 Clear ALL agent memory data. For selective deletion, use `llm session delete` instead.
 
@@ -954,7 +1006,7 @@ machine-dream llm memory clear --confirm
 
 **Note:** To delete specific sessions while preserving others, use `llm session delete` with filters.
 
-#### 3.8.7 `llm session list` - List Play Sessions
+#### 3.8.8 `llm session list` - List Play Sessions
 
 List play sessions with aggregate statistics, exit status, and learning flags for A/B testing analysis.
 
@@ -1017,7 +1069,7 @@ machine-dream llm session list --unit my-learning-unit
 machine-dream llm session list --format json > sessions.json
 ```
 
-#### 3.8.8 `llm session show` - Session Details
+#### 3.8.9 `llm session show` - Session Details
 
 Show detailed breakdown of a play session including move-by-move analysis and learning context.
 
@@ -1084,7 +1136,7 @@ machine-dream llm session show be1171ea-1b0d-47a9-b28e-3826134424e2 --format jso
 🔍 Use 'llm memory list --session sess-abc1' to see all moves
 ```
 
-#### 3.8.9 `llm session edit` - Edit Session Metadata
+#### 3.8.10 `llm session edit` - Edit Session Metadata
 
 Edit session metadata such as notes and annotations.
 
@@ -1107,7 +1159,7 @@ machine-dream llm session edit be1171ea-1b0d-47a9-b28e-3826134424e2 --notes "A/B
 machine-dream llm session edit be1171ea-1b0d-47a9-b28e-3826134424e2 --notes "Updated notes"
 ```
 
-#### 3.8.10 `llm session delete` - Delete Sessions
+#### 3.8.11 `llm session delete` - Delete Sessions
 
 Delete sessions and their associated experiences (memories). Supports filtering to delete multiple sessions at once.
 
@@ -1145,11 +1197,11 @@ machine-dream llm session delete --unit my-test-unit --yes
 
 **Note:** For clearing ALL memory data, use `llm memory clear` instead.
 
-#### 3.8.11 `llm learning` - Learning Unit Management
+#### 3.8.12 `llm learning` - Learning Unit Management
 
 Commands for managing learning units (consolidated knowledge packages).
 
-##### 3.8.11.1 `llm learning list` - List Learning Units
+##### 3.8.12.1 `llm learning list` - List Learning Units
 
 ```bash
 machine-dream llm learning list [options]
@@ -1159,7 +1211,7 @@ Options:
   --format <format>            # Output format (text|json), default: text
 ```
 
-##### 3.8.11.2 `llm learning show` - Show Learning Unit Details
+##### 3.8.12.2 `llm learning show` - Show Learning Unit Details
 
 ```bash
 machine-dream llm learning show <unit-id> [options]
@@ -1171,7 +1223,7 @@ Options:
   --format <format>            # Output format (text|json), default: text
 ```
 
-##### 3.8.11.3 `llm learning clone` - Clone Learning Unit
+##### 3.8.12.3 `llm learning clone` - Clone Learning Unit
 
 Create a complete copy of a learning unit including all its associated experiences, few-shots, and hierarchy. Useful for backup before making changes or for creating variations.
 
@@ -1203,7 +1255,7 @@ machine-dream llm learning clone gpt-oss-120b_standard_llmclusterv3_20260118_1 g
 machine-dream llm learning clone my-training-unit my-experiment-unit
 ```
 
-##### 3.8.11.4 `llm learning unconsolidate` - Restore Experiences to Global Pool
+##### 3.8.12.4 `llm learning unconsolidate` - Restore Experiences to Global Pool
 
 Restore unit-bound experiences back to the global unconsolidated pool, enabling re-dreaming with the same experiences. This reverses the "sticky" experience model absorption.
 
@@ -1240,7 +1292,7 @@ machine-dream llm learning unconsolidate gpt-oss-120b_standard_llmclusterv3_2026
 machine-dream llm learning unconsolidate gpt-oss-120b_standard_llmclusterv3_20260118_1 --delete-unit --yes
 ```
 
-##### 3.8.11.5 `llm learning delete` - Delete Learning Unit
+##### 3.8.12.5 `llm learning delete` - Delete Learning Unit
 
 ```bash
 machine-dream llm learning delete <unit-id> [options]

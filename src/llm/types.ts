@@ -42,15 +42,29 @@ export interface ValidatedChatResult {
  * LLM Configuration (Spec 11 - Configuration)
  */
 export interface LLMConfig {
-  // LM Studio connection
+  // Connection
   baseUrl: string;          // 'http://localhost:1234/v1'
   model: string;            // 'qwen3-30b' or 'local-model' (friendly name)
   modelPath?: string;       // Full model path for lms CLI (e.g., "Qwen/QwQ-32B-GGUF/qwq-32b-q8_0.gguf")
+  provider?: string;        // Provider type (lmstudio, llama-server, etc.)
+  launchCommand?: string;   // Full command to start server (for llama-server)
 
   // Generation parameters
   temperature: number;      // 0.7 default
   maxTokens: number;        // 1024 for reasoning
   timeout: number;          // 60000ms for large models
+
+  // Extended sampling parameters (LM Studio / llama.cpp)
+  topP?: number;            // Nucleus sampling (0.0-1.0)
+  topK?: number;            // Top-K sampling (e.g., 50)
+  minP?: number;            // Min-P sampling (0.0-1.0)
+  repeatPenalty?: number;   // Repeat penalty (1.0 = disabled)
+
+  // DRY (Don't Repeat Yourself) sampling
+  dryMultiplier?: number;   // DRY penalty multiplier (e.g., 1.1)
+  dryBase?: number;         // DRY base value (e.g., 1.75)
+  dryAllowedLength?: number; // Min sequence length for DRY
+  dryPenaltyLastN?: number; // Context for DRY (-1 = full)
 
   // Learning settings
   memoryEnabled: boolean;   // Toggle for A/B testing

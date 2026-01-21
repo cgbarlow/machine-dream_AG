@@ -227,9 +227,24 @@ export function profileToConfig(profile: LLMProfile): LLMConfig {
     baseUrl,
     model: profile.model,
     modelPath: profile.modelPath,
+    provider: profile.provider,
+    launchCommand: profile.launchCommand,
     temperature: profile.parameters.temperature,
     maxTokens: profile.parameters.maxTokens,
     timeout: profile.timeout,
+
+    // Extended sampling parameters
+    topP: profile.parameters.topP,
+    topK: profile.parameters.topK,
+    minP: profile.parameters.minP,
+    repeatPenalty: profile.parameters.repeatPenalty,
+
+    // DRY sampling parameters
+    dryMultiplier: profile.parameters.dryMultiplier,
+    dryBase: profile.parameters.dryBase,
+    dryAllowedLength: profile.parameters.dryAllowedLength,
+    dryPenaltyLastN: profile.parameters.dryPenaltyLastN,
+
     memoryEnabled: true, // Default to enabled, can be overridden
     maxHistoryMoves: 20, // Default value
     includeReasoning: false, // Default: OFF

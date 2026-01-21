@@ -135,18 +135,33 @@ export class LMStudioClient {
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
     try {
+      // Build request body with optional extended sampling parameters
+      const requestBody: Record<string, unknown> = {
+        model: this.config.model,
+        messages,
+        temperature: this.config.temperature,
+        max_tokens: this.config.maxTokens,
+        stream: !!onStream, // Enable streaming if callback provided
+      };
+
+      // Add extended sampling parameters if configured
+      if (this.config.topP !== undefined) requestBody.top_p = this.config.topP;
+      if (this.config.topK !== undefined) requestBody.top_k = this.config.topK;
+      if (this.config.minP !== undefined) requestBody.min_p = this.config.minP;
+      if (this.config.repeatPenalty !== undefined) requestBody.repeat_penalty = this.config.repeatPenalty;
+
+      // Add DRY sampling parameters if configured
+      if (this.config.dryMultiplier !== undefined) requestBody.dry_multiplier = this.config.dryMultiplier;
+      if (this.config.dryBase !== undefined) requestBody.dry_base = this.config.dryBase;
+      if (this.config.dryAllowedLength !== undefined) requestBody.dry_allowed_length = this.config.dryAllowedLength;
+      if (this.config.dryPenaltyLastN !== undefined) requestBody.dry_penalty_last_n = this.config.dryPenaltyLastN;
+
       const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: this.config.model,
-          messages,
-          temperature: this.config.temperature,
-          max_tokens: this.config.maxTokens,
-          stream: !!onStream, // Enable streaming if callback provided
-        }),
+        body: JSON.stringify(requestBody),
         signal: controller.signal,
       });
 

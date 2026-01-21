@@ -761,6 +761,43 @@ When `--debug` is enabled, parsers must log:
 | 51-80% | Warning logged (always) |
 | 81-100% | Error details logged (with --debug) |
 
+#### 4.13.5 Hierarchy Response Parsing
+
+The `parseAISPHierarchyResponse()` function parses abstraction hierarchy responses with format `L0≔item1;item2;item3`.
+
+**Multiline Content Support:**
+
+Hierarchy levels may span multiple lines. The regex must handle multiline content:
+
+```typescript
+// Extract level content - handles multiline by stopping at next level marker
+const extractLevel = (level: string): string[] => {
+  // [\s\S]+? matches any character including newlines
+  // (?=L\d|$) stops at next level marker (L0, L1, L2, L3) or end of string
+  const regex = new RegExp(`${level}[≔=]([\\s\\S]+?)(?=L\\d|$)`, 'i');
+  const match = response.match(regex);
+  if (!match) return [];
+  return match[1].split(';').map(s => s.trim()).filter(s => s.length > 0);
+};
+```
+
+**AISP List Field Extraction:**
+
+The `extractAISPListField()` function extracts lists from angle brackets `⟨item₁;item₂⟩`:
+
+```typescript
+// [\s\S]*? matches any character including newlines inside angle brackets
+const regex = new RegExp(`${fieldName}≔⟨([\\s\\S]*?)⟩`);
+```
+
+**Why These Patterns:**
+
+| Pattern | Description | Use Case |
+|---------|-------------|----------|
+| `[\\s\\S]+?` | Any char including newlines (non-greedy) | Multiline level content |
+| `(?=L\\d\|$)` | Lookahead for next level or end | Proper boundary detection |
+| `[\\s\\S]*?` | Any char including newlines (allows empty) | Angle bracket content |
+
 ---
 
 ## 5. Prompt Structure
