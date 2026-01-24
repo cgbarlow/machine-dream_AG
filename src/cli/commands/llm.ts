@@ -14,7 +14,7 @@ import type { LLMConfig, LLMExperience } from '../../llm/types.js';
 import { AgentMemory } from '../../memory/AgentMemory.js';
 import type { AgentDBConfig } from '../../types.js';
 import { LLMProfileManager, ProfileValidator } from '../../llm/profiles/index.js';
-import type { CreateProfileOptions, UpdateProfileOptions, LLMProvider } from '../../llm/profiles/index.js';
+import type { CreateProfileOptions, UpdateProfileOptions, UpdateInstanceOptions, ModelParameters, LLMProvider } from '../../llm/profiles/index.js';
 import { LearningUnitManager } from '../../llm/LearningUnitManager.js';
 import type { LearningUnitExport } from '../../llm/LearningUnitManager.js';
 import { DEFAULT_LEARNING_UNIT_ID, DOUBLE_STRATEGY_SUFFIX, NO_LEARNING_UNIT_DISPLAY, DEFAULT_CONSOLIDATION_COUNTS, DOUBLED_CONSOLIDATION_COUNTS } from '../../llm/types.js';
@@ -218,16 +218,74 @@ async function runLmsCommand(args: string, timeout = 30000): Promise<{ stdout: s
 /**
  * Check if llama-server is running by checking if the endpoint responds
  */
-async function isLlamaServerRunning(baseUrl: string): Promise<boolean> {
+async function isLlamaServerRunning(baseUrl: string, verbose = false): Promise<boolean> {
+  // llama-server uses /v1/models endpoint (OpenAI-compatible)
+  const checkUrl = baseUrl.endsWith('/v1') ? `${baseUrl}/models` : `${baseUrl}/v1/models`;
   try {
-    const response = await fetch(`${baseUrl}/health`, {
+    if (verbose) logger.info(`   Checking: ${checkUrl}`);
+    const response = await fetch(checkUrl, {
       method: 'GET',
       signal: AbortSignal.timeout(3000),
     });
+    if (verbose) logger.info(`   Response: ${response.status} ${response.statusText}`);
     return response.ok;
-  } catch {
+  } catch (err) {
+    if (verbose) logger.info(`   Not responding: ${err instanceof Error ? err.message : 'connection refused'}`);
     return false;
   }
+}
+
+/**
+ * Generate llama-server launch command from config parameters
+ * Used when launchCommand is not set but llamaServerPath and modelPath are available
+ *
+ * @param config - LLM configuration with llamaServerPath, modelPath, and parameters
+ * @returns Generated command string
+ */
+function generateLlamaServerCommand(config: LLMConfig): string | null {
+  if (!config.llamaServerPath || !config.modelPath) {
+    return null;
+  }
+
+  // Normalize path separators: if llamaServerPath uses backslashes, convert modelPath too
+  let modelPath = config.modelPath;
+  const usesBackslash = config.llamaServerPath.includes('\\');
+  if (usesBackslash && modelPath.includes('/')) {
+    modelPath = modelPath.replace(/\//g, '\\');
+  } else if (!usesBackslash && modelPath.includes('\\')) {
+    modelPath = modelPath.replace(/\\/g, '/');
+  }
+
+  // Build command with parameters
+  const parts: string[] = [
+    `"${config.llamaServerPath}"`,
+    `-m "${modelPath}"`,
+  ];
+
+  // Extract port from baseUrl for --port parameter
+  try {
+    const url = new URL(config.baseUrl);
+    if (url.port) {
+      parts.push(`--port ${url.port}`);
+    }
+  } catch {
+    // If URL parsing fails, skip port
+  }
+
+  // Add sampling parameters
+  if (config.temperature !== undefined) parts.push(`--temp ${config.temperature}`);
+  if (config.topP !== undefined) parts.push(`--top-p ${config.topP}`);
+  if (config.topK !== undefined) parts.push(`--top-k ${config.topK}`);
+  if (config.minP !== undefined) parts.push(`--min-p ${config.minP}`);
+  if (config.repeatPenalty !== undefined) parts.push(`--repeat-penalty ${config.repeatPenalty}`);
+
+  // Add DRY sampling parameters
+  if (config.dryMultiplier !== undefined) parts.push(`--dry-multiplier ${config.dryMultiplier}`);
+  if (config.dryBase !== undefined) parts.push(`--dry-base ${config.dryBase}`);
+  if (config.dryAllowedLength !== undefined) parts.push(`--dry-allowed-length ${config.dryAllowedLength}`);
+  if (config.dryPenaltyLastN !== undefined) parts.push(`--dry-penalty-last-n ${config.dryPenaltyLastN}`);
+
+  return parts.join(' ');
 }
 
 /**
@@ -236,24 +294,38 @@ async function isLlamaServerRunning(baseUrl: string): Promise<boolean> {
  */
 async function startLlamaServer(launchCommand: string, baseUrl: string): Promise<boolean> {
   logger.info('🚀 Starting llama-server...');
-  logger.debug(`   Command: ${launchCommand}`);
 
   try {
-    // Run the command via PowerShell (for Windows executables from WSL)
-    // Use Start-Process to run it detached so it continues after we return
-    const psCommand = `Start-Process -FilePath 'cmd.exe' -ArgumentList '/c ${launchCommand.replace(/"/g, '\\"')}' -WindowStyle Hidden`;
+    // Double backslashes for cmd.exe (they get interpreted as escapes)
+    const escapedCmd = launchCommand.replace(/\\/g, '\\\\');
+    const cmdCommand = `cmd.exe /c start "" ${escapedCmd}`;
+    logger.info(`   Launching...`);
 
-    await execAsync(`powershell.exe -Command "${psCommand}"`, { timeout: 10000 });
+    // Run the command - ignore errors since UNC path warning causes non-zero exit
+    try {
+      await execAsync(cmdCommand, { timeout: 15000 });
+    } catch (e) {
+      // Ignore - the UNC path warning causes a non-zero exit but server still starts
+      const msg = e instanceof Error ? e.message : '';
+      if (!msg.includes('UNC paths are not supported')) {
+        throw e; // Re-throw if it's a different error
+      }
+    }
 
-    // Wait for server to start (check health endpoint)
-    logger.info('   Waiting for server to start...');
+    // Wait for server to be ready
+    logger.info('   Waiting for server to initialize...');
+    await new Promise(r => setTimeout(r, 8000));
+
+    // Wait for server to start (check /v1/models endpoint)
+    logger.info('   Waiting for server to respond...');
     for (let i = 0; i < 60; i++) { // Wait up to 2 minutes
       await new Promise(r => setTimeout(r, 2000));
-      if (await isLlamaServerRunning(baseUrl)) {
+      const verbose = i === 0 || i % 10 === 0; // Verbose on first check and every 20s
+      if (await isLlamaServerRunning(baseUrl, verbose)) {
         logger.info('✓ llama-server started successfully');
         return true;
       }
-      if (i % 5 === 0) {
+      if (i % 5 === 0 && i > 0) {
         logger.info(`   Still waiting... (${(i + 1) * 2}s)`);
       }
     }
@@ -394,15 +466,14 @@ async function ensureModelLoaded(requiredModel: string, baseUrl: string, modelPa
 
 /**
  * Unified function to ensure model is ready for the given provider
- * Handles both lmstudio (via lms CLI) and llama-server (via launchCommand)
+ * Handles both lmstudio (via lms CLI) and llama-server (via launchCommand or auto-generated)
+ *
+ * For llama-server provider:
+ * - If launchCommand is set, use it as override
+ * - If launchCommand is not set but llamaServerPath + modelPath are, generate command
+ * - If neither, error with instructions
  */
-async function ensureModelReady(config: {
-  model: string;
-  baseUrl: string;
-  modelPath?: string;
-  provider?: string;
-  launchCommand?: string;
-}): Promise<boolean> {
+async function ensureModelReady(config: LLMConfig): Promise<boolean> {
   const provider = config.provider || 'lmstudio';
 
   if (provider === 'llama-server') {
@@ -412,15 +483,32 @@ async function ensureModelReady(config: {
       return true;
     }
 
+    // Determine launch command: explicit override or auto-generated
+    let launchCommand = config.launchCommand;
+
+    if (!launchCommand) {
+      // Try to generate command from llamaServerPath + modelPath + parameters
+      const generatedCommand = generateLlamaServerCommand(config);
+
+      if (generatedCommand) {
+        launchCommand = generatedCommand;
+        logger.info('   Auto-generating launch command from profile settings...');
+        logger.debug(`   Generated: ${launchCommand}`);
+      }
+    }
+
     // Need to start it
-    if (!config.launchCommand) {
-      logger.error('❌ llama-server not running and no launchCommand configured');
-      logger.info('   Start it manually or add launchCommand to your profile');
+    if (!launchCommand) {
+      logger.error('❌ llama-server not running and cannot determine how to start it');
+      logger.info('   Options:');
+      logger.info('   1. Set launchCommand in profile (full command override)');
+      logger.info('   2. Set llamaServerPath + modelPath in profile (auto-generate command)');
+      logger.info('   3. Start server manually');
       logger.info(`   Use: machine-dream llm server start <profile>`);
       return false;
     }
 
-    return await startLlamaServer(config.launchCommand, config.baseUrl);
+    return await startLlamaServer(launchCommand, config.baseUrl);
   }
 
   // Default: lmstudio or other OpenAI-compatible providers
@@ -533,6 +621,8 @@ export function registerLLMCommand(program: Command): void {
     .option('--api-key <key>', 'API key or ${ENV_VAR} reference')
     .option('--model <model>', 'Model name (friendly name for display)')
     .option('--model-path <path>', 'Full model path for lms CLI (e.g., Qwen/QwQ-32B-GGUF/qwq-32b-q8_0.gguf)')
+    .option('--llama-server-path <path>', 'Path to llama-server executable (for llama-server provider)')
+    .option('--launch-command <cmd>', 'Override launch command (for llama-server provider)')
     .option('--temperature <n>', 'Temperature (0.0-2.0)', '0.7')
     .option('--max-tokens <n>', 'Max response tokens', '2048')
     .option('--timeout <ms>', 'Request timeout (ms)', '60000')
@@ -574,6 +664,8 @@ export function registerLLMCommand(program: Command): void {
           baseUrl,
           model,
           modelPath: modelPath || undefined,
+          llamaServerPath: options.llamaServerPath || undefined,
+          launchCommand: options.launchCommand || undefined,
           apiKey: apiKey || undefined,
           parameters: {
             temperature: parseFloat(options.temperature),
@@ -642,16 +734,21 @@ export function registerLLMCommand(program: Command): void {
         }
         logger.info(`API Key:        ${p.apiKey ? (ProfileValidator.isEnvVarReference(p.apiKey) ? p.apiKey : '***hidden***') : '(none)'}`);
         logger.info('');
-        logger.info('Parameters:');
-        logger.info(`  Temperature:      ${p.parameters.temperature}`);
-        logger.info(`  Max Tokens:       ${p.parameters.maxTokens}`);
-        if (p.parameters.topP) logger.info(`  Top P:            ${p.parameters.topP}`);
-        if (p.parameters.topK) logger.info(`  Top K:            ${p.parameters.topK}`);
-        if (p.parameters.minP) logger.info(`  Min P:            ${p.parameters.minP}`);
-        if (p.parameters.frequencyPenalty) logger.info(`  Frequency Penalty: ${p.parameters.frequencyPenalty}`);
-        if (p.parameters.presencePenalty) logger.info(`  Presence Penalty:  ${p.parameters.presencePenalty}`);
-        if (p.parameters.repeatPenalty !== undefined) logger.info(`  Repeat Penalty:   ${p.parameters.repeatPenalty}`);
-        if (p.parameters.dryMultiplier) logger.info(`  DRY Multiplier:   ${p.parameters.dryMultiplier}`);
+
+        // Get effective parameters from active instance
+        const activeInstanceName = manager.getActiveInstance(name);
+        const effectiveParams = manager.getEffectiveParameters(name) || p.parameters;
+
+        logger.info(`Parameters (instance: ${activeInstanceName}):`);
+        logger.info(`  Temperature:      ${effectiveParams.temperature}`);
+        logger.info(`  Max Tokens:       ${effectiveParams.maxTokens}`);
+        if (effectiveParams.topP) logger.info(`  Top P:            ${effectiveParams.topP}`);
+        if (effectiveParams.topK) logger.info(`  Top K:            ${effectiveParams.topK}`);
+        if (effectiveParams.minP) logger.info(`  Min P:            ${effectiveParams.minP}`);
+        if (effectiveParams.frequencyPenalty) logger.info(`  Frequency Penalty: ${effectiveParams.frequencyPenalty}`);
+        if (effectiveParams.presencePenalty) logger.info(`  Presence Penalty:  ${effectiveParams.presencePenalty}`);
+        if (effectiveParams.repeatPenalty !== undefined) logger.info(`  Repeat Penalty:   ${effectiveParams.repeatPenalty}`);
+        if (effectiveParams.dryMultiplier) logger.info(`  DRY Multiplier:   ${effectiveParams.dryMultiplier}`);
         logger.info('');
         logger.info(`Timeout:        ${p.timeout}ms`);
         logger.info(`Retries:        ${p.retries}`);
@@ -664,9 +761,25 @@ export function registerLLMCommand(program: Command): void {
           logger.info('');
         }
         logger.info(`Created:        ${new Date(p.createdAt).toLocaleString()}`);
+        if (p.modifiedAt) logger.info(`Modified:       ${new Date(p.modifiedAt).toLocaleString()}`);
         logger.info(`Last Used:      ${formatTimestamp(p.lastUsed)}`);
         logger.info(`Usage Count:    ${p.usageCount}`);
         logger.info(`Active:         ${p.isDefault ? '✓ Yes' : '✗ No'}`);
+
+        // Display instances if available
+        const instances = manager.listInstances(name);
+        if (instances.length > 0) {
+          const activeInstance = manager.getActiveInstance(name);
+          logger.info('');
+          logger.info('Instances:');
+          for (const inst of instances) {
+            const isActive = inst.name === activeInstance;
+            const marker = isActive ? '▶' : ' ';
+            logger.info(`  ${marker} ${inst.name}${isActive ? ' (active)' : ''}`);
+          }
+          logger.info('');
+          logger.info(`  Use 'llm profile instance list ${name}' for instance details`);
+        }
       } catch (error) {
         throw new CLIError('Failed to show profile', 1, error instanceof Error ? error.message : String(error));
       }
@@ -719,6 +832,8 @@ export function registerLLMCommand(program: Command): void {
     .option('--api-key <key>', 'API key or ${ENV_VAR} reference')
     .option('--model <model>', 'Model name')
     .option('--model-path <path>', 'Full model path for lms CLI (e.g., Qwen/QwQ-32B-GGUF/qwq-32b-q8_0.gguf)')
+    .option('--llama-server-path <path>', 'Path to llama-server executable (for llama-server provider)')
+    .option('--launch-command <cmd>', 'Override launch command (for llama-server provider)')
     .option('--temperature <n>', 'Temperature (0.0-2.0)')
     .option('--max-tokens <n>', 'Max response tokens')
     .option('--timeout <ms>', 'Request timeout (ms)')
@@ -743,6 +858,8 @@ export function registerLLMCommand(program: Command): void {
         if (options.apiKey) updates.apiKey = options.apiKey;
         if (options.model) updates.model = options.model;
         if (options.modelPath) updates.modelPath = options.modelPath;
+        if (options.llamaServerPath) updates.llamaServerPath = options.llamaServerPath;
+        if (options.launchCommand) updates.launchCommand = options.launchCommand;
         if (options.description) updates.description = options.description;
         if (options.timeout) updates.timeout = parseInt(options.timeout, 10);
         if (options.tags) updates.tags = options.tags.split(',').map((t: string) => t.trim());
@@ -900,6 +1017,380 @@ export function registerLLMCommand(program: Command): void {
         }
       } catch (error) {
         throw new CLIError('Failed to import profiles', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm profile clone
+  profile
+    .command('clone')
+    .description('Clone a profile')
+    .argument('<source>', 'Source profile name')
+    .argument('<new-name>', 'New profile name')
+    .option('--description <desc>', 'Description for cloned profile')
+    .option('--set-active', 'Set as active profile after cloning')
+    .action(async (sourceName, newName, options) => {
+      try {
+        const manager = new LLMProfileManager();
+        const { profile: cloned } = manager.clone(sourceName, newName, options.description);
+
+        if (options.setActive) {
+          manager.setActive(newName);
+        }
+
+        logger.info(`\n✅ Profile cloned: ${sourceName} → ${cloned.name}`);
+        logger.info(`   Description: ${cloned.description || '(none)'}`);
+        logger.info(`   Provider: ${cloned.provider}`);
+        logger.info(`   Model: ${cloned.model}`);
+        if (options.setActive) {
+          logger.info(`\n▶ Set as active profile`);
+        }
+      } catch (error) {
+        throw new CLIError('Failed to clone profile', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm profile instance - Instance management subcommand
+  const instance = profile
+    .command('instance')
+    .description('Manage profile instances (parameter variants)');
+
+  // llm profile instance list
+  instance
+    .command('list')
+    .description('List all instances for a profile')
+    .argument('<profile>', 'Profile name')
+    .action(async (profileName) => {
+      try {
+        const manager = new LLMProfileManager();
+        const profileObj = manager.get(profileName);
+        if (!profileObj) {
+          throw new CLIError(`Profile not found: ${profileName}`, 1);
+        }
+
+        const instances = manager.listInstances(profileName);
+        const activeInstance = manager.getActiveInstance(profileName);
+
+        logger.info(`\n🔧 Instances for profile: ${profileName}\n`);
+
+        if (instances.length === 0) {
+          logger.info('  No instances found.');
+          return;
+        }
+
+        for (const inst of instances) {
+          const isActive = inst.name === activeInstance;
+          const marker = isActive ? '▶' : ' ';
+          const activeTag = isActive ? ' (active)' : '';
+          const p = inst.parameters;
+
+          logger.info(`${marker} ${inst.name}${activeTag}`);
+          if (inst.description) logger.info(`   Description: ${inst.description}`);
+          logger.info(`   Temperature:      ${p.temperature}`);
+          logger.info(`   Max Tokens:       ${p.maxTokens}`);
+          logger.info(`   Top P:            ${p.topP ?? '(not set)'}`);
+          logger.info(`   Top K:            ${p.topK ?? '(not set)'}`);
+          logger.info(`   Min P:            ${p.minP ?? '(not set)'}`);
+          logger.info(`   Repeat Penalty:   ${p.repeatPenalty ?? '(not set)'}`);
+          logger.info(`   DRY Multiplier:   ${p.dryMultiplier ?? '(not set)'}`);
+          if (inst.launchCommand) {
+            const cmd = inst.launchCommand.length > 60
+              ? inst.launchCommand.substring(0, 57) + '...'
+              : inst.launchCommand;
+            logger.info(`   Launch Command:   ${cmd}`);
+          }
+          logger.info(`   Created: ${new Date(inst.createdAt).toLocaleString()}`);
+          if (inst.modifiedAt) logger.info(`   Modified: ${new Date(inst.modifiedAt).toLocaleString()}`);
+          logger.info('');
+        }
+      } catch (error) {
+        throw new CLIError('Failed to list instances', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm profile instance create
+  instance
+    .command('create')
+    .description('Create a new instance for a profile')
+    .argument('<profile>', 'Profile name')
+    .argument('<name>', 'Instance name')
+    .option('--description <desc>', 'Instance description')
+    .option('--copy-from <instance>', 'Copy parameters from existing instance')
+    .option('--temperature <n>', 'Temperature (0.0-2.0)')
+    .option('--max-tokens <n>', 'Max response tokens')
+    .option('--top-p <n>', 'Top P sampling')
+    .option('--top-k <n>', 'Top K sampling')
+    .option('--min-p <n>', 'Min P sampling')
+    .option('--repeat-penalty <n>', 'Repeat penalty')
+    .option('--dry-multiplier <n>', 'DRY multiplier')
+    .option('--launch-command <cmd>', 'Override launch command (for llama-server)')
+    .option('--set-active', 'Set as active instance after creation')
+    .action(async (profileName, instanceName, options) => {
+      try {
+        const manager = new LLMProfileManager();
+
+        // Build parameters from options
+        const parameters: Partial<ModelParameters> = {};
+        if (options.temperature) parameters.temperature = parseFloat(options.temperature);
+        if (options.maxTokens) parameters.maxTokens = parseInt(options.maxTokens, 10);
+        if (options.topP) parameters.topP = parseFloat(options.topP);
+        if (options.topK) parameters.topK = parseInt(options.topK, 10);
+        if (options.minP) parameters.minP = parseFloat(options.minP);
+        if (options.repeatPenalty) parameters.repeatPenalty = parseFloat(options.repeatPenalty);
+        if (options.dryMultiplier) parameters.dryMultiplier = parseFloat(options.dryMultiplier);
+
+        const inst = manager.createInstance(profileName, {
+          name: instanceName,
+          description: options.description,
+          copyFrom: options.copyFrom,
+          parameters: Object.keys(parameters).length > 0 ? parameters : undefined,
+          launchCommand: options.launchCommand,
+          setActive: options.setActive,
+        });
+
+        logger.info(`\n✅ Instance created: ${inst.name}`);
+        logger.info(`   Profile: ${profileName}`);
+        if (inst.description) logger.info(`   Description: ${inst.description}`);
+        logger.info(`   Temperature: ${inst.parameters.temperature}`);
+        logger.info(`   Max Tokens: ${inst.parameters.maxTokens}`);
+        if (options.setActive) {
+          logger.info(`\n▶ Set as active instance`);
+        }
+      } catch (error) {
+        throw new CLIError('Failed to create instance', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm profile instance show
+  instance
+    .command('show')
+    .description('Show instance details')
+    .argument('<profile>', 'Profile name')
+    .argument('<name>', 'Instance name')
+    .action(async (profileName, instanceName) => {
+      try {
+        const manager = new LLMProfileManager();
+        const inst = manager.getInstance(profileName, instanceName);
+
+        if (!inst) {
+          throw new CLIError(`Instance not found: ${instanceName}`, 1);
+        }
+
+        const activeInstance = manager.getActiveInstance(profileName);
+        const isActive = inst.name === activeInstance;
+
+        const p = inst.parameters;
+        logger.info(`\n🔧 Instance: ${inst.name}${isActive ? ' (active)' : ''}`);
+        logger.info(`   Profile: ${profileName}`);
+        if (inst.description) logger.info(`   Description: ${inst.description}`);
+        logger.info('');
+        logger.info('Parameters:');
+        logger.info(`  Temperature:      ${p.temperature}`);
+        logger.info(`  Max Tokens:       ${p.maxTokens}`);
+        logger.info(`  Top P:            ${p.topP ?? '(not set)'}`);
+        logger.info(`  Top K:            ${p.topK ?? '(not set)'}`);
+        logger.info(`  Min P:            ${p.minP ?? '(not set)'}`);
+        logger.info(`  Repeat Penalty:   ${p.repeatPenalty ?? '(not set)'}`);
+        logger.info(`  DRY Multiplier:   ${p.dryMultiplier ?? '(not set)'}`);
+        logger.info('');
+        if (inst.launchCommand) {
+          logger.info('Launch Command:');
+          logger.info(`  ${inst.launchCommand}`);
+          logger.info('');
+        }
+        logger.info(`Created:        ${new Date(inst.createdAt).toLocaleString()}`);
+        if (inst.modifiedAt) logger.info(`Modified:       ${new Date(inst.modifiedAt).toLocaleString()}`);
+        if (inst.lastUsed) logger.info(`Last Used:      ${formatTimestamp(inst.lastUsed)}`);
+      } catch (error) {
+        throw new CLIError('Failed to show instance', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm profile instance use
+  instance
+    .command('use')
+    .description('Set active instance for a profile')
+    .argument('<profile>', 'Profile name')
+    .argument('<name>', 'Instance name')
+    .action(async (profileName, instanceName) => {
+      try {
+        const manager = new LLMProfileManager();
+        manager.setActiveInstance(profileName, instanceName);
+        logger.info(`\n▶ Active instance set to: ${instanceName} (profile: ${profileName})`);
+      } catch (error) {
+        throw new CLIError('Failed to set active instance', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm profile instance delete
+  instance
+    .command('delete')
+    .description('Delete an instance')
+    .argument('<profile>', 'Profile name')
+    .argument('<name>', 'Instance name')
+    .option('--yes', 'Skip confirmation')
+    .action(async (profileName, instanceName, options) => {
+      try {
+        const manager = new LLMProfileManager();
+
+        if (instanceName === 'default') {
+          throw new CLIError('Cannot delete the default instance', 1);
+        }
+
+        // Confirmation
+        if (!options.yes) {
+          const rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout,
+          });
+
+          const answer = await rl.question(`\n⚠️  Delete instance "${instanceName}" from profile "${profileName}"? (y/N): `);
+          rl.close();
+
+          if (answer.toLowerCase() !== 'y' && answer.toLowerCase() !== 'yes') {
+            logger.info('Cancelled.');
+            return;
+          }
+        }
+
+        const deleted = manager.deleteInstance(profileName, instanceName);
+        if (deleted) {
+          logger.info(`\n✅ Instance deleted: ${instanceName}`);
+        } else {
+          throw new CLIError(`Instance not found: ${instanceName}`, 1);
+        }
+      } catch (error) {
+        throw new CLIError('Failed to delete instance', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm profile instance rename
+  instance
+    .command('rename')
+    .description('Rename an instance')
+    .argument('<profile>', 'Profile name')
+    .argument('<old-name>', 'Current instance name')
+    .argument('<new-name>', 'New instance name')
+    .action(async (profileName, oldName, newName) => {
+      try {
+        const manager = new LLMProfileManager();
+        const inst = manager.renameInstance(profileName, oldName, newName);
+        logger.info(`\n✅ Instance renamed: ${oldName} → ${inst.name}`);
+      } catch (error) {
+        throw new CLIError('Failed to rename instance', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm profile instance update
+  instance
+    .command('update')
+    .description('Update instance parameters')
+    .argument('<profile>', 'Profile name')
+    .argument('<name>', 'Instance name')
+    .option('--description <desc>', 'Instance description')
+    .option('--temperature <n>', 'Temperature (0.0-2.0)')
+    .option('--max-tokens <n>', 'Max response tokens')
+    .option('--top-p <n>', 'Top P sampling')
+    .option('--top-k <n>', 'Top K sampling')
+    .option('--min-p <n>', 'Min P sampling')
+    .option('--repeat-penalty <n>', 'Repeat penalty')
+    .option('--dry-multiplier <n>', 'DRY multiplier')
+    .action(async (profileName, instanceName, options) => {
+      try {
+        const manager = new LLMProfileManager();
+
+        // Build updates from options
+        const updates: UpdateInstanceOptions = {};
+        if (options.description) updates.description = options.description;
+
+        const parameters: Partial<ModelParameters> = {};
+        if (options.temperature) parameters.temperature = parseFloat(options.temperature);
+        if (options.maxTokens) parameters.maxTokens = parseInt(options.maxTokens, 10);
+        if (options.topP) parameters.topP = parseFloat(options.topP);
+        if (options.topK) parameters.topK = parseInt(options.topK, 10);
+        if (options.minP) parameters.minP = parseFloat(options.minP);
+        if (options.repeatPenalty) parameters.repeatPenalty = parseFloat(options.repeatPenalty);
+        if (options.dryMultiplier) parameters.dryMultiplier = parseFloat(options.dryMultiplier);
+
+        if (Object.keys(parameters).length > 0) {
+          updates.parameters = parameters;
+        }
+
+        if (Object.keys(updates).length === 0) {
+          throw new CLIError('No update options provided. Use --help for available options.', 1);
+        }
+
+        const inst = manager.updateInstance(profileName, instanceName, updates);
+
+        logger.info(`\n✅ Instance updated: ${inst.name}`);
+        logger.info(`   Temperature: ${inst.parameters.temperature}`);
+        logger.info(`   Max Tokens: ${inst.parameters.maxTokens}`);
+      } catch (error) {
+        throw new CLIError('Failed to update instance', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm profile instance clone
+  instance
+    .command('clone')
+    .description('Clone an instance')
+    .argument('<profile>', 'Profile name')
+    .argument('<source>', 'Source instance name')
+    .argument('<new-name>', 'New instance name')
+    .option('--description <desc>', 'Description for cloned instance')
+    .action(async (profileName, sourceName, newName, options) => {
+      try {
+        const manager = new LLMProfileManager();
+        const inst = manager.cloneInstance(profileName, sourceName, newName, options.description);
+
+        logger.info(`\n✅ Instance cloned: ${sourceName} → ${inst.name}`);
+        logger.info(`   Description: ${inst.description || '(none)'}`);
+        logger.info(`   Temperature: ${inst.parameters.temperature}`);
+        logger.info(`   Max Tokens: ${inst.parameters.maxTokens}`);
+      } catch (error) {
+        throw new CLIError('Failed to clone instance', 1, error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  // llm profile instance reset
+  instance
+    .command('reset')
+    .description('Reset instance to default parameters')
+    .argument('<profile>', 'Profile name')
+    .argument('<name>', 'Instance name')
+    .option('--yes', 'Skip confirmation')
+    .action(async (profileName, instanceName, options) => {
+      try {
+        const manager = new LLMProfileManager();
+
+        if (!options.yes) {
+          const rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout,
+          });
+
+          const msg = instanceName === 'default'
+            ? `\n⚠️  Clear all optional parameters from "${instanceName}" instance? (y/N): `
+            : `\n⚠️  Reset instance "${instanceName}" to default parameters? (y/N): `;
+
+          const answer = await rl.question(msg);
+          rl.close();
+
+          if (answer.toLowerCase() !== 'y' && answer.toLowerCase() !== 'yes') {
+            logger.info('Cancelled.');
+            return;
+          }
+        }
+
+        const inst = manager.resetInstance(profileName, instanceName);
+
+        logger.info(`\n✅ Instance reset: ${inst.name}`);
+        logger.info(`   Temperature: ${inst.parameters.temperature}`);
+        logger.info(`   Max Tokens: ${inst.parameters.maxTokens}`);
+        logger.info(`   Top P: ${inst.parameters.topP ?? '(not set)'}`);
+        logger.info(`   Top K: ${inst.parameters.topK ?? '(not set)'}`);
+        logger.info(`   Min P: ${inst.parameters.minP ?? '(not set)'}`);
+      } catch (error) {
+        throw new CLIError('Failed to reset instance', 1, error instanceof Error ? error.message : String(error));
       }
     });
 
@@ -1092,13 +1583,16 @@ export function registerLLMCommand(program: Command): void {
         }
 
         // Health check and model verification
-        logger.info(`Checking LM Studio connection at ${config.baseUrl}...`);
+        logger.info(`Checking connection at ${config.baseUrl}...`);
         const modelCheck = await player.verifyModel();
 
         if (!modelCheck.available) {
-          if (modelCheck.loadedModels.length === 0) {
-            throw new CLIError('LM Studio is not running or no models loaded', 1, modelCheck.error, [
-              'Start LM Studio and load a model',
+          // For llama-server, skip strict model name matching (it only serves one model)
+          if (config.provider === 'llama-server' && modelCheck.loadedModels.length > 0) {
+            logger.info(`✓ Connected to llama-server (model: ${modelCheck.loadedModels[0]})`);
+          } else if (modelCheck.loadedModels.length === 0) {
+            throw new CLIError('Server is not running or no models loaded', 1, modelCheck.error, [
+              'Start the server and load a model',
               'Verify the endpoint URL',
               `Check that the server is running on ${config.baseUrl}`,
             ]);
@@ -1109,11 +1603,11 @@ export function registerLLMCommand(program: Command): void {
               `Either load the correct model or use: --profile <profile-with-loaded-model>`,
             ]);
           }
+        } else {
+          logger.info(
+            `✓ Connected (model: ${modelCheck.expectedModel})`
+          );
         }
-
-        logger.info(
-          `✓ Connected to LM Studio (model: ${modelCheck.expectedModel})`
-        );
         logger.info(
           `Memory: ${config.memoryEnabled ? '✓ ENABLED' : '✗ DISABLED (baseline)'}`
         );

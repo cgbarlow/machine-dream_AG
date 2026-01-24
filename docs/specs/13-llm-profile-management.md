@@ -1,8 +1,8 @@
 # Spec 13: LLM Connection Profile Management
 
 **Status**: Draft
-**Version**: 1.0
-**Last Updated**: 2024-01-06
+**Version**: 1.1
+**Last Updated**: 2026-01-22
 
 ---
 
@@ -54,11 +54,13 @@ interface LLMProfile {
   // Model Configuration
   model: string;                     // Model name/ID (friendly name for display)
   modelPath?: string;                // Full model path for LM Studio CLI (e.g., "Qwen/QwQ-32B-GGUF/qwq-32b-q8_0.gguf")
-  launchCommand?: string;            // Full command to start server (for llama-server provider)
+  llamaServerPath?: string;          // Path to llama-server executable (for llama-server provider)
+  launchCommand?: string;            // Override launch command (for llama-server provider) - if set, used instead of auto-generated
   parameters: ModelParameters;       // Generation parameters
 
   // Metadata
   createdAt: number;                 // Unix timestamp
+  modifiedAt?: number;               // Last modification timestamp
   lastUsed?: number;                 // Last usage timestamp
   usageCount: number;                // Number of times used
   isDefault: boolean;                // Is this the active profile?
@@ -73,6 +75,24 @@ interface LLMProfile {
 
   // Custom Prompting
   systemPrompt?: string;             // Additional system prompt text (appended to base prompt)
+
+  // Instance Support (parameter variants)
+  instances?: Record<string, ProfileInstance>; // Instance name -> instance config
+  activeInstance?: string;           // Currently active instance name (default: "default")
+}
+
+/**
+ * Profile instance - a named configuration variant of a profile
+ * Allows multiple parameter sets for the same profile/model
+ */
+interface ProfileInstance {
+  name: string;                      // Instance identifier (e.g., "default", "20260122_test1")
+  description?: string;              // Human-readable description
+  parameters: ModelParameters;       // Generation parameters for this instance
+  launchCommand?: string;            // Override launch command (for llama-server provider)
+  createdAt: number;                 // Unix timestamp (milliseconds)
+  modifiedAt?: number;               // Last modification timestamp
+  lastUsed?: number;                 // Last usage timestamp
 }
 
 type LLMProvider =
@@ -157,12 +177,36 @@ interface ModelParameters {
     },
     "glm-4-llama": {
       "name": "glm-4-llama",
-      "description": "GLM-4.7 Flash via llama-server (pre-configured sampling)",
+      "description": "GLM-4.7 Flash via llama-server (auto-generated command)",
       "provider": "llama-server",
       "baseUrl": "http://127.0.0.1:8080",
       "model": "glm-4.7-flash",
-      "modelPath": "unsloth/GLM-4.7-Flash-GGUF/GLM-4.7-Flash-UD-Q8_K_XL.gguf",
-      "launchCommand": "llama-server.exe --model \"C:\\Users\\user\\.lmstudio\\models\\unsloth\\GLM-4.7-Flash-GGUF\\GLM-4.7-Flash-UD-Q8_K_XL.gguf\" --port 8080 --ctx-size 16384 --n-gpu-layers 999 --flash-attn on --temp 0.2 --top-k 50 --top-p 0.95 --min-p 0.01 --dry-multiplier 1.1",
+      "modelPath": "C:\\Users\\user\\.lmstudio\\models\\unsloth\\GLM-4.7-Flash-GGUF\\GLM-4.7-Flash-UD-Q8_K_XL.gguf",
+      "llamaServerPath": "C:\\Users\\user\\llama.cpp\\llama-server.exe",
+      "parameters": {
+        "temperature": 0.2,
+        "maxTokens": 8192,
+        "topK": 50,
+        "topP": 0.95,
+        "minP": 0.01,
+        "dryMultiplier": 1.1
+      },
+      "createdAt": 1704556800000,
+      "usageCount": 0,
+      "isDefault": false,
+      "timeout": 600000,
+      "retries": 3,
+      "tags": ["local", "llama-server", "moe"]
+    },
+    "glm-4-llama-custom": {
+      "name": "glm-4-llama-custom",
+      "description": "GLM-4.7 Flash via llama-server (custom launch command override)",
+      "provider": "llama-server",
+      "baseUrl": "http://127.0.0.1:8080",
+      "model": "glm-4.7-flash",
+      "modelPath": "C:\\Users\\user\\.lmstudio\\models\\unsloth\\GLM-4.7-Flash-GGUF\\GLM-4.7-Flash-UD-Q8_K_XL.gguf",
+      "llamaServerPath": "C:\\Users\\user\\llama.cpp\\llama-server.exe",
+      "launchCommand": "llama-server.exe --model \"C:\\Users\\user\\.lmstudio\\models\\unsloth\\GLM-4.7-Flash-GGUF\\GLM-4.7-Flash-UD-Q8_K_XL.gguf\" --port 8080 --ctx-size 16384 --n-gpu-layers 999 --flash-attn on",
       "parameters": {
         "temperature": 0.6,
         "maxTokens": 8192
@@ -172,7 +216,7 @@ interface ModelParameters {
       "isDefault": false,
       "timeout": 600000,
       "retries": 3,
-      "tags": ["local", "llama-server", "moe"]
+      "tags": ["local", "llama-server", "moe", "custom-cmd"]
     }
   },
   "activeProfile": "lm-studio-local"
@@ -354,6 +398,22 @@ machine-dream llm profile add my-openai --template openai-gpt4 \
 # With tags
 machine-dream llm profile add test-profile --tags local,testing,experimental
 
+# llama-server with auto-generated launch command
+machine-dream llm profile add glm-4-flash \
+  --provider llama-server \
+  --url http://127.0.0.1:8080 \
+  --model glm-4.7-flash \
+  --model-path "C:\Users\user\.lmstudio\models\unsloth\GLM-4.7-Flash-GGUF\GLM-4.7-Flash-UD-Q8_K_XL.gguf" \
+  --llama-server-path "C:\Users\user\llama.cpp\llama-server.exe" \
+  --temperature 0.4 --top-p 0.95 --min-p 0.01
+
+# llama-server with custom launch command override
+machine-dream llm profile add glm-4-flash-custom \
+  --provider llama-server \
+  --url http://127.0.0.1:8080 \
+  --model glm-4.7-flash \
+  --launch-command "llama-server.exe -m model.gguf --port 8080 --ctx-size 32768 --flash-attn"
+
 # With custom system prompt (appended to base prompt)
 machine-dream llm profile add my-profile \
   --provider lmstudio \
@@ -490,6 +550,98 @@ machine-dream llm profile import profiles-backup.json --set-active lm-studio-loc
 machine-dream llm profile import profiles-backup.json --dry-run
 ```
 
+#### `profile clone`
+```bash
+# Clone a profile
+machine-dream llm profile clone glm-4-flash glm-4-flash-v2
+
+# Clone with custom description
+machine-dream llm profile clone glm-4-flash glm-4-flash-experimental \
+  --description "Experimental settings for higher creativity"
+
+# Clone and set as active
+machine-dream llm profile clone glm-4-flash glm-4-flash-prod --set-active
+```
+
+**Output:**
+```
+✅ Profile cloned: glm-4-flash → glm-4-flash-v2
+   Description: Clone of glm-4-flash
+   Provider: llama-server
+   Model: glm-4-9b-chat-q8_0
+```
+
+#### `profile instance` - Manage Profile Instances
+
+Instances allow multiple parameter configurations for the same profile/model.
+Each profile starts with a `default` instance. The active instance determines
+which parameters are used when the profile is loaded.
+
+```bash
+# List all instances for a profile
+machine-dream llm profile instance list glm-4-flash
+
+# Create new instance (copies from default or specified source)
+machine-dream llm profile instance create glm-4-flash 20260122_test1 \
+  --description "Test instance with temp 0.4" \
+  --temperature 0.4 \
+  --max-tokens 8192 \
+  --top-p 0.95 \
+  --min-p 0.01
+
+# Create instance by copying from another
+machine-dream llm profile instance create glm-4-flash high-temp \
+  --copy-from default \
+  --temperature 1.0
+
+# Show instance details
+machine-dream llm profile instance show glm-4-flash 20260122_test1
+
+# Set active instance
+machine-dream llm profile instance use glm-4-flash 20260122_test1
+
+# Update instance parameters
+machine-dream llm profile instance update glm-4-flash 20260122_test1 \
+  --temperature 0.5 \
+  --description "Updated test instance"
+
+# Rename instance
+machine-dream llm profile instance rename glm-4-flash 20260122_test1 production
+
+# Delete instance (cannot delete 'default')
+machine-dream llm profile instance delete glm-4-flash old-instance
+
+# Clone instance
+machine-dream llm profile instance clone glm-4-flash default experimental \
+  --description "Experimental high-temp settings"
+
+# Reset instance to default parameters
+machine-dream llm profile instance reset glm-4-flash experimental
+
+# Create instance with custom launch command (llama-server only)
+machine-dream llm profile instance create glm-4-flash high-context \
+  --launch-command "llama-server.exe -m model.gguf --ctx-size 32768 --flash-attn"
+```
+
+**Output (list):**
+```
+🔧 Instances for profile: glm-4-flash
+
+▶ default (active)
+   Description: Default configuration
+   Temperature: 0.2 | Max Tokens: 8192
+   Top P: 0.95
+   Min P: 0.01
+   Created: 1/22/2025, 5:00:00 AM
+
+  20260122_test1
+   Description: Test instance with temp 0.4
+   Temperature: 0.4 | Max Tokens: 8192
+   Top P: 0.95
+   Min P: 0.01
+   Created: 1/22/2026, 9:04:08 PM
+```
+
 ---
 
 ## 5. TUI Screen
@@ -616,7 +768,64 @@ src/
       CLIExecutor.ts               # Add profile methods
 ```
 
-### 6.2 Security Considerations
+### 6.2 llama-server Provider: Auto-Start Behavior
+
+When using the `llama-server` provider, Machine Dream can automatically start the server if it's not running. The launch command is determined as follows:
+
+**Priority:**
+1. **If `launchCommand` is set**: Use the exact command provided (full override)
+2. **If `llamaServerPath` + `modelPath` are set**: Auto-generate the launch command
+
+**Auto-Generated Command Format:**
+```bash
+"<llamaServerPath>" -m "<modelPath>" --port <port> [sampling parameters from active instance]
+```
+
+**Included Sampling Parameters (when set in active instance):**
+- `--temp <temperature>`
+- `--top-p <topP>`
+- `--top-k <topK>`
+- `--min-p <minP>`
+- `--repeat-penalty <repeatPenalty>`
+- `--dry-multiplier <dryMultiplier>`
+- `--dry-base <dryBase>`
+- `--dry-allowed-length <dryAllowedLength>`
+- `--dry-penalty-last-n <dryPenaltyLastN>`
+
+**Path Separator Normalization:**
+The auto-generator normalizes path separators to match the `llamaServerPath` format:
+- If `llamaServerPath` uses backslashes (`\`), `modelPath` slashes are converted to backslashes
+- If `llamaServerPath` uses forward slashes (`/`), `modelPath` backslashes are converted to forward slashes
+
+**Example:**
+```typescript
+// Profile configuration
+{
+  provider: 'llama-server',
+  baseUrl: 'http://127.0.0.1:8080',
+  llamaServerPath: 'C:\\llama.cpp\\llama-server.exe',
+  modelPath: 'models/qwen/qwen-32b-q8.gguf',
+  parameters: {
+    temperature: 0.4,
+    topP: 0.95,
+    minP: 0.01
+  }
+}
+
+// Auto-generated command:
+// "C:\llama.cpp\llama-server.exe" -m "models\qwen\qwen-32b-q8.gguf" --port 8080 --temp 0.4 --top-p 0.95 --min-p 0.01
+```
+
+**Per-Instance Launch Commands:**
+Instances can override the launch command while keeping other parameters. This is useful for testing different startup configurations:
+
+```bash
+# Create instance with custom launch command
+machine-dream llm profile instance create glm-4-flash high-context \
+  --launch-command "llama-server.exe -m model.gguf --ctx-size 32768 --flash-attn"
+```
+
+### 6.3 Security Considerations
 
 **API Key Storage:**
 1. **Option 1: Environment Variables** (Recommended)
@@ -647,7 +856,7 @@ function resolveApiKey(key: string): string {
 }
 ```
 
-### 6.3 Backward Compatibility
+### 6.4 Backward Compatibility
 
 **Migration from config.ts:**
 ```typescript

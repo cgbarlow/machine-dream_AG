@@ -210,6 +210,9 @@ export function validateConfig(config: LLMConfig): void {
 /**
  * Convert LLM Profile to LLMConfig
  * Spec 13: Profile to Config conversion
+ *
+ * Uses active instance parameters if available, otherwise falls back to
+ * profile-level parameters for backward compatibility.
  */
 export function profileToConfig(profile: LLMProfile): LLMConfig {
   // Normalize baseUrl: ensure /v1 suffix for OpenAI-compatible APIs
@@ -223,27 +226,43 @@ export function profileToConfig(profile: LLMProfile): LLMConfig {
     }
   }
 
+  // Get effective parameters and launch command from active instance or profile
+  let effectiveParams = profile.parameters;
+  let effectiveLaunchCommand = profile.launchCommand;
+  if (profile.instances) {
+    const activeInstanceName = profile.activeInstance || 'default';
+    const activeInstance = profile.instances[activeInstanceName];
+    if (activeInstance) {
+      effectiveParams = activeInstance.parameters;
+      // Use instance launch command if set, otherwise fall back to profile's
+      if (activeInstance.launchCommand) {
+        effectiveLaunchCommand = activeInstance.launchCommand;
+      }
+    }
+  }
+
   return {
     baseUrl,
     model: profile.model,
     modelPath: profile.modelPath,
     provider: profile.provider,
-    launchCommand: profile.launchCommand,
-    temperature: profile.parameters.temperature,
-    maxTokens: profile.parameters.maxTokens,
+    llamaServerPath: profile.llamaServerPath,
+    launchCommand: effectiveLaunchCommand,
+    temperature: effectiveParams.temperature,
+    maxTokens: effectiveParams.maxTokens,
     timeout: profile.timeout,
 
     // Extended sampling parameters
-    topP: profile.parameters.topP,
-    topK: profile.parameters.topK,
-    minP: profile.parameters.minP,
-    repeatPenalty: profile.parameters.repeatPenalty,
+    topP: effectiveParams.topP,
+    topK: effectiveParams.topK,
+    minP: effectiveParams.minP,
+    repeatPenalty: effectiveParams.repeatPenalty,
 
     // DRY sampling parameters
-    dryMultiplier: profile.parameters.dryMultiplier,
-    dryBase: profile.parameters.dryBase,
-    dryAllowedLength: profile.parameters.dryAllowedLength,
-    dryPenaltyLastN: profile.parameters.dryPenaltyLastN,
+    dryMultiplier: effectiveParams.dryMultiplier,
+    dryBase: effectiveParams.dryBase,
+    dryAllowedLength: effectiveParams.dryAllowedLength,
+    dryPenaltyLastN: effectiveParams.dryPenaltyLastN,
 
     memoryEnabled: true, // Default to enabled, can be overridden
     maxHistoryMoves: 20, // Default value

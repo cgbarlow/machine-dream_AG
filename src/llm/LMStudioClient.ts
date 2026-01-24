@@ -156,7 +156,11 @@ export class LMStudioClient {
       if (this.config.dryAllowedLength !== undefined) requestBody.dry_allowed_length = this.config.dryAllowedLength;
       if (this.config.dryPenaltyLastN !== undefined) requestBody.dry_penalty_last_n = this.config.dryPenaltyLastN;
 
-      const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
+      // Normalize URL to include /v1 for OpenAI API compatibility (llama-server, etc.)
+      const chatUrl = this.config.baseUrl.endsWith('/v1')
+        ? `${this.config.baseUrl}/chat/completions`
+        : `${this.config.baseUrl}/v1/chat/completions`;
+      const response = await fetch(chatUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -257,6 +261,9 @@ export class LMStudioClient {
                 fullReasoning += reasoning;
                 if (onReasoning) {
                   onReasoning(reasoning);
+                } else {
+                  // No dedicated reasoning callback - stream to main output so user sees progress
+                  onStream(reasoning);
                 }
               }
 
@@ -327,7 +334,7 @@ export class LMStudioClient {
    */
   async healthCheck(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.config.baseUrl}/models`, {
+      const response = await fetch(`${this.config.baseUrl.endsWith('/v1') ? this.config.baseUrl : this.config.baseUrl + '/v1'}/models`, {
         method: 'GET',
         signal: AbortSignal.timeout(5000),
       });
@@ -342,7 +349,7 @@ export class LMStudioClient {
    */
   async getModelInfo(): Promise<{ id: string; object: string } | null> {
     try {
-      const response = await fetch(`${this.config.baseUrl}/models`, {
+      const response = await fetch(`${this.config.baseUrl.endsWith('/v1') ? this.config.baseUrl : this.config.baseUrl + '/v1'}/models`, {
         method: 'GET',
         signal: AbortSignal.timeout(5000),
       });
@@ -375,7 +382,7 @@ export class LMStudioClient {
     const expectedModel = this.config.model;
 
     try {
-      const response = await fetch(`${this.config.baseUrl}/models`, {
+      const response = await fetch(`${this.config.baseUrl.endsWith('/v1') ? this.config.baseUrl : this.config.baseUrl + '/v1'}/models`, {
         method: 'GET',
         signal: AbortSignal.timeout(5000),
       });

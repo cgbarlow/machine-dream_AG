@@ -364,12 +364,23 @@ machine-dream llm profile add [options]
 | Option | Description |
 |--------|-------------|
 | `--name <name>` | Profile name (auto-suffixed with date) |
-| `--provider <provider>` | Provider: lmstudio\|openai\|anthropic\|ollama\|openrouter\|custom |
+| `--provider <provider>` | Provider: lmstudio\|llama-server\|openai\|anthropic\|ollama\|openrouter\|custom |
 | `--base-url <url>` | API endpoint URL |
 | `--api-key <key>` | API key or ${ENV_VAR} reference |
 | `--model <model>` | Model name |
+| `--model-path <path>` | Full model file path (for llama-server auto-start) |
+| `--llama-server-path <path>` | Path to llama-server executable (for llama-server provider) |
+| `--launch-command <cmd>` | Override launch command (for llama-server provider) |
 | `--temperature <n>` | Temperature (0.0-2.0) |
 | `--max-tokens <n>` | Max response tokens |
+| `--top-p <n>` | Top P nucleus sampling |
+| `--top-k <n>` | Top K sampling |
+| `--min-p <n>` | Min P sampling |
+| `--repeat-penalty <n>` | Repeat penalty |
+| `--dry-multiplier <n>` | DRY multiplier |
+| `--dry-base <n>` | DRY base |
+| `--dry-allowed-length <n>` | DRY allowed length |
+| `--dry-penalty-last-n <n>` | DRY penalty last N |
 | `--timeout <ms>` | Request timeout |
 | `--tags <tags>` | Comma-separated tags |
 | `--color <color>` | Display color |
@@ -388,6 +399,18 @@ machine-dream llm profile add --name qwen3-coder --provider lmstudio --base-url 
 
 # If created again same day - becomes "qwen3-coder_20260112_001"
 machine-dream llm profile add --name qwen3-coder --provider lmstudio --base-url http://localhost:1234/v1 --model qwen3-coder-v2
+
+# llama-server with auto-generated launch command (from llamaServerPath + modelPath + parameters)
+machine-dream llm profile add --name glm-flash --provider llama-server \
+  --base-url http://127.0.0.1:8080 --model glm-4.7-flash \
+  --llama-server-path "C:\llama.cpp\llama-server.exe" \
+  --model-path "C:\models\glm-4.7-flash.gguf" \
+  --temperature 0.4 --top-p 0.95 --min-p 0.01
+
+# llama-server with custom launch command override
+machine-dream llm profile add --name glm-custom --provider llama-server \
+  --base-url http://127.0.0.1:8080 --model glm-4.7-flash \
+  --launch-command "llama-server.exe -m model.gguf --port 8080 --ctx-size 32768"
 ```
 
 #### llm profile show
@@ -445,6 +468,123 @@ machine-dream llm profile import <file>
 ```
 
 Import profile from file.
+
+#### llm profile clone
+
+```bash
+machine-dream llm profile clone <source> <new-name> [options]
+```
+
+Clone a profile.
+
+| Option | Description |
+|--------|-------------|
+| `--description <desc>` | Description for cloned profile |
+| `--set-active` | Set as active profile after cloning |
+
+#### llm profile instance
+
+Manage profile instances (parameter variants). Each profile can have multiple instances with different parameter configurations.
+
+##### llm profile instance list
+
+```bash
+machine-dream llm profile instance list <profile>
+```
+
+List all instances for a profile.
+
+##### llm profile instance create
+
+```bash
+machine-dream llm profile instance create <profile> <name> [options]
+```
+
+Create a new instance for a profile.
+
+**Options:**
+| Option | Description |
+|--------|-------------|
+| `--description <desc>` | Instance description |
+| `--copy-from <instance>` | Copy parameters from existing instance |
+| `--temperature <n>` | Temperature (0.0-2.0) |
+| `--max-tokens <n>` | Max response tokens |
+| `--top-p <n>` | Top P sampling |
+| `--top-k <n>` | Top K sampling |
+| `--min-p <n>` | Min P sampling |
+| `--repeat-penalty <n>` | Repeat penalty |
+| `--dry-multiplier <n>` | DRY multiplier |
+| `--dry-base <n>` | DRY base |
+| `--dry-allowed-length <n>` | DRY allowed length |
+| `--dry-penalty-last-n <n>` | DRY penalty last N |
+| `--launch-command <cmd>` | Override launch command (for llama-server provider) |
+| `--set-active` | Set as active instance after creation |
+
+##### llm profile instance show
+
+```bash
+machine-dream llm profile instance show <profile> <name>
+```
+
+Show instance details.
+
+##### llm profile instance use
+
+```bash
+machine-dream llm profile instance use <profile> <name>
+```
+
+Set active instance for a profile.
+
+##### llm profile instance update
+
+```bash
+machine-dream llm profile instance update <profile> <name> [options]
+```
+
+Update instance parameters. Accepts same options as `instance create`.
+
+##### llm profile instance rename
+
+```bash
+machine-dream llm profile instance rename <profile> <old-name> <new-name>
+```
+
+Rename an instance.
+
+##### llm profile instance delete
+
+```bash
+machine-dream llm profile instance delete <profile> <name>
+```
+
+Delete an instance (cannot delete 'default').
+
+##### llm profile instance clone
+
+```bash
+machine-dream llm profile instance clone <profile> <source> <new-name> [options]
+```
+
+Clone an instance within a profile.
+
+| Option | Description |
+|--------|-------------|
+| `--description <desc>` | Description for cloned instance |
+
+##### llm profile instance reset
+
+```bash
+machine-dream llm profile instance reset <profile> <name> [options]
+```
+
+Reset an instance to default parameters:
+- For non-default instances: copies parameters from 'default' instance, clears launchCommand override
+- For the 'default' instance: clears all optional parameters (topP, topK, minP, DRY params, launchCommand)
+
+| Option | Description |
+|--------|-------------|
+| `--yes` | Skip confirmation prompt |
 
 ### llm model
 
@@ -967,6 +1107,59 @@ Master test runner: comprehensive suite + A/B/X comparison.
 | 3 | Configuration error |
 | 4 | Network/connection error |
 | 5 | LLM error |
+
+---
+
+## llama-server Provider: Auto-Start
+
+When using the `llama-server` provider, Machine Dream can automatically start the llama-server if it's not already running. The launch command is determined as follows:
+
+### Launch Command Priority
+
+1. **If `launchCommand` is set on the profile or active instance**: Use the exact command provided (full override)
+2. **If `llamaServerPath` + `modelPath` are set**: Auto-generate the launch command from profile settings
+
+### Auto-Generated Command
+
+When `launchCommand` is not set but `llamaServerPath` and `modelPath` are available, Machine Dream generates a launch command that includes:
+
+```bash
+"<llamaServerPath>" -m "<modelPath>" --port <port> [sampling parameters]
+```
+
+**Sampling parameters included (when set in active instance):**
+- `--temp` (temperature)
+- `--top-p` (topP)
+- `--top-k` (topK)
+- `--min-p` (minP)
+- `--repeat-penalty` (repeatPenalty)
+- `--dry-multiplier`, `--dry-base`, `--dry-allowed-length`, `--dry-penalty-last-n` (DRY parameters)
+
+### Example Profile Setup
+
+```bash
+# Create profile with auto-generated launch command
+machine-dream llm profile add --name qwen-llama --provider llama-server \
+  --base-url http://127.0.0.1:8080 \
+  --model qwen-32b \
+  --llama-server-path "C:\llama.cpp\llama-server.exe" \
+  --model-path "C:\models\qwen-32b-q8.gguf" \
+  --temperature 0.4 --top-p 0.95 --min-p 0.01
+
+# Create instance with different parameters (uses auto-generated command with these params)
+machine-dream llm profile instance create qwen-llama high-temp \
+  --temperature 0.8 --top-p 0.9
+
+# Or create instance with custom launch command override
+machine-dream llm profile instance create qwen-llama custom-ctx \
+  --launch-command "llama-server.exe -m model.gguf --ctx-size 32768 --flash-attn"
+```
+
+### Path Normalization
+
+The auto-generator normalizes path separators to match your system:
+- If `llamaServerPath` uses backslashes (`\`), forward slashes in `modelPath` are converted to backslashes
+- If `llamaServerPath` uses forward slashes (`/`), backslashes in `modelPath` are converted to forward slashes
 
 ---
 

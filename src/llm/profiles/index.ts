@@ -11,12 +11,16 @@ export { ProfileValidator } from './ProfileValidator.js';
 export type {
   LLMProvider,
   LLMProfile,
+  ProfileInstance,
   ModelParameters,
   ProfileStorage,
   ValidationResult,
   HealthCheckResult,
   CreateProfileOptions,
   UpdateProfileOptions,
+  CreateInstanceOptions,
+  UpdateInstanceOptions,
+  RenameInstanceOptions,
   ExportOptions,
   ImportResult,
 } from './types.js';

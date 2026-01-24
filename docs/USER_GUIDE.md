@@ -948,13 +948,31 @@ machine-dream llm profile list
 # Create new profile (interactive)
 machine-dream llm profile add
 
-# Create with CLI options
+# Create with CLI options (LM Studio)
 machine-dream llm profile add \
   --name lm-studio-qwen3 \
   --provider lmstudio \
   --base-url http://localhost:1234/v1 \
   --model qwen3-30b \
   --set-default
+
+# Create llama-server profile with auto-start support
+machine-dream llm profile add \
+  --name glm-flash \
+  --provider llama-server \
+  --base-url http://127.0.0.1:8080 \
+  --model glm-4.7-flash \
+  --llama-server-path "C:\llama.cpp\llama-server.exe" \
+  --model-path "C:\models\glm-4.7-flash.gguf" \
+  --temperature 0.4 --top-p 0.95 --min-p 0.01
+
+# Create llama-server with custom launch command (full override)
+machine-dream llm profile add \
+  --name glm-custom \
+  --provider llama-server \
+  --base-url http://127.0.0.1:8080 \
+  --model glm-4.7-flash \
+  --launch-command "llama-server.exe -m model.gguf --port 8080 --ctx-size 32768"
 
 # Set active profile
 machine-dream llm profile set lm-studio-qwen3
@@ -967,7 +985,36 @@ machine-dream llm profile export profiles.json
 
 # Import profiles
 machine-dream llm profile import profiles.json
+
+# List instances for a profile (parameter variants)
+machine-dream llm profile instance list glm-4-flash
+
+# Create instance with custom parameters
+machine-dream llm profile instance create glm-4-flash test1 \
+  --description "Test config" --temperature 0.4
+
+# Create instance with custom launch command (llama-server only)
+machine-dream llm profile instance create glm-4-flash high-ctx \
+  --launch-command "llama-server.exe -m model.gguf --ctx-size 32768 --flash-attn"
+
+# Set active instance for a profile
+machine-dream llm profile instance use glm-4-flash test1
+
+# Show instance details
+machine-dream llm profile instance show glm-4-flash test1
+
+# Reset instance to default parameters
+machine-dream llm profile instance reset glm-4-flash test1
 ```
+
+#### llama-server Provider Auto-Start
+
+When using the `llama-server` provider, Machine Dream can automatically start the server:
+
+1. **If `launchCommand` is set**: Uses the exact command provided
+2. **If `llamaServerPath` + `modelPath` are set**: Auto-generates launch command from profile settings
+
+Auto-generated commands include sampling parameters (temperature, topP, topK, minP, DRY params) from the active instance.
 
 #### LLM Play Commands
 

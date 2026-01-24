@@ -47,7 +47,8 @@ export interface LLMConfig {
   model: string;            // 'qwen3-30b' or 'local-model' (friendly name)
   modelPath?: string;       // Full model path for lms CLI (e.g., "Qwen/QwQ-32B-GGUF/qwq-32b-q8_0.gguf")
   provider?: string;        // Provider type (lmstudio, llama-server, etc.)
-  launchCommand?: string;   // Full command to start server (for llama-server)
+  llamaServerPath?: string; // Path to llama-server executable (for llama-server provider)
+  launchCommand?: string;   // Override launch command (for llama-server) - if set, used instead of auto-generated
 
   // Generation parameters
   temperature: number;      // 0.7 default

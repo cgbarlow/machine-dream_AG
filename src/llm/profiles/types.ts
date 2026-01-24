@@ -55,11 +55,13 @@ export interface LLMProfile {
   // Model Configuration
   model: string;                    // Model name/ID (friendly name for display)
   modelPath?: string;               // Full model path for LM Studio CLI (e.g., "Qwen/QwQ-32B-GGUF/qwq-32b-q8_0.gguf")
-  launchCommand?: string;           // Full command to start server (for llama-server provider)
+  llamaServerPath?: string;         // Path to llama-server executable (for llama-server provider)
+  launchCommand?: string;           // Override launch command (for llama-server provider) - if set, used instead of auto-generated
   parameters: ModelParameters;      // Generation parameters
 
   // Metadata
   createdAt: number;                // Unix timestamp (milliseconds)
+  modifiedAt?: number;              // Last modification timestamp
   lastUsed?: number;                // Last usage timestamp
   usageCount: number;               // Number of times used
   isDefault: boolean;               // Is this the active profile?
@@ -74,6 +76,10 @@ export interface LLMProfile {
 
   // Custom Prompting
   systemPrompt?: string;            // Additional system prompt text (appended to base prompt)
+
+  // Instance support (parameter variants)
+  instances?: Record<string, ProfileInstance>; // Instance name -> instance config
+  activeInstance?: string;          // Currently active instance name (default: "default")
 }
 
 /**
@@ -106,6 +112,20 @@ export interface HealthCheckResult {
 }
 
 /**
+ * Profile instance - a named configuration variant of a profile
+ * Allows multiple parameter sets for the same profile/model
+ */
+export interface ProfileInstance {
+  name: string;                     // Instance identifier (e.g., "default", "20260122_test1")
+  description?: string;             // Human-readable description
+  parameters: ModelParameters;      // Generation parameters for this instance
+  launchCommand?: string;           // Override launch command (for llama-server provider)
+  createdAt: number;                // Unix timestamp (milliseconds)
+  modifiedAt?: number;              // Last modification timestamp
+  lastUsed?: number;                // Last usage timestamp
+}
+
+/**
  * Profile creation options
  */
 export interface CreateProfileOptions {
@@ -116,6 +136,8 @@ export interface CreateProfileOptions {
   apiKey?: string;
   model: string;
   modelPath?: string;               // Full model path for LM Studio CLI
+  llamaServerPath?: string;         // Path to llama-server executable
+  launchCommand?: string;           // Override launch command (llama-server provider)
   parameters?: Partial<ModelParameters>;
   timeout?: number;
   retries?: number;
@@ -146,4 +168,32 @@ export interface ImportResult {
   imported: string[];               // Successfully imported profile names
   skipped: string[];                // Skipped (already exist)
   errors: Array<{ profile: string; error: string }>;
+}
+
+/**
+ * Instance creation options
+ */
+export interface CreateInstanceOptions {
+  name: string;                     // Instance identifier
+  description?: string;             // Human-readable description
+  parameters?: Partial<ModelParameters>; // Parameters (merged with profile defaults)
+  launchCommand?: string;           // Override launch command (for llama-server)
+  copyFrom?: string;                // Copy parameters from existing instance
+  setActive?: boolean;              // Set as active instance after creation
+}
+
+/**
+ * Instance update options
+ */
+export interface UpdateInstanceOptions {
+  description?: string;             // New description
+  parameters?: Partial<ModelParameters>; // Parameters to update
+}
+
+/**
+ * Instance rename options
+ */
+export interface RenameInstanceOptions {
+  oldName: string;
+  newName: string;
 }

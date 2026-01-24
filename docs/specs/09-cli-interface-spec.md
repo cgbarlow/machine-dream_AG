@@ -660,6 +660,28 @@ machine-dream llm profile export profiles-backup.json
 
 # Import profiles
 machine-dream llm profile import profiles-backup.json
+
+# List instances for a profile
+machine-dream llm profile instance list glm-4-flash
+
+# Create new instance with custom parameters
+machine-dream llm profile instance create glm-4-flash 20260122_test1 \
+  --description "Test instance" --temperature 0.4
+
+# Set active instance
+machine-dream llm profile instance use glm-4-flash 20260122_test1
+
+# Show instance details
+machine-dream llm profile instance show glm-4-flash 20260122_test1
+
+# Update instance parameters
+machine-dream llm profile instance update glm-4-flash 20260122_test1 --temperature 0.5
+
+# Rename instance
+machine-dream llm profile instance rename glm-4-flash old-name new-name
+
+# Delete instance (cannot delete 'default')
+machine-dream llm profile instance delete glm-4-flash old-instance
 ```
 
 #### 3.8.1 `llm server` - Manage llama-server Instances
